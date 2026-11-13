@@ -1,20 +1,28 @@
 # Phase 4 — Database & Persistence Report
 
-Status: **IMPLEMENTED — CI VERIFICATION PENDING**
+Status: **IMPLEMENTED AND CI-VERIFIED**
 
 ## Delivered
-- SQLAlchemy PostgreSQL-compatible persistence and task record model.
-- Alembic migration and tenant/status indexes.
-- PostgreSQL RLS policy using transaction-local tenant context.
-- Tenant-scoped repository and persistent API task operations.
-- Atomic PENDING-to-RUNNING task claim.
+- SQLAlchemy 2.x PostgreSQL-compatible task persistence.
+- Alembic migration for task records and tenant/status indexes.
+- PostgreSQL row-level security policy using transaction-local tenant context.
+- Tenant-scoped repository and persistent API task create/read/execute operations.
+- Atomic PENDING-to-RUNNING claim to reduce duplicate execution races.
 - SQLite-backed repository and API integration tests.
 
-## Limitations
-PostgreSQL migration execution against a live PostgreSQL server is NOT_RUN in this phase's
-initial test setup. Shared API tokens are not bound to tenant identities, so tenant headers
-are not proof of authorization. Crash recovery for RUNNING tasks is deferred.
+## Verification evidence
+- Branch: `phase-4/database-persistence`
+- Commit: `3fbedff3f74037cc3b7907e074fd1da894e91f3e`
+- GitHub Actions: [Phase 4 CI](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/43395499201)
+- Result: **SUCCESS** — Python test suite and frontend workspace install, TypeScript check,
+  and Vite production build passed.
 
-## Verification
-GitHub Actions must pass on the final branch head. Live PostgreSQL RLS behavior must be
-verified separately before production use.
+## Limitations and NOT_RUN items
+- CI used SQLite for persistence tests. Live PostgreSQL migration execution and RLS policy
+  behavior have **NOT_RUN** and still require a PostgreSQL service-backed test.
+- Shared API bearer tokens are not bound to tenant identities. Tenant headers are not proof
+  of authorization; Phase 10 must bind principals to authorized tenants.
+- Crash recovery for tasks left RUNNING remains future work.
+
+## Delivery boundary
+No merge, production deployment, or production-readiness claim is included.
