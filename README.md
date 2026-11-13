@@ -11,8 +11,11 @@ alembic upgrade head
 uvicorn backend.app.main:app --reload
 ```
 
-Protected task endpoints require Authorization: Bearer <token> and X-Tenant-ID: <UUID>.
+Protected API endpoints require Authorization: Bearer <token> and X-Tenant-ID: <UUID>.
 Never commit real secrets. API docs are available at /docs while the local server is running.
+
+Company Brain endpoints: POST /api/v1/memory and GET /api/v1/memory/search.
+Embedding providers are not configured by default; lexical search remains available.
 
 Passing CI does not mean production readiness. Review phase reports and security limitations
 before deployment.
