@@ -38,6 +38,8 @@ class ToolRegistry:
             raise ValueError("Tool description cannot be empty")
         if not definition.version.strip():
             raise ValueError("Tool version cannot be empty")
+        if not isinstance(definition.risk, CapabilityRisk):
+            raise ValueError("Tool risk must be a supported CapabilityRisk")
         if not callable(definition.handler):
             raise TypeError("Tool handler must be callable")
         if definition.input_validator is not None and not callable(definition.input_validator):

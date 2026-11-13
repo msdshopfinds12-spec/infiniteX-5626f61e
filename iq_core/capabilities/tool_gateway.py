@@ -52,7 +52,9 @@ class ToolGateway:
 
     def invoke(self, tool_name: str, payload: dict[str, Any], *,
                context: CapabilityContext | None) -> ToolInvocationResult:
-        if context is None or not context.principal_id.strip() or not context.tenant_id.strip():
+        if (context is None or not isinstance(context.principal_id, str)
+                or not context.principal_id.strip() or not isinstance(context.tenant_id, str)
+                or not context.tenant_id.strip()):
             return ToolInvocationResult(tool_name, "DENIED", error_code="TRUSTED_CONTEXT_REQUIRED")
         definition = self.registry.get(tool_name)
         if definition is None:
@@ -68,11 +70,15 @@ class ToolGateway:
             return ToolInvocationResult(tool_name, "DENIED",
                                         error_code="AUTHORIZATION_CHECK_FAILED",
                                         correlation_id=context.correlation_id)
-        if not authorized:
+        if authorized is not True:
             return ToolInvocationResult(tool_name, "DENIED",
                                         error_code="CAPABILITY_NOT_AUTHORIZED",
                                         correlation_id=context.correlation_id)
 
+        if not isinstance(payload, dict):
+            return ToolInvocationResult(tool_name, "INVALID_INPUT",
+                                        error_code="PAYLOAD_MUST_BE_OBJECT",
+                                        correlation_id=context.correlation_id)
         validated_payload = dict(payload)
         if definition.input_validator is not None:
             try:
@@ -98,7 +104,7 @@ class ToolGateway:
                 return ToolInvocationResult(tool_name, "NEEDS_APPROVAL",
                                             error_code="APPROVAL_CHECK_FAILED",
                                             correlation_id=context.correlation_id)
-            if not isinstance(decision, ApprovalDecision) or not decision.approved:
+            if not isinstance(decision, ApprovalDecision) or decision.approved is not True:
                 return ToolInvocationResult(tool_name, "NEEDS_APPROVAL",
                                             error_code="APPROVAL_NOT_GRANTED",
                                             correlation_id=context.correlation_id)
