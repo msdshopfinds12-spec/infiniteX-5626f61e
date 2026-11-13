@@ -1,0 +1,1 @@
+"""Provider adapter contracts; concrete external integrations are opt-in."""

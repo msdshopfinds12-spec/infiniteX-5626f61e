@@ -1,0 +1,1 @@
+"""Integration namespace; no external provider is configured by default."""
