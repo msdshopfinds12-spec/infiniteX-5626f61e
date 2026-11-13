@@ -13,5 +13,6 @@ def test_cosine_similarity_handles_equal_and_zero_vectors():
 
 
 def test_hybrid_uses_vector_when_available():
-    score = hybrid_score("memory search", "memory search works", [1, 0], [1, 0])
-    assert score > lexical_score("memory search", "memory search works")
+    lexical = lexical_score("memory search", "memory found")
+    score = hybrid_score("memory search", "memory found", [1, 0], [1, 0])
+    assert score > lexical
