@@ -8,8 +8,8 @@ from iq_core.kernel.iq_engine import IQStatus
 
 
 class TaskCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100, pattern=r".*\\S.*")
-    objective: str = Field(min_length=1, max_length=4000, pattern=r".*\\S.*")
+    name: str = Field(min_length=1, max_length=100, pattern=r".*\S.*")
+    objective: str = Field(min_length=1, max_length=4000, pattern=r".*\S.*")
     input_data: dict[str, Any] = Field(default_factory=dict)
 
 
