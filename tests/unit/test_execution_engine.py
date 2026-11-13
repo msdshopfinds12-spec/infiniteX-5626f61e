@@ -19,7 +19,9 @@ NOW = datetime(2026, 11, 13, 9, 0, tzinfo=timezone.utc)
 
 def test_queue_claims_due_job_and_prevents_second_claim() -> None:
     queue = JobQueue()
-    job = queue.enqueue(ExecutionJob(task_name="echo", objective="Queue claim"))
+    job = queue.enqueue(ExecutionJob(
+        task_name="echo", objective="Queue claim", scheduled_at=NOW
+    ))
     claimed = queue.claim(job.job_id, now=NOW)
     assert claimed is not None and claimed.status is JobStatus.RUNNING
     assert claimed.attempts == 1
@@ -79,7 +81,7 @@ def test_task_engine_completes_job_and_emits_lifecycle_events() -> None:
     engine = TaskEngine()
     engine.register_handler("echo", lambda data: {"received": data["payload"]["value"]})
     job = engine.submit(task_name="echo", objective="Execute", payload={"value": 7},
-                        correlation_id="corr-task")
+                        correlation_id="corr-task", scheduled_at=NOW)
     attempt = engine.run_job(job.job_id, now=NOW)
     assert attempt is not None
     assert attempt.kernel_result.status is IQStatus.COMPLETED
@@ -101,7 +103,8 @@ def test_task_engine_retries_then_completes_with_distinct_kernel_task_ids() -> N
             raise RuntimeError("temporary")
         return "recovered"
     engine.register_handler("flaky", flaky)
-    job = engine.submit(task_name="flaky", objective="Retry", max_attempts=3)
+    job = engine.submit(task_name="flaky", objective="Retry", max_attempts=3,
+                        scheduled_at=NOW)
     first = engine.run_job(job.job_id, now=NOW)
     assert first is not None and first.job.status is JobStatus.QUEUED
     assert first.job.attempts == 1
@@ -116,7 +119,8 @@ def test_task_engine_retries_then_completes_with_distinct_kernel_task_ids() -> N
 def test_task_engine_dead_letters_after_attempt_limit() -> None:
     engine = TaskEngine(retry_manager=RetryManager(max_attempts=2, base_delay_seconds=1))
     engine.register_handler("broken", lambda _: (_ for _ in ()).throw(ValueError("nope")))
-    job = engine.submit(task_name="broken", objective="Dead letter", max_attempts=2)
+    job = engine.submit(task_name="broken", objective="Dead letter", max_attempts=2,
+                        scheduled_at=NOW)
     first = engine.run_job(job.job_id, now=NOW)
     assert first is not None and first.job.status is JobStatus.QUEUED
     second = engine.run_job(job.job_id, now=NOW + timedelta(seconds=1))
@@ -126,7 +130,7 @@ def test_task_engine_dead_letters_after_attempt_limit() -> None:
 
 def test_task_engine_blocks_when_handler_is_missing() -> None:
     engine = TaskEngine()
-    job = engine.submit(task_name="missing", objective="Blocked")
+    job = engine.submit(task_name="missing", objective="Blocked", scheduled_at=NOW)
     result = engine.run_job(job.job_id, now=NOW)
     assert result is not None and result.job.status is JobStatus.BLOCKED
 
