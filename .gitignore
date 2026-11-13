@@ -1,14 +1,32 @@
-node_modules/
+# Secrets
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+*.egg-info/
+build/
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+*.tsbuildinfo
 vite.config.js.timestamp-*.mjs
-vite.config.mjs.timestamp-*.mjs
-vite.config.cjs.timestamp-*.mjs
 vite.config.ts.timestamp-*.mjs
-vite.config.mts.timestamp-*.mjs
-vite.config.cts.timestamp-*.mjs
-vitest.config.js.timestamp-*.mjs
-vitest.config.mjs.timestamp-*.mjs
-vitest.config.cjs.timestamp-*.mjs
-vitest.config.ts.timestamp-*.mjs
-vitest.config.mts.timestamp-*.mjs
-vitest.config.cts.timestamp-*.mjs
+
+# Local database data and backups
+backups/
+*.dump
+*.sql.gz

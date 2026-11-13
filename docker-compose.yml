@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: infinitegx7-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-infinitegx7}
+      POSTGRES_USER: ${POSTGRES_USER:-infinitegx7}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only-change-me}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - infinitegx7_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-infinitegx7} -d ${POSTGRES_DB:-infinitegx7}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  infinitegx7_postgres_data:
