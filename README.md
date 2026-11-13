@@ -17,5 +17,15 @@ Never commit real secrets. API docs are available at /docs while the local serve
 Company Brain endpoints: POST /api/v1/memory and GET /api/v1/memory/search.
 Embedding providers are not configured by default; lexical search remains available.
 
+## Architecture and security requirements
+- [Cognition architecture](docs/architecture/cognition.md)
+- [Owner-only security requirement](docs/security/owner-only-security.md)
+- [Phase 6 report](docs/phase-reports/phase-6-cognition.md)
+
+The intended product model is private and single-owner: one explicitly provisioned owner identity,
+no public registration, server-side authorization on every protected operation, and owner-controlled
+recovery. This is a mandatory target, **not a claim that end-to-end enforcement is already complete**.
+See the security document for required controls and verification gates.
+
 Passing CI does not mean production readiness. Review phase reports and security limitations
-before deployment.
+before deployment. No merge or production deployment is implied by phase branch work.
