@@ -18,8 +18,10 @@ Company Brain endpoints: POST /api/v1/memory and GET /api/v1/memory/search.
 Embedding providers are not configured by default; lexical search remains available.
 
 ## Architecture and security requirements
+- [Agent Swarm architecture](docs/architecture/agent-swarm.md)
 - [Cognition architecture](docs/architecture/cognition.md)
 - [Owner-only security requirement](docs/security/owner-only-security.md)
+- [Phase 7 report](docs/phase-reports/phase-7-agent-swarm.md)
 - [Phase 6 report](docs/phase-reports/phase-6-cognition.md)
 
 The intended product model is private and single-owner: one explicitly provisioned owner identity,
