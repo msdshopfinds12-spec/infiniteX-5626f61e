@@ -5,9 +5,9 @@ cd "$ROOT_DIR"
 status=0
 for command_name in python npm; do
   if command -v "$command_name" >/dev/null 2>&1; then
-    printf 'FOUND: %s -> %s\\n' "$command_name" "$(command -v "$command_name")"
+    printf 'FOUND: %s -> %s\n' "$command_name" "$(command -v "$command_name")"
   else
-    printf 'MISSING: %s\\n' "$command_name"
+    printf 'MISSING: %s\n' "$command_name"
     status=1
   fi
 done
