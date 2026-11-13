@@ -31,6 +31,7 @@ class TaskRead(BaseModel):
 
 
 class TaskExecutionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     task_id: str
     status: IQStatus
     output: Any = None
