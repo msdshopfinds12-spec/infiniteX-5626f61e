@@ -1,9 +1,6 @@
-"""Validated task API schemas."""
 from datetime import datetime
 from typing import Any
-
 from pydantic import BaseModel, ConfigDict, Field
-
 from iq_core.kernel.iq_engine import IQStatus
 
 
@@ -15,8 +12,8 @@ class TaskCreate(BaseModel):
 
 class TaskRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     task_id: str
+    tenant_id: str
     name: str
     objective: str
     input_data: dict[str, Any]
