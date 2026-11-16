@@ -34,10 +34,10 @@ Approved changes:
 
 No claim is made that the tests, TypeScript typecheck, or production build pass. The tests are committed as source, but require execution in a Node.js 22+ environment with the API package dependencies installed.
 
-Run from `apps/api`:
+Repository inspection found a root `package-lock.json` for the frontend package, but no lockfile under `apps/api`. Do not use the root lockfile as if it locked the API dependencies. Until an API-specific lockfile is deliberately added and reviewed, install the API package's already-declared dependencies without writing a lockfile. Run from `apps/api`:
 
 ```bash
-npm ci
+npm install --no-package-lock
 npm test -- tests/task-repository.test.ts
 npm test
 npm run typecheck
