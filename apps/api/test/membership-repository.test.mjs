@@ -7,7 +7,7 @@ const actorId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const targetId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const requestId = "test-request-001";
 
-function makePool({ actorRole = "owner", targetRole = "member", ownerCount = 1, workspaceExists = true } = {}) {
+function makePool({ actorRole = "owner", targetRole = "member", ownerCount = 1, workspaceExists = true, actorAccountStatus = "active", targetAccountStatus = "active" } = {}) {
   const calls = [];
   const client = {
     async query(sql, params = []) {
@@ -19,10 +19,10 @@ function makePool({ actorRole = "owner", targetRole = "member", ownerCount = 1, 
       if (normalized.startsWith("SELECT id FROM workspaces")) {
         return { rowCount: workspaceExists ? 1 : 0, rows: workspaceExists ? [{ id: workspaceId }] : [] };
       }
-      if (normalized.startsWith("SELECT user_id, workspace_id, role, status")) {
+      if (normalized.startsWith("SELECT m.user_id, m.workspace_id, m.role, m.status")) {
         return { rowCount: 2, rows: [
-          { user_id: actorId, workspace_id: workspaceId, role: actorRole, status: "active" },
-          { user_id: targetId, workspace_id: workspaceId, role: targetRole, status: "active" },
+          { user_id: actorId, workspace_id: workspaceId, role: actorRole, status: "active", account_status: actorAccountStatus },
+          { user_id: targetId, workspace_id: workspaceId, role: targetRole, status: "active", account_status: targetAccountStatus },
         ] };
       }
       if (normalized.startsWith("SELECT count(*)::int AS active_owner_count")) {
@@ -107,6 +107,39 @@ test("invalid role is rejected before connecting", async () => {
     workspaceId, actorUserId: actorId, targetUserId: targetId,
     newRole: "superuser", requestId,
   }), /newRole is invalid/);
+  assert.equal(connected, false);
+});
+
+
+test("disabled actor account cannot change membership", async () => {
+  const { pool, calls } = makePool({ actorAccountStatus: "disabled" });
+  const result = await createWorkspaceMembershipRepository(pool).changeRole({
+    workspaceId, actorUserId: actorId, targetUserId: targetId, newRole: "viewer", requestId,
+  });
+  assert.deepEqual(result, { allowed: false, reason: "ACTOR_ACCOUNT_DISABLED" });
+  assert.ok(calls.some((x) => x.sql === "ROLLBACK"));
+  assert.ok(!calls.some((x) => x.sql.startsWith("UPDATE workspace_memberships")));
+});
+
+test("disabled target account cannot be modified through membership role changes", async () => {
+  const { pool, calls } = makePool({ targetAccountStatus: "disabled" });
+  const result = await createWorkspaceMembershipRepository(pool).changeRole({
+    workspaceId, actorUserId: actorId, targetUserId: targetId, newRole: "viewer", requestId,
+  });
+  assert.deepEqual(result, { allowed: false, reason: "TARGET_ACCOUNT_DISABLED" });
+  assert.ok(calls.some((x) => x.sql === "ROLLBACK"));
+  assert.ok(!calls.some((x) => x.sql.startsWith("UPDATE workspace_memberships")));
+});
+
+test("whitespace-only request IDs are rejected before connecting", async () => {
+  let connected = false;
+  const repo = createWorkspaceMembershipRepository({
+    async connect() { connected = true; throw new Error("must not connect"); },
+  });
+  await assert.rejects(repo.changeRole({
+    workspaceId, actorUserId: actorId, targetUserId: targetId,
+    newRole: "viewer", requestId: "   ",
+  }), /requestId must contain 1 to 128 characters/);
   assert.equal(connected, false);
 });
 
