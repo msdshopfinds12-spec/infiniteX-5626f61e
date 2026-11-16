@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-infinite_x_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-infinite_x_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local environment file}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-54329}:5432"
+    volumes:
+      - infinite_x_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-infinite_x_dev} -d ${POSTGRES_DB:-infinite_x_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    shm_size: 128mb
+    networks:
+      - database_internal
+
+volumes:
+  infinite_x_postgres_data:
+
+networks:
+  database_internal:
+    internal: true
