@@ -13,6 +13,9 @@ function makePool({ actorRole = "owner", targetRole = "member", ownerCount = 1, 
     async query(sql, params = []) {
       const normalized = sql.replace(/\s+/g, " ").trim();
       calls.push({ sql: normalized, params });
+      if (normalized.startsWith("SELECT set_config('app.current_workspace_id'")) {
+        return { rowCount: 1, rows: [{ set_config: workspaceId }] };
+      }
       if (["BEGIN", "COMMIT", "ROLLBACK"].includes(normalized)) {
         return { rowCount: null, rows: [] };
       }
