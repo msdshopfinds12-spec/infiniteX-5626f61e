@@ -186,3 +186,39 @@ A result may claim costUsd = 0 only if the policy gate approved the exact model 
 - Anthropic API usage credits: https://support.anthropic.com/en/articles/8977456-how-do-i-pay-for-api-usage
 - Anthropic Claude Sonnet 5 pricing: https://www.anthropic.com/news/claude-sonnet-5
 - Anthropic Claude Fable pricing: https://www.anthropic.com/claude/fable
+
+
+## 2026-11-17 implementation update
+
+### Source configuration spot-check
+
+The following paid model selections were independently confirmed in source files on the respective repositories' `main` branches:
+
+| Repository | Source path | Observed exact model selection |
+|---|---|---|
+| eve-content-agent-template | `agent/agent.ts` | `anthropic/claude-opus-4.8` |
+| eve-chat-template | `agent/agent.ts` | `anthropic/claude-sonnet-5` |
+| personal-agent | `agent/agent.ts` | `anthropic/claude-sonnet-5` |
+| bagsikai-agent | `agent/agent.ts` | `openai/gpt-5.6-luna-fast` |
+| eve-software-factory-template | `agent/lib/models.ts` | OpenAI GPT-5.6 Terra Fast and Anthropic Claude Fable 5 |
+
+These are configuration detections, not evidence that API calls have been made or that credentials exist. Do not copy these model selections into the strict-$0 InfiniteX runtime.
+
+### InfiniteX fail-closed policy implementation
+
+Added on `fix/infiniteX-foundation-hardening`:
+
+- `iq_core/agents/provider_policy.py`: pure policy gate; no provider SDK and no network calls.
+- `tests/unit/test_provider_policy.py`: tests for default-deny, mock-only, exact allowlist matching, expired evidence, unknown/exhausted quota, nonzero cost, paid fallback, account eligibility, and data-use approval.
+
+The external provider allowlist is empty by default. The only default permitted mode is deterministic `mock/mock`. A future external provider must have an exact provider/model approval, current evidence, account eligibility, approved data-use terms, a known positive free quota, and a zero estimated cost. Paid fallback is always denied.
+
+**Important limitation:** this policy module is not yet wired into a live inference adapter or every agent execution path. It is a policy primitive with unit tests, not proof that the entire application enforces $0 at runtime. No external provider is activated.
+
+The latest two commits were created through the GitHub contents API. The latest available CI run still targets an earlier commit; CI for the provider-policy commits has not been observed. Do not mark these new tests as executed or passing until a workflow run for the latest branch SHA reports success.
+
+### Repository search coverage and secret-handling boundary
+
+The connected GitHub account exposes 41 repositories. The repository inventory and selected AI configuration spot-checks do not amount to a complete source, runtime, deployment, or secret-history audit. GitHub code-search returned zero matches for the tested API-key identifiers; zero indexed matches are not proof that no provider keys or paid integrations exist.
+
+No secret values are reproduced in this report. A complete credential audit requires authorized secret scanning and history review; any suspected credential must be handled privately and rotated if confirmed live. Never paste credentials into chat or commit them to the repository.
