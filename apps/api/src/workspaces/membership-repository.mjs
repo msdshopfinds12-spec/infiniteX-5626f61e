@@ -49,6 +49,14 @@ export function createWorkspaceMembershipRepository(pool) {
         await client.query("BEGIN");
         transactionOpen = true;
 
+        // Transaction-local identity context is required by PostgreSQL RLS.
+        // Values are parameterized and disappear automatically at transaction end.
+        await client.query(
+          "SELECT set_config('app.current_workspace_id', $1, true), " +
+          "set_config('app.current_user_id', $2, true)",
+          [workspaceId, actorUserId],
+        );
+
         // Serializes membership mutations within this workspace.
         const workspace = await client.query(
           "SELECT id FROM workspaces WHERE id = $1 FOR UPDATE",
