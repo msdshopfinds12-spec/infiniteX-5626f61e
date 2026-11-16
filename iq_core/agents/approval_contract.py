@@ -123,6 +123,8 @@ def verify_ed25519_approval(
     *,
     expected_issuer: str,
     expected_audience: str,
+    expected_reviewer_subject: str,
+    expected_reviewer_role: str,
     expected_repository_id: str,
     expected_branch: str,
     expected_base_commit_sha: str,
@@ -136,6 +138,12 @@ def verify_ed25519_approval(
     claims = ApprovalClaims.from_payload(payload)
     if claims.iss != expected_issuer or claims.aud != expected_audience:
         raise ApprovalRejected("ISSUER_OR_AUDIENCE_MISMATCH")
+    # These expected values must come from the authenticated reviewer context
+    # and server-side authorization policy, never from the approval payload.
+    if claims.sub != expected_reviewer_subject:
+        raise ApprovalRejected("REVIEWER_SUBJECT_MISMATCH")
+    if claims.reviewer_role != expected_reviewer_role:
+        raise ApprovalRejected("REVIEWER_ROLE_MISMATCH")
     if claims.repository_id != expected_repository_id:
         raise ApprovalRejected("REPOSITORY_MISMATCH")
     if claims.target_branch != expected_branch:
