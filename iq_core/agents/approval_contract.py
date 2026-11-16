@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping
 
@@ -81,8 +82,13 @@ class ApprovalClaims:
             raise ApprovalRejected("FILE_SET_NOT_CANONICAL")
         for path in paths:
             parts = path.split("/")
-            if path.startswith("/") or "\\" in path or any(
-                part in {"", ".", ".."} for part in parts
+            if (
+                path.startswith("/")
+                or re.match(r"^[A-Za-z]:", path)
+                or "\\" in path
+                or path != unicodedata.normalize("NFC", path)
+                or any(ord(char) < 32 or ord(char) == 127 for char in path)
+                or any(part in {"", ".", ".."} for part in parts)
             ):
                 raise ApprovalRejected("FILE_PATH_UNSAFE")
 
