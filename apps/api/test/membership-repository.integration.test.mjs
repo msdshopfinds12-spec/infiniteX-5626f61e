@@ -111,6 +111,65 @@ test("runtime role connects with restricted database identity", integration, asy
   assert.equal(role.rows[0].rolbypassrls, false);
 });
 
+
+test("RLS: runtime identity cannot read or mutate another workspace", integration, async () => {
+  const current = await createFixture();
+  const foreign = await createFixture();
+  await pool.query(
+    "SELECT set_config('app.current_workspace_id', $1, false), " +
+      "set_config('app.current_user_id', $2, false)",
+    [current.workspaceId, current.actorId],
+  );
+
+  const visibleWorkspace = await pool.query(
+    "SELECT id FROM workspaces WHERE id = $1",
+    [current.workspaceId],
+  );
+  const hiddenWorkspace = await pool.query(
+    "SELECT id FROM workspaces WHERE id = $1",
+    [foreign.workspaceId],
+  );
+  const hiddenMembership = await pool.query(
+    "SELECT user_id FROM workspace_memberships WHERE workspace_id = $1",
+    [foreign.workspaceId],
+  );
+  const hiddenUser = await pool.query(
+    "SELECT id FROM app_users WHERE id = $1",
+    [foreign.targetId],
+  );
+
+  assert.equal(visibleWorkspace.rowCount, 1);
+  assert.equal(hiddenWorkspace.rowCount, 0);
+  assert.equal(hiddenMembership.rowCount, 0);
+  assert.equal(hiddenUser.rowCount, 0);
+
+  const crossTenantUpdate = await pool.query(
+    "UPDATE workspace_memberships SET role = 'viewer' " +
+      "WHERE workspace_id = $1 AND user_id = $2",
+    [foreign.workspaceId, foreign.targetId],
+  );
+  assert.equal(crossTenantUpdate.rowCount, 0);
+
+  await assert.rejects(
+    pool.query(
+      "INSERT INTO audit_events " +
+        "(actor_user_id, workspace_id, target_user_id, event_type, request_id, metadata) " +
+        "VALUES ($1, $2, $3, 'cross_tenant_probe', $4, '{}'::jsonb)",
+      [foreign.actorId, foreign.workspaceId, foreign.targetId, "rls-cross-" + randomUUID()],
+    ),
+    (error) => error.code === "42501",
+  );
+});
+
+test("RLS: missing tenant context returns no workspace or membership rows", integration, async () => {
+  await pool.query("SELECT set_config('app.current_workspace_id', '', false)");
+  await pool.query("SELECT set_config('app.current_user_id', '', false)");
+  const workspaces = await pool.query("SELECT id FROM workspaces");
+  const memberships = await pool.query("SELECT user_id FROM workspace_memberships");
+  assert.equal(workspaces.rowCount, 0);
+  assert.equal(memberships.rowCount, 0);
+});
+
 test("real PostgreSQL: role mutation and audit event commit atomically", integration, async () => {
   const fixture = await createFixture();
   const result = await createWorkspaceMembershipRepository(pool).changeRole({
