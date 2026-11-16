@@ -53,7 +53,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
-      - name: Apply migration to disposable PostgreSQL
+      - name: Apply identity/workspace foundation to disposable PostgreSQL
         working-directory: .
         env:
           PGPASSWORD: ci_test_only_password
@@ -65,18 +65,31 @@ jobs:
           PGPASSWORD: ci_test_only_password
         run: |
           psql --host 127.0.0.1 --username postgres --dbname infinite_x_ci --set ON_ERROR_STOP=1 --file infra/db/ci/0002_runtime_role.sql
-      - name: Apply workspace RLS migration to disposable PostgreSQL
+      - name: Apply baseline workspace RLS to disposable PostgreSQL
         working-directory: .
         env:
           PGPASSWORD: ci_test_only_password
         run: |
           psql --host 127.0.0.1 --username postgres --dbname infinite_x_ci --set ON_ERROR_STOP=1 --file infra/db/migrations/0002_workspace_row_level_security.sql
+      - name: Apply database-verified identity boundary to disposable PostgreSQL
+        working-directory: .
+        env:
+          PGPASSWORD: ci_test_only_password
+        run: |
+          psql --host 127.0.0.1 --username postgres --dbname infinite_x_ci --set ON_ERROR_STOP=1 --file infra/db/migrations/0003_verified_identity_assertions.sql
+      - name: Seed synthetic CI-only identity verification key
+        working-directory: .
+        env:
+          PGPASSWORD: ci_test_only_password
+        run: |
+          psql --host 127.0.0.1 --username postgres --dbname infinite_x_ci --set ON_ERROR_STOP=1 --file infra/db/ci/0003_seed_identity_test_key.sql
       - name: Syntax checks
         run: npm run check
-      - name: Unit, HTTP, and least-privilege PostgreSQL integration tests
+      - name: Unit, HTTP, and adversarial PostgreSQL integration tests
         env:
           DATABASE_URL: postgres://infinite_x_app_runtime_ci:ci_runtime_only_password@127.0.0.1:5432/infinite_x_ci
           ADMIN_DATABASE_URL: postgres://postgres:ci_test_only_password@127.0.0.1:5432/infinite_x_ci
+          IDENTITY_HMAC_SECRET_HEX: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         run: npm test
       - name: Verify schema constraints with synthetic fixtures
         working-directory: .
