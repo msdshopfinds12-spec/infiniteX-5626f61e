@@ -6,8 +6,9 @@ on:
       - feat/provider-neutral-billing-sandbox
     paths:
       - "scripts/auth/**"
-      - "server/auth/**"
+      - "server/**"
       - "tests/auth/**"
+      - "tests/server/**"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/auth-discovery-tests.yml"
