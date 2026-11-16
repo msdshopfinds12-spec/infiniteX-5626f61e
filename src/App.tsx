@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Activity, Bot, CircleCheck as CheckCircle2, Cpu, GitBranch, Play, Search, Settings, ShieldCheck, Terminal, Zap } from "lucide-react";
+import { Activity, Bot, CircleHelp, Cpu, GitBranch, Play, Search, Settings, ShieldCheck, Terminal, Zap } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -172,7 +172,7 @@ export default function App() {
                   "Mutation authorization: not fully verified",
                 ].map((item) => (
                   <li key={item}>
-                    <CheckCircle2 size={16} className="check-icon" />
+                    <CircleHelp size={16} className="check-icon" />
                     {item}
                   </li>
                 ))}
