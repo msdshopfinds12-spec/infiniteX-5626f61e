@@ -92,3 +92,59 @@ def test_master_agent_rejects_duplicate_engine_handler() -> None:
     with pytest.raises(ValueError, match="Handler already registered"):
         master.register_agent(ResearchAgent())
     assert master.registry.get("research") is None
+
+
+def test_coding_agent_validates_proposal_but_never_writes_or_executes():
+    agent = CodingAgent()
+    response = agent.run(
+        AgentRequest(
+            objective="Review this code proposal",
+            payload={
+                "proposal": {
+                    "proposal_id": "proposal-agent-001",
+                    "target_branch": "fix/infiniteX-foundation-hardening",
+                    "rationale": "Add a small deterministic helper",
+                    "changes": [{"path": "iq_core/helper.py", "content": "VALUE = 1\\n"}],
+                }
+            },
+        )
+    )
+    assert response.execution_status == "REVIEW_REQUIRED"
+    assert response.provider_status == "LOCAL_POLICY_ONLY"
+    assert response.output["automatic_write_performed"] is False
+    assert response.output["code_execution_performed"] is False
+    assert "HUMAN_APPROVAL_REQUIRED" in response.issues
+
+
+def test_coding_agent_blocks_protected_branch_proposal():
+    response = CodingAgent().run(
+        AgentRequest(
+            objective="Review",
+            payload={
+                "proposal": {
+                    "proposal_id": "proposal-agent-002",
+                    "target_branch": "main",
+                    "rationale": "Attempt protected branch update",
+                    "changes": [{"path": "iq_core/helper.py", "content": "VALUE = 1"}],
+                }
+            },
+        )
+    )
+    assert response.execution_status == "BLOCKED"
+    assert "PROTECTED_BRANCH_FORBIDDEN" in response.issues
+    assert response.output["automatic_write_performed"] is False
+
+
+def test_coding_agent_rejects_non_object_proposal_payload():
+    response = CodingAgent().run(
+        AgentRequest(objective="Review", payload={"proposal": ["not", "an", "object"]})
+    )
+    assert response.execution_status == "BLOCKED"
+    assert "INVALID_PROPOSAL_PAYLOAD" in response.issues
+
+
+def test_coding_agent_without_proposal_does_not_claim_code_generation():
+    response = CodingAgent().run(AgentRequest(objective="Generate a new feature"))
+    assert response.execution_status == "NEEDS_REVIEW"
+    assert response.provider_status == "NOT_CONFIGURED"
+    assert "AI_PROVIDER_NOT_CONFIGURED" in response.issues
