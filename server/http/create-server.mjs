@@ -10,13 +10,13 @@ const SECURITY_HEADERS = Object.freeze({
   "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
 });
 
-function sendJson(response, statusCode, body, requestId) {
+function sendJson(response, statusCode, body, requestId, headOnly = false) {
   response.writeHead(statusCode, {
     ...SECURITY_HEADERS,
     "content-length": Buffer.byteLength(JSON.stringify(body)),
     "x-request-id": requestId,
   });
-  response.end(JSON.stringify(body));
+  response.end(headOnly ? undefined : JSON.stringify(body));
 }
 
 /**
@@ -25,7 +25,7 @@ function sendJson(response, statusCode, body, requestId) {
  * No CORS policy is enabled; browser access must be explicitly designed later.
  */
 export function createInfiniteXServer({
-  readinessCheck = async () => true,
+  readinessCheck = async () => false,
   logger = () => {},
 } = {}) {
   if (typeof readinessCheck !== "function") {
@@ -65,13 +65,13 @@ export function createInfiniteXServer({
       if (request.method !== "GET" && request.method !== "HEAD") {
         statusCode = 405;
         response.setHeader("allow", "GET, HEAD");
-        sendJson(response, statusCode, { error: "method_not_allowed" }, requestId);
+        sendJson(response, statusCode, { error: "method_not_allowed" }, requestId, request.method === "HEAD");
         return;
       }
 
       if (route === "/health") {
         statusCode = 200;
-        sendJson(response, statusCode, { status: "ok" }, requestId);
+        sendJson(response, statusCode, { status: "ok" }, requestId, request.method === "HEAD");
         return;
       }
 
@@ -93,11 +93,11 @@ export function createInfiniteXServer({
       }
 
       statusCode = 404;
-      sendJson(response, statusCode, { error: "not_found" }, requestId);
+      sendJson(response, statusCode, { error: "not_found" }, requestId, request.method === "HEAD");
     } catch {
       if (!response.headersSent) {
         statusCode = 500;
-        sendJson(response, statusCode, { error: "internal_error" }, requestId);
+        sendJson(response, statusCode, { error: "internal_error" }, requestId, request.method === "HEAD");
       } else {
         response.destroy();
       }
