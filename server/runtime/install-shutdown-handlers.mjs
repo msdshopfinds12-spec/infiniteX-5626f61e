@@ -34,11 +34,11 @@ export function installShutdownHandlers(server, {
   let signalHandled = false;
 
   const cleanup = () => {
-    processLike.removeListener("SIGINT", onSignal);
-    processLike.removeListener("SIGTERM", onSignal);
+    processLike.removeListener("SIGINT", onSigint);
+    processLike.removeListener("SIGTERM", onSigterm);
   };
 
-  const onSignal = (signal) => {
+  const handleSignal = (signal) => {
     if (signalHandled) return;
     signalHandled = true;
     cleanup();
@@ -65,8 +65,11 @@ export function installShutdownHandlers(server, {
     });
   };
 
-  processLike.once("SIGINT", onSignal);
-  processLike.once("SIGTERM", onSignal);
+  const onSigint = () => handleSignal("SIGINT");
+  const onSigterm = () => handleSignal("SIGTERM");
+
+  processLike.once("SIGINT", onSigint);
+  processLike.once("SIGTERM", onSigterm);
 
   return Object.freeze({ dispose: cleanup });
 }
