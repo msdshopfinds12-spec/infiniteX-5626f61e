@@ -66,7 +66,6 @@ export function createShutdownController(server, {
       } catch {
         // The server close callback remains authoritative.
       }
-      }
     });
 
     return shutdownPromise;
