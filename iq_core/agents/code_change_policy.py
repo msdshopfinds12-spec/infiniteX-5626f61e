@@ -68,7 +68,10 @@ class CodeChangePolicy:
             normalized_branch = branch.strip()
             if normalized_branch in self.PROTECTED_BRANCHES:
                 reasons.append("PROTECTED_BRANCH_FORBIDDEN")
-            elif not normalized_branch.startswith(self.ALLOWED_BRANCH_PREFIXES):
+            elif not any(
+                normalized_branch.startswith(prefix) and len(normalized_branch) > len(prefix)
+                for prefix in self.ALLOWED_BRANCH_PREFIXES
+            ):
                 reasons.append("UNAPPROVED_BRANCH_NAMESPACE")
 
         if not isinstance(proposal.proposal_id, str) or not proposal.proposal_id.strip():
@@ -98,9 +101,15 @@ class CodeChangePolicy:
 
             normalized = str(PurePosixPath(path))
             parts = PurePosixPath(path).parts
-            if normalized != path or any(part in {".", ".."} for part in parts):
+            if (
+                normalized != path
+                or not parts
+                or any(part in {".", ".."} for part in parts)
+            ):
                 reasons.append("PATH_TRAVERSAL_FORBIDDEN")
                 continue
+            if parts[0] == ".git" or parts[:2] == (".github", "workflows"):
+                reasons.append("REPOSITORY_CONTROL_PATH_FORBIDDEN")
             if normalized in seen_paths:
                 reasons.append("DUPLICATE_FILE_PATH")
                 continue
