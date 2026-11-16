@@ -62,14 +62,15 @@ before(async () => {
 
 afterEach(async () => {
   if (!adminPool) return;
-  const fixture = fixtures.pop();
-  if (!fixture) return;
-  await adminPool.query("DELETE FROM audit_events WHERE workspace_id = $1", [fixture.workspaceId]);
-  await adminPool.query("DELETE FROM workspace_memberships WHERE workspace_id = $1", [fixture.workspaceId]);
-  await adminPool.query("DELETE FROM workspaces WHERE id = $1", [fixture.workspaceId]);
-  await adminPool.query("DELETE FROM app_users WHERE id = ANY($1::uuid[])", [
-    [fixture.actorId, fixture.targetId, fixture.extraOwnerId].filter(Boolean),
-  ]);
+  while (fixtures.length) {
+    const fixture = fixtures.pop();
+    await adminPool.query("DELETE FROM audit_events WHERE workspace_id = $1", [fixture.workspaceId]);
+    await adminPool.query("DELETE FROM workspace_memberships WHERE workspace_id = $1", [fixture.workspaceId]);
+    await adminPool.query("DELETE FROM workspaces WHERE id = $1", [fixture.workspaceId]);
+    await adminPool.query("DELETE FROM app_users WHERE id = ANY($1::uuid[])", [
+      [fixture.actorId, fixture.targetId, fixture.extraOwnerId].filter(Boolean),
+    ]);
+  }
 });
 
 after(async () => {
@@ -115,59 +116,72 @@ test("runtime role connects with restricted database identity", integration, asy
 test("RLS: runtime identity cannot read or mutate another workspace", integration, async () => {
   const current = await createFixture();
   const foreign = await createFixture();
-  await pool.query(
-    "SELECT set_config('app.current_workspace_id', $1, false), " +
-      "set_config('app.current_user_id', $2, false)",
-    [current.workspaceId, current.actorId],
-  );
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      "SELECT set_config('app.current_workspace_id', $1, true), " +
+        "set_config('app.current_user_id', $2, true)",
+      [current.workspaceId, current.actorId],
+    );
+    const visibleWorkspace = await client.query(
+      "SELECT id FROM workspaces WHERE id = $1",
+      [current.workspaceId],
+    );
+    const hiddenWorkspace = await client.query(
+      "SELECT id FROM workspaces WHERE id = $1",
+      [foreign.workspaceId],
+    );
+    const hiddenMembership = await client.query(
+      "SELECT user_id FROM workspace_memberships WHERE workspace_id = $1",
+      [foreign.workspaceId],
+    );
+    const hiddenUser = await client.query(
+      "SELECT id FROM app_users WHERE id = $1",
+      [foreign.targetId],
+    );
 
-  const visibleWorkspace = await pool.query(
-    "SELECT id FROM workspaces WHERE id = $1",
-    [current.workspaceId],
-  );
-  const hiddenWorkspace = await pool.query(
-    "SELECT id FROM workspaces WHERE id = $1",
-    [foreign.workspaceId],
-  );
-  const hiddenMembership = await pool.query(
-    "SELECT user_id FROM workspace_memberships WHERE workspace_id = $1",
-    [foreign.workspaceId],
-  );
-  const hiddenUser = await pool.query(
-    "SELECT id FROM app_users WHERE id = $1",
-    [foreign.targetId],
-  );
+    assert.equal(visibleWorkspace.rowCount, 1);
+    assert.equal(hiddenWorkspace.rowCount, 0);
+    assert.equal(hiddenMembership.rowCount, 0);
+    assert.equal(hiddenUser.rowCount, 0);
 
-  assert.equal(visibleWorkspace.rowCount, 1);
-  assert.equal(hiddenWorkspace.rowCount, 0);
-  assert.equal(hiddenMembership.rowCount, 0);
-  assert.equal(hiddenUser.rowCount, 0);
+    const crossTenantUpdate = await client.query(
+      "UPDATE workspace_memberships SET role = 'viewer' " +
+        "WHERE workspace_id = $1 AND user_id = $2",
+      [foreign.workspaceId, foreign.targetId],
+    );
+    assert.equal(crossTenantUpdate.rowCount, 0);
 
-  const crossTenantUpdate = await pool.query(
-    "UPDATE workspace_memberships SET role = 'viewer' " +
-      "WHERE workspace_id = $1 AND user_id = $2",
-    [foreign.workspaceId, foreign.targetId],
-  );
-  assert.equal(crossTenantUpdate.rowCount, 0);
-
-  await assert.rejects(
-    pool.query(
-      "INSERT INTO audit_events " +
-        "(actor_user_id, workspace_id, target_user_id, event_type, request_id, metadata) " +
-        "VALUES ($1, $2, $3, 'cross_tenant_probe', $4, '{}'::jsonb)",
-      [foreign.actorId, foreign.workspaceId, foreign.targetId, "rls-cross-" + randomUUID()],
-    ),
-    (error) => error.code === "42501",
-  );
+    await assert.rejects(
+      client.query(
+        "INSERT INTO audit_events " +
+          "(actor_user_id, workspace_id, target_user_id, event_type, request_id, metadata) " +
+          "VALUES ($1, $2, $3, 'cross_tenant_probe', $4, '{}'::jsonb)",
+        [foreign.actorId, foreign.workspaceId, foreign.targetId, "rls-cross-" + randomUUID()],
+      ),
+      (error) => error.code === "42501",
+    );
+    await client.query("ROLLBACK");
+  } finally {
+    client.release();
+  }
 });
 
 test("RLS: missing tenant context returns no workspace or membership rows", integration, async () => {
-  await pool.query("SELECT set_config('app.current_workspace_id', '', false)");
-  await pool.query("SELECT set_config('app.current_user_id', '', false)");
-  const workspaces = await pool.query("SELECT id FROM workspaces");
-  const memberships = await pool.query("SELECT user_id FROM workspace_memberships");
-  assert.equal(workspaces.rowCount, 0);
-  assert.equal(memberships.rowCount, 0);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_workspace_id', '', true)");
+    await client.query("SELECT set_config('app.current_user_id', '', true)");
+    const workspaces = await client.query("SELECT id FROM workspaces");
+    const memberships = await client.query("SELECT user_id FROM workspace_memberships");
+    assert.equal(workspaces.rowCount, 0);
+    assert.equal(memberships.rowCount, 0);
+    await client.query("ROLLBACK");
+  } finally {
+    client.release();
+  }
 });
 
 test("real PostgreSQL: role mutation and audit event commit atomically", integration, async () => {
