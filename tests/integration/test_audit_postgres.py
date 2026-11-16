@@ -105,13 +105,13 @@ def _append(engine, tenant_id: str, stream_id: str, action: str) -> int:
 
 
 def test_postgres_concurrent_appends_serialize_existing_stream(pg_engine):
-    _append(pg_engine, "tenant-a", "concurrent", "seed")
+    _append(pg_engine, "11111111-1111-4111-8111-111111111111", "concurrent", "seed")
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         sequences = list(
             executor.map(
                 lambda index: _append(
-                    pg_engine, "tenant-a", "concurrent", f"parallel-{index}"
+                    pg_engine, "11111111-1111-4111-8111-111111111111", "concurrent", f"parallel-{index}"
                 ),
                 range(8),
             )
@@ -122,7 +122,7 @@ def test_postgres_concurrent_appends_serialize_existing_stream(pg_engine):
         events = session.scalars(
             select(AuditEvent)
             .where(
-                AuditEvent.tenant_id == "tenant-a",
+                AuditEvent.tenant_id == "11111111-1111-4111-8111-111111111111",
                 AuditEvent.stream_id == "concurrent",
             )
             .order_by(AuditEvent.sequence)
@@ -140,7 +140,7 @@ def test_postgres_transaction_rollback_removes_event_and_stream_head(pg_engine):
             with session.begin():
                 append_audit_event(
                     session,
-                    tenant_id="tenant-rollback",
+                    tenant_id="33333333-3333-4333-8333-333333333333",
                     stream_id="rollback",
                     actor="tester",
                     action="will_rollback",
@@ -152,28 +152,28 @@ def test_postgres_transaction_rollback_removes_event_and_stream_head(pg_engine):
 
     with Session(pg_engine) as session:
         assert session.scalar(
-            select(AuditEvent).where(AuditEvent.tenant_id == "tenant-rollback")
+            select(AuditEvent).where(AuditEvent.tenant_id == "33333333-3333-4333-8333-333333333333")
         ) is None
 
 
 def test_postgres_rls_hides_other_tenants_from_restricted_role(pg_engine):
-    _append(pg_engine, "tenant-a", "tenant-a-stream", "visible")
-    _append(pg_engine, "tenant-b", "tenant-b-stream", "hidden")
+    _append(pg_engine, "11111111-1111-4111-8111-111111111111", "tenant-a-stream", "visible")
+    _append(pg_engine, "22222222-2222-4222-8222-222222222222", "tenant-b-stream", "hidden")
 
     with Session(pg_engine) as session:
         with session.begin():
             session.execute(text(f"SET LOCAL ROLE {APP_ROLE}"))
-            set_tenant_context(session, "tenant-a")
+            set_tenant_context(session, "11111111-1111-4111-8111-111111111111")
             rows = session.scalars(select(AuditEvent)).all()
             assert rows
-            assert {row.tenant_id for row in rows} == {"tenant-a"}
+            assert {row.tenant_id for row in rows} == {"11111111-1111-4111-8111-111111111111"}
             assert session.scalar(
-                select(AuditEvent).where(AuditEvent.tenant_id == "tenant-b")
+                select(AuditEvent).where(AuditEvent.tenant_id == "22222222-2222-4222-8222-222222222222")
             ) is None
 
 
 def test_postgres_rls_without_tenant_context_returns_no_rows(pg_engine):
-    _append(pg_engine, "tenant-a", "no-context", "seed")
+    _append(pg_engine, "11111111-1111-4111-8111-111111111111", "no-context", "seed")
 
     with Session(pg_engine) as session:
         with session.begin():
