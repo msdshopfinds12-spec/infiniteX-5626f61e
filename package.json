@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "tsc -b --noEmit"
+    "lint": "tsc -b --noEmit",
+    "test:auth-discovery": "node --test tests/auth/validate-oidc-discovery.test.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
@@ -21,5 +22,8 @@
     "@vitejs/plugin-react": "^4.3.3",
     "typescript": "^5.6.3",
     "vite": "^5.4.10"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
