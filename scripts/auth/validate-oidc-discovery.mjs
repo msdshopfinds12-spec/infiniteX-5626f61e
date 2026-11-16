@@ -43,6 +43,9 @@ function parseTrustedUrl(value, label, errors, {
   if (url.username || url.password || url.hash) {
     errors.push(`${label} must not contain credentials or a fragment`);
   }
+  if (label === "configured issuer" && url.search) {
+    errors.push("configured issuer must not contain a query string");
+  }
   if (allowedOrigins && !allowedOrigins.has(url.origin)) {
     errors.push(`${label} origin is not in the configured origin allowlist`);
   }
