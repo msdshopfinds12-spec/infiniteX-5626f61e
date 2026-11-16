@@ -3,9 +3,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 from collections.abc import Sequence
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from database.models.memory import MemoryRecord
+from database.tenant_context import set_tenant_context
 from iq_core.memory.embeddings import EmbeddingProvider
 from iq_core.memory.memory_governance import validate_memory
 from iq_core.memory.retrieval import hybrid_score
@@ -35,9 +36,7 @@ class CompanyBrain:
         self.embedding_provider = embedding_provider
 
     def _set_tenant(self) -> None:
-        if self.session.get_bind().dialect.name == "postgresql":
-            self.session.execute(text("SELECT set_config('app.tenant_id', :tenant_id, true)"),
-                                 {"tenant_id": self.tenant_id})
+        set_tenant_context(self.session, self.tenant_id)
 
     def remember(self, item: MemoryInput) -> MemoryRecord:
         content, metadata = validate_memory(item.content, item.metadata or {})
