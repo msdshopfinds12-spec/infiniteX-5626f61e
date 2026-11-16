@@ -1,5 +1,5 @@
 """Protected owner-scoped task API backed by persistent storage."""
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response, status

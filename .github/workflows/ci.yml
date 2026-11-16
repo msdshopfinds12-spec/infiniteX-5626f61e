@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "phase-*/**"
+      - "fix/**"
   pull_request:
     branches:
       - main
