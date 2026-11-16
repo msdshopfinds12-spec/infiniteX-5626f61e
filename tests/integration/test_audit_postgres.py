@@ -7,14 +7,22 @@ migrations or touch any configured application database.
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime
+from hashlib import sha256
+from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from sqlalchemy import create_engine, select, text
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from sqlalchemy import create_engine, func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from database.audit_persistence import append_audit_event
-from database.models import AuditEvent, Base
+from database.audit_persistence import append_audit_event, persist_verified_approval
+from database.models import (
+    ApprovalIntent, AuditEvent, Base, ConsumedNonce, OutboxEvent,
+)
+from iq_core.agents.approval_contract import ApprovalClaims, canonical_approval_bytes
 from database.tenant_context import set_tenant_context
 
 DATABASE_URL = os.getenv("PG_TEST_DATABASE_URL")
@@ -184,3 +192,111 @@ def test_postgres_rls_without_tenant_context_returns_no_rows(pg_engine):
         with session.begin():
             session.execute(text(f"SET LOCAL ROLE {APP_ROLE}"))
             assert session.scalars(select(AuditEvent)).all() == []
+
+
+def _signed_postgres_approval(nonce: str):
+    private_key = Ed25519PrivateKey.generate()
+    now = int(datetime.now(UTC).timestamp())
+    proposal_id = "pg-" + str(uuid4())
+    digest = sha256(proposal_id.encode("utf-8")).hexdigest()
+    payload = {
+        "iss": "infiniteX-ci-approval",
+        "aud": "infiniteX-ci-apply",
+        "jti": nonce,
+        "sub": "postgres-reviewer",
+        "reviewer_role": "owner",
+        "repository_id": "1426264287",
+        "target_branch": "fix/infiniteX-foundation-hardening",
+        "base_commit_sha": "b" * 40,
+        "proposal_id": proposal_id,
+        "proposal_sha256": digest,
+        "file_paths": ["src/ci-approved.py"],
+        "policy_version": "1.0",
+        "schema_version": 1,
+        "iat": now - 5,
+        "nbf": now - 5,
+        "exp": now + 300,
+    }
+    claims = ApprovalClaims.from_payload(payload)
+    signature = private_key.sign(canonical_approval_bytes(claims))
+    expected = {
+        "expected_issuer": payload["iss"],
+        "expected_audience": payload["aud"],
+        "expected_reviewer_subject": payload["sub"],
+        "expected_reviewer_role": payload["reviewer_role"],
+        "expected_repository_id": payload["repository_id"],
+        "expected_branch": payload["target_branch"],
+        "expected_base_commit_sha": payload["base_commit_sha"],
+        "expected_proposal_id": payload["proposal_id"],
+        "expected_proposal_sha256": digest,
+        "expected_policy_version": payload["policy_version"],
+        "expected_file_paths": ("src/ci-approved.py",),
+        "now": now,
+    }
+    return payload, signature, private_key.public_key(), expected
+
+
+def test_postgres_duplicate_signed_nonce_race_persists_one_complete_set(pg_engine):
+    tenant_id = "44444444-4444-4444-8444-444444444444"
+    payload, signature, public_key, expected = _signed_postgres_approval(
+        "pg-race-" + str(uuid4())
+    )
+
+    def contender(_):
+        try:
+            with Session(pg_engine) as session:
+                with session.begin():
+                    persist_verified_approval(
+                        session,
+                        tenant_id=tenant_id,
+                        payload=payload,
+                        signature=signature,
+                        public_key=public_key,
+                        **expected,
+                        signer_key_id="ci-trusted-key",
+                        actor="postgres-reviewer",
+                    )
+            return "committed"
+        except IntegrityError:
+            return "rejected"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = list(executor.map(contender, range(2)))
+
+    assert outcomes.count("committed") == 1
+    assert outcomes.count("rejected") == 1
+    with Session(pg_engine) as session:
+        for model in (ApprovalIntent, ConsumedNonce, AuditEvent, OutboxEvent):
+            assert session.scalar(
+                select(func.count()).select_from(model).where(
+                    model.tenant_id == tenant_id
+                )
+            ) == 1
+
+
+def test_postgres_approval_transaction_rollback_removes_all_effects(pg_engine):
+    tenant_id = "55555555-5555-4555-8555-555555555555"
+    payload, signature, public_key, expected = _signed_postgres_approval(
+        "pg-rollback-" + str(uuid4())
+    )
+
+    with pytest.raises(RuntimeError, match="force approval rollback"):
+        with Session(pg_engine) as session:
+            with session.begin():
+                persist_verified_approval(
+                    session,
+                    tenant_id=tenant_id,
+                    payload=payload,
+                    signature=signature,
+                    public_key=public_key,
+                    **expected,
+                    signer_key_id="ci-trusted-key",
+                    actor="postgres-reviewer",
+                )
+                raise RuntimeError("force approval rollback")
+
+    with Session(pg_engine) as session:
+        for model in (ApprovalIntent, ConsumedNonce, AuditEvent, OutboxEvent):
+            assert session.scalar(
+                select(model).where(model.tenant_id == tenant_id)
+            ) is None
