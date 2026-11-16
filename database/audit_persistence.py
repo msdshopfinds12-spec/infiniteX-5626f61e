@@ -9,9 +9,10 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Mapping
 from uuid import uuid4
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -23,6 +24,7 @@ from database.models.audit import (
     OutboxEvent,
 )
 from database.tenant_context import set_tenant_context
+from iq_core.agents.approval_contract import verify_ed25519_approval
 from iq_core.audit.audit_event import (
     AuditEvent as ContractAuditEvent,
     verify_audit_chain,
@@ -183,7 +185,7 @@ def verify_persisted_audit_chain(
     return verify_audit_chain(events=events)
 
 
-def persist_verified_approval(
+def _persist_verified_approval(
     session: Session,
     *,
     tenant_id: str,
@@ -256,3 +258,68 @@ def persist_verified_approval(
     )
     session.flush()
     return intent
+
+
+def persist_verified_approval(
+    session: Session,
+    *,
+    tenant_id: str,
+    payload: Mapping[str, Any],
+    signature: bytes,
+    public_key: Ed25519PublicKey,
+    expected_issuer: str,
+    expected_audience: str,
+    expected_reviewer_subject: str,
+    expected_reviewer_role: str,
+    expected_repository_id: str,
+    expected_branch: str,
+    expected_base_commit_sha: str,
+    expected_proposal_id: str,
+    expected_proposal_sha256: str,
+    expected_policy_version: str,
+    expected_file_paths: tuple[str, ...],
+    signer_key_id: str,
+    actor: str,
+    now: int | None = None,
+    stream_id: str = "approvals",
+) -> ApprovalIntent:
+    """Verify signed approval evidence before atomically persisting its effects.
+
+    All expected_* values, tenant_id, and signer_key_id must be derived from
+    authenticated server-side reviewer, repository, tenant, and key-registry
+    context. Never copy expected values from the untrusted approval payload.
+    The caller owns the outer transaction; verification failure writes nothing.
+    """
+    if not isinstance(public_key, Ed25519PublicKey):
+        raise TypeError("a trusted Ed25519 public key is required")
+    if not isinstance(payload, Mapping):
+        raise ValueError("approval payload must be a mapping")
+    verified_at = int(datetime.now(timezone.utc).timestamp()) if now is None else now
+    claims = verify_ed25519_approval(
+        payload,
+        signature,
+        public_key,
+        expected_issuer=expected_issuer,
+        expected_audience=expected_audience,
+        expected_reviewer_subject=expected_reviewer_subject,
+        expected_reviewer_role=expected_reviewer_role,
+        expected_repository_id=expected_repository_id,
+        expected_branch=expected_branch,
+        expected_base_commit_sha=expected_base_commit_sha,
+        expected_proposal_id=expected_proposal_id,
+        expected_proposal_sha256=expected_proposal_sha256,
+        expected_policy_version=expected_policy_version,
+        expected_file_paths=expected_file_paths,
+        now=verified_at,
+    )
+    return _persist_verified_approval(
+        session,
+        tenant_id=tenant_id,
+        intent_id=str(uuid4()),
+        raw_nonce=claims.jti,
+        request_digest=claims.proposal_sha256,
+        signer_key_id=signer_key_id,
+        expires_at=datetime.fromtimestamp(claims.exp, timezone.utc),
+        actor=actor,
+        stream_id=stream_id,
+    )
