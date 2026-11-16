@@ -6,6 +6,7 @@ on:
       - feat/provider-neutral-billing-sandbox
     paths:
       - "scripts/auth/**"
+      - "server/auth/**"
       - "tests/auth/**"
       - "package.json"
       - "package-lock.json"
@@ -46,4 +47,4 @@ jobs:
         run: npm ci
 
       - name: Run authentication discovery tests
-        run: npm run test:auth-discovery
+        run: npm run test:auth
