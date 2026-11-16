@@ -1,95 +1,80 @@
 # Integration Execution Status
 
-Date: 2026-11-16  
-Branch: `feature/infiniteX-platform-integrations`
+**Date:** 2026-11-16  
+**Branch:** `feature/infiniteX-platform-integrations`
 
 ## Verified repository facts
 
-- Frontend: React 18, TypeScript, Vite.
-- Root package manager evidence: `package-lock.json` exists; no pnpm lockfile was found.
-- Root scripts: `dev`, `build`, `preview`, `lint`. No root test script is defined.
-- Frontend currently has no `@santi020k/lumen-react` or `@auth0/auth0-react` dependency.
-- The current React entry point renders `App` directly; no Auth0Provider exists.
-- Backend already has a `jose` remote-JWKS bearer-token middleware and production config validation for issuer, audience and JWKS URL.
-- API routes currently include health, AI, agents and tasks. A full persistent chat/conversation API is not verified.
-- Dashboard fixture values were previously presented as live metrics and healthy security posture. The preview now labels unconnected data honestly and disables pipeline actions that have no backend handler.
+- Frontend manifest declares React/React DOM 18.3.1, TypeScript 5.6.3 and Vite 5.4.10.
+- Root npm scripts include dev, build, preview and lint; no root test script is defined.
+- API package declares Hono, jose, pg and Zod, with typecheck, test and build scripts.
+- API Vitest configuration and test files exist. Their presence does not mean tests passed.
+- API source includes JWT verification, rate limiting, AI generation, agent routes, task routes, tenant-aware repository helpers and a PostgreSQL pool.
+- SQL migration file defines tenants, app_users, agents, tasks, ai_usage and audit_events; live migration status is unknown.
+- The task route explicitly returns `execution: queued_no_worker_configured`; a worker is not verified.
+- A persistent conversation/message API and end-to-end streaming chat are not verified.
+- No Auth0 React SDK or Lumen React package is declared in the root manifest.
 
-## Integration blockers
+## Lumen compatibility gate
 
-### Lumen UI
+- Lumen React catalog version 5.0.0 declares React >=19 and motion ^14 peer requirements.
+- InfiniteX currently uses React 18.3.1. Direct installation of Lumen React v5 is BLOCKED until a separately approved React 19 migration or a verified compatible alternative.
+- Do not run an install command for Lumen React v5 against the current manifest.
+- Safer immediate path: keep React 18 and use existing primitives or a compatible accessible component system. Evaluate React 19 as a separate migration with a complete dependency/test/build review.
 
-- Lumen MCP catalog is healthy; React catalog version is 5.0.0. The published React package declares peer dependencies react >=19 and motion ^14.0.0, while this app uses React 18.3.1. Lumen React v5 is therefore incompatible with the current frontend until a separately planned React 19 migration or a verified alternative adapter/version.
-- The repository does not declare an installed Lumen package, so resolved-version compatibility cannot be checked.
-- Do not import Lumen components or CSS until the dependency is installed and the lockfile regenerated with npm.
-- Candidate package from the React catalog: `@santi020k/lumen-react`, but direct installation is BLOCKED by the React 18 vs React >=19 peer dependency mismatch.
-- If a React 19 migration is separately approved and verified, use the v5 React selective CSS contract: foundation CSS once plus CSS for each used component, or the full stylesheet if intentionally selected. Do not mount the Astro runtime in React.
+## Auth0 status
 
-### Auth0
+- API-side jose JWT verification exists and explicitly restricts algorithms to RS256.
+- Browser-side Auth0 integration is not present in the inspected manifest/entry point.
+- Auth0 tenant, SPA client, API audience, callback/logout URLs and live token flow are unverified.
+- If later approved, use Universal Login with Authorization Code + PKCE, request API access tokens, keep token cache in memory by default, and never put client secrets in Vite variables.
+- Do not create or read real `.env` files or change tenant settings without explicit approval.
 
-- `@auth0/auth0-react` is not installed.
-- No Auth0 tenant, SPA application, API audience, callback URLs or logout URLs have been verified.
-- The API verifier is present and now explicitly restricts accepted JWT signing algorithms to RS256. This still does not establish a working browser login.
-- Before writing `.env`, obtain explicit user approval. Never read or commit real `.env` contents.
-- Use Universal Login with Authorization Code + PKCE, memory cache by default, an API audience, and server-side JWT verification. Do not accept ID tokens as API bearer tokens.
+## Hostinger status
 
-### Hostinger
+- Hostinger connector tools are not exposed in this session.
+- Hosting plan, Node runtime, domain, SSL, backups and deployment target remain unverified.
+- No account change, DNS edit, provisioning, purchase or deployment is authorized.
 
-- Hostinger connector tools are not exposed in the current session.
-- Account inventory, plan type, Node.js runtime support, domain, SSL, backups and deployment target are therefore unverified.
-- Connect the official hosted MCP server at `https://mcp.hostinger.com` through the app's connector settings and complete its sign-in flow.
-- Begin with the read-only hosting audit. No DNS, purchase, provisioning or deployment action is authorized.
+## MCP decision
 
-### UI/UX
-
-- Current dashboard is a demo engineering workspace, not a functioning AI chat product.
-- Responsive layout has a small-screen refinement and focus-visible styles, but no rendered browser evidence or assistive-technology test has been run.
-- Lumen-based chat screen, conversation history, streaming UI, keyboard interaction and screen-reader verification remain pending.
-
-## Safe execution commands (run from repository root)
-
-After reviewing and approving dependency changes:
-
-```bash
-npm install @santi020k/lumen-react@5.0.0 @auth0/auth0-react
-npm install
-npm run lint
-npm run build
-```
-
-The install commands intentionally are not represented as executed. Review the resulting package.json and package-lock.json diff before committing.
+- Existing GitHub connector: keep; a second GitHub MCP is redundant for this workflow.
+- Lumen catalog MCP: keep as a design reference, but do not confuse catalog access with installed UI components.
+- Context7: optional docs helper.
+- Choose one browser tool when needed: Playwright MCP, Playwright CLI, or Chrome DevTools MCP.
+- Supabase, Cloudflare and Auth0 account MCPs remain disconnected until the target platform/tenant is confirmed.
+- Installation instructions and free/open-source caveats are in `MCP-INTEGRATION-STATUS.md` and `FREE-MCP-ECOSYSTEM-RESEARCH.md`.
 
 ## Required next sequence
 
-1. Connect Hostinger MCP and run a read-only inventory/audit.
-2. Confirm Auth0 tenant domain, SPA client ID and API audience without sharing secrets in chat.
-3. Obtain explicit approval before writing any `.env` file or changing Auth0 tenant configuration.
-4. Install dependencies and regenerate package-lock.json on a controlled environment.
-5. Build the Auth0 provider and API client with token acquisition; keep backend `jose` validation.
-6. Replace the dashboard demo with the Lumen-based mobile-first chat experience in a separate feature slice.
-7. Add tests for login-required, unauthorized, expired token, conversation ownership, rate limit, streaming cancellation and API failure.
-8. Run lint, typecheck, build, browser tests, accessibility checks and security review.
-9. Release only after separate human approval.
+1. Establish actual root and API dependency-lockfile state and run the existing quality commands in a controlled Node 22 environment.
+2. Fix and test backend tenant isolation, ownership and task idempotency.
+3. Design and implement a worker before claiming task execution.
+4. Define persistent conversation/message contracts before building a full chat UI.
+5. Confirm identity provider and API audience before implementing browser auth.
+6. Select React 18-compatible UI components or approve a separate React 19 migration.
+7. Add browser, accessibility, security and DB integration tests.
+8. Review diffs and test evidence before any source-code commit.
+9. Obtain separate explicit approval before migrations, account changes, merges or deployment.
 
-## MCP ecosystem research update
+## Documentation added to this branch
 
-- Public official repositories and licenses were reviewed for GitHub, Auth0, Supabase, Cloudflare, Microsoft Playwright and Context7.
-- The detailed shortlist, risks and recommended adoption sequence are in FREE-MCP-ECOSYSTEM-RESEARCH.md.
-- Hostinger official MCP endpoint is documented, but no Hostinger connector tools are exposed in this session.
-
-## Latest Auth0/Lumen implementation update
-
-- Auth0 React integration and token-handling guidance were inspected.
-- Lumen React v5.0.0 contracts were inspected for Message, MessageScroller, PromptComposer, StreamMessage, Avatar and Bubble.
-- API JWT verification now explicitly allowlists RS256.
-- The full implementation blueprint and code examples are in AUTH0-LUMEN-IMPLEMENTATION.md.
-- Frontend SDK imports are intentionally not committed yet because dependencies and lockfile have not been updated; importing them now would break the build.
+- `docs/architecture/SYSTEM-ARCHITECTURE.md`
+- `docs/architecture/MCP-SECURITY-ARCHITECTURE.md`
+- `docs/architecture/DATA-FLOW.md`
+- `docs/engineering/MCP-INTEGRATION-STATUS.md`
+- `docs/engineering/REPAIR-ROADMAP.md`
+- `docs/engineering/TEST-REPORT.md`
+- `docs/security/THREAT-MODEL.md`
+- `docs/security/PERMISSION-POLICY.md`
+- `docs/security/SECRET-MANAGEMENT.md`
 
 ## Evidence status
 
-- Repository and source inspection: VERIFIED.
-- Documentation and dashboard preview corrections: committed to the isolated feature branch.
-- Lumen dependency installation: BLOCKED / NOT STARTED.
-- Auth0 tenant integration: BLOCKED / NOT STARTED.
-- Hostinger account audit: BLOCKED because connector is not connected.
-- Automated tests and build: NOT TESTED in this session.
-- Merge and deployment: NOT AUTHORIZED.
+- Repository/source inspection: VERIFIED.
+- Documentation commits to the isolated feature branch: VERIFIED.
+- MCP installation/connection: NOT DONE.
+- Dependency installation: NOT DONE.
+- Tests/build/browser QA: NOT EXECUTED in this documentation pass.
+- Database migration/live RLS verification: NOT TESTED.
+- Merge/deployment: NOT AUTHORIZED.
