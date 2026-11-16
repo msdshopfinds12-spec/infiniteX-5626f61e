@@ -1,67 +1,77 @@
 # InfiniteX Identity and Session Architecture
 
-**Status:** PROPOSED — design only; not implemented or tested.
+**Status:** PROPOSED — design only; not implemented or tested.  
+**Preferred direction:** OIDC identity provider evaluation; InfiniteX retains authorization.
 
 ## Goals
-- Establish a small, auditable identity boundary before protected features.
-- Default-deny access and enforce authorization on the server.
-- Keep browser sessions revocable and independent from client-side role claims.
-- Minimize personal data and avoid unnecessary third-party identity dependencies.
-- Use synthetic test accounts only until privacy and operational controls are approved.
+- Avoid inventing a custom password and account-recovery system without specialist review.
+- Establish a clear identity boundary before protected features.
+- Enforce workspace membership and resource ownership on the server.
+- Keep browser and Android-native authentication flows distinct.
+- Minimize personal data and use synthetic accounts during testing.
 
-## Proposed request flow
-1. Browser submits credentials over HTTPS to the API.
-2. API validates request size, schema, origin and rate limits.
-3. API loads the account by normalized login identifier and verifies the password hash using a reviewed implementation.
-4. API creates a cryptographically random opaque session token.
-5. Only a one-way hash of the token is persisted. Raw token is returned only in a Secure, HttpOnly, SameSite cookie.
-6. On each protected request, API hashes the cookie token, loads the active session and account, checks expiry/revocation, then constructs a server-side principal.
-7. Authorization policy checks permissions and resource ownership before domain services run.
-8. Logout revokes the server-side session and clears the cookie.
+## Proposed OIDC request flow
+1. Browser begins Authorization Code + PKCE with the approved OIDC provider.
+2. Provider authenticates the user and returns an authorization code.
+3. Backend validates issuer, audience, signature, state, nonce, expiry and PKCE binding.
+4. Backend maps the trusted issuer + subject pair to a local user identity.
+5. Backend creates a local session under the approved cookie policy.
+6. Each protected request resolves a trusted principal and checks local workspace membership and resource permissions.
+7. Logout revokes the local session and follows the provider logout policy where applicable.
 
-## Cookie and browser controls
-- Production cookie: Secure, HttpOnly, SameSite=Lax or stricter based on final navigation flow; Path=/; omit Domain unless justified.
-- Use a __Host- prefixed cookie name in production where compatible with deployment.
-- Do not store session identifiers in localStorage, sessionStorage, URLs, or JavaScript-readable state.
-- Protect state-changing cookie-authenticated requests with a CSRF token strategy and strict Origin/Referer validation.
-- Configure exact allowed origins; never use wildcard CORS with credentials.
+OIDC authenticates identity; it does not determine local workspace ownership or grant every application permission.
+
+## Browser session controls
+- Evaluate Secure, HttpOnly, SameSite cookies with Path=/ and no Domain attribute unless justified.
+- A __Host- cookie name may be used in production when compatible with deployment.
+- Never store bearer/session tokens in localStorage, URLs or JavaScript-readable state.
+- Protect cookie-authenticated mutations with CSRF defenses and strict Origin validation.
+- Use exact allowed CORS origins; never wildcard credentialed CORS.
 - HTTPS is mandatory outside local loopback development.
-- Rotate the session after successful authentication and privilege changes.
+- Rotate and revoke local sessions after security-sensitive changes.
 
-## Account lifecycle
-Initial scope proposal:
-- Create accounts only after server-side validation and uniqueness checks.
-- Store a normalized login identifier and password hash; never store plaintext passwords.
-- Account states: pending_verification, active, locked, disabled.
-- Login errors should not reveal whether an account exists.
-- Support logout current session; later add revoke-all-sessions.
-- Password recovery and email verification remain deferred until an approved mail-delivery design exists.
-- Account deletion and data export require a separately documented retention and recovery policy.
+## Android-native client
+Use the system browser and Authorization Code + PKCE. Do not embed a client secret in the Android app. Review redirect URI ownership, app-link verification, token storage and logout separately before implementation. Do not assume browser cookie behavior is suitable for a native client.
 
 ## Authorization model
-Use server-derived permissions, not client-provided roles.
-- user: access only to resources owned by the authenticated account.
-- support: no implicit access to private user content; exceptional access must be time-bound, justified, audited and separately approved.
-- admin: restricted operational role; require stronger authentication and audited privileged actions.
-- No public self-registration as admin.
-- Role assignment must be an explicit privileged operation and create an audit event.
-- Every resource query must scope by authenticated owner or an explicitly authorized relationship. Random IDs are not authorization.
+Use the existing workspace role proposal as the baseline:
+- owner
+- admin
+- member
+- viewer
+
+Rules:
+- Deny by default.
+- Check workspace membership on every workspace-scoped operation.
+- Never trust client-supplied user ID, role, workspace ID or ownership claims without server verification.
+- Hidden UI controls are not authorization.
+- Separate platform operators from workspace roles.
+- Privileged actions require explicit policy and audit records.
+- Support access to private user content is not implicit.
+
+## Proposed identity/session lifecycle
+- Map identities by unique issuer + subject.
+- Maintain explicit local account status and timestamps.
+- Store only the minimum OIDC subject/issuer metadata needed.
+- If opaque local sessions are used, store only a hash of the random session token, plus expiry and revocation state.
+- Password recovery and MFA are delegated to the selected provider unless a later approved design says otherwise.
+- Account deletion and export require a retention and recovery policy.
 
 ## Abuse and resilience controls
-- Rate-limit login, registration and recovery by multiple signals, with privacy-preserving storage and conservative lockout behavior.
-- Add bounded request body size, request timeout and generic error responses.
-- Use constant-time password-hash verification behavior as provided by the vetted library.
-- Record security events without recording passwords, raw session tokens, cookies or reset secrets.
-- Revoke sessions on password change, account disablement and suspected compromise.
-- If recovery tokens are later implemented, make them one-time, hashed at rest, short-lived and purpose-bound.
+- Rate-limit login initiation and callback abuse at the appropriate boundary.
+- Validate state, nonce, PKCE, issuer, audience, signature and expiry.
+- Redact authorization codes, tokens, cookies and provider payload secrets from logs.
+- Enforce request limits, timeouts and generic external errors.
+- Revoke local sessions on account disablement and suspected compromise.
+- Treat provider metadata and claims as untrusted until cryptographically validated.
 
 ## Deferred
-MFA/passkeys, OAuth/OIDC, email delivery, password reset, device fingerprinting, social login, organization tenancy and support impersonation are out of initial scope.
+Provider selection, provider installation, email delivery, custom password auth, MFA/passkeys configuration, organization tenancy, support impersonation and production federation are not yet approved.
 
 ## Acceptance criteria before implementation
-- Framework and password-hashing dependencies reviewed and approved.
-- Threat model and data schema approved.
-- Cookie, CSRF, CORS and HTTPS behavior defined for each deployment profile.
-- Authorization matrix covers every planned endpoint and resource.
-- Synthetic tests cover session expiry, revocation, account states, CSRF, origin checks, ownership and privilege escalation.
-- No real personal data is used during initial validation.
+- Select and approve the OIDC provider and operational owner.
+- Approve browser and Android redirect/session flows.
+- Define role/permission matrix and tenant isolation invariants.
+- Approve schema, retention, deletion, backup and restore policies.
+- Review framework and database dependencies.
+- Synthetic tests cover invalid issuer/audience/signature, state/nonce/PKCE failure, session expiry/revocation, cross-workspace access and privilege escalation.
