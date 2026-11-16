@@ -69,7 +69,7 @@ def test_audit_stream_appends_ordered_hash_chain(session):
 
 
 def test_audit_metadata_rejects_secret_like_keys(session):
-    with pytest.raises(ValueError, match="Sensitive"):
+    with pytest.raises(ValueError, match="SENSITIVE"):
         with session.begin():
             append_audit_event(
                 session,
