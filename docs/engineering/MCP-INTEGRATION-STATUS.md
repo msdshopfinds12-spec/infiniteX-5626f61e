@@ -117,3 +117,30 @@ These local `npx` examples require Node.js and a compatible MCP host. Opening a 
 ## Execution record
 
 No MCP server was installed, launched or connected as part of this documentation change. No external account permissions were changed.
+
+
+---
+
+## Additional free/open-source candidates reviewed — 2026-11-16
+
+| Candidate | Repository / install | Fit for InfiniteX | Recommendation |
+|---|---|---|---|
+| MCP Inspector | https://github.com/modelcontextprotocol/inspector · `npx @modelcontextprotocol/inspector` | Inspect/test MCP tool schemas and protocol behavior | Useful developer QA utility; not a production app dependency |
+| DBHub | https://github.com/bytebase/dbhub · `npx @bytebase/dbhub@latest` | PostgreSQL schema and query diagnostics; read-only mode, row limits and query timeouts | Better candidate than a broad DB admin MCP for a later read-only DB audit; only with dedicated read-only DB role |
+| Filesystem MCP | https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem · `npx -y @modelcontextprotocol/server-filesystem <allowed-directory>` | Local source/document access | Optional only in a supported local coding host; allowlist one workspace and use read-only mode for audits |
+| Playwright E2E MCP (third party) | https://github.com/xsignon-secure/E2E | Runs and diagnoses Playwright tests; project claims MIT/no account | Experimental alternative; review source, package provenance and permission behavior before use. Not required if using official Playwright MCP/CLI |
+| Sigil | https://github.com/sigildev/sigil | Static source analysis for MCP server implementations | Experimental, very new/small project; do not treat its score as proof of safety |
+
+The official MCP Inspector offers web, CLI and TUI inspection modes. It is a testing utility for MCP servers, not an InfiniteX runtime dependency. DBHub documents read-only mode, row limits and query timeouts; do not connect it to a live database using an owner/admin credential. The official Filesystem server supports explicit allowed-directory scoping; never grant it the whole device filesystem. References: https://github.com/modelcontextprotocol/inspector, https://github.com/bytebase/dbhub, https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem.
+
+### Deprecated or avoid
+
+- `semgrep/mcp` standalone repository is archived and says the MCP implementation moved into the main Semgrep project. Do not install the archived standalone package. Use Semgrep's current official CLI/integration only after checking current terms and supported setup: https://github.com/semgrep/mcp.
+- Do not add an MCP just because it is popular. Each server expands the trust boundary and tool surface.
+- MCP Inspector does not certify a server as secure. A successful protocol test is not a security audit.
+
+### Minimal install set — final recommendation
+
+For InfiniteX today, **install zero new MCP servers until the coding host and runtime environment are confirmed**. Existing GitHub connector already covers repository operations. When a supported Node 22 coding host is available, the first optional tools to evaluate are Context7 and MCP Inspector. For browser QA, choose one of Playwright MCP or Playwright CLI. For a database audit later, choose DBHub in strict read-only mode. Keep cloud/account MCPs disconnected until the target provider is confirmed.
+
+Open-source software can be free to install while hosted services, compute, storage, model usage or API quotas remain metered. This list is not a promise of unlimited free usage.
