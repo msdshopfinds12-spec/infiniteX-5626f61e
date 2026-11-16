@@ -67,3 +67,20 @@ The first event in a new stream is protected by a composite primary key on the s
 The persistence function named `persist_verified_approval` does not perform cryptographic verification. It accepts only a previously verified approval context; callers must verify signature, signer authorization, request binding, expiry, and owner/tenant authorization before invoking it. The database transaction then atomically persists the nonce hash, intent, audit event, stream head, and outbox event.
 
 The migration has not been applied. Before any migration is authorized, validate it against an isolated PostgreSQL database, inspect generated SQL and rollback behavior, and verify RLS and append-only behavior using the same restricted role intended for the application.
+
+## Canonical contract integration update
+
+The persistence adapter now imports `iq_core.audit.audit_event.AuditEvent` and delegates event validation, canonical JSON hashing, and digest verification to that domain contract. The adapter no longer maintains a second, divergent hash implementation.
+
+The persisted event payload binds the tenant identifier into the hashed metadata. The persistence verifier reads one tenant/stream sequence, checks contiguous database sequence numbers, checks the tenant binding, reconstructs each domain event, compares the recomputed digest to the stored digest, and then invokes the existing `verify_audit_chain` implementation.
+
+The adapter normalizes stored timestamps to UTC when rehydrating rows because SQLite may return timezone-naive values for timezone-aware columns. Input timestamps remain required to be timezone-aware.
+
+Additional tests have been authored for canonical digest parity, stored-chain verification, digest tampering, sequence gaps, and tenant binding. These tests are committed but have not yet been executed in this workflow.
+
+Remaining limitations:
+- PostgreSQL concurrency and RLS behavior are not yet tested.
+- The verifier checks the rows returned by the database; it cannot prove that rows were not omitted. Compare the tail digest to an independently protected checkpoint.
+- Database grants restricting UPDATE/DELETE on audit rows are not yet provisioned. The migration trigger is not a substitute for a least-privilege database role or external checkpoint.
+- The approval persistence function remains a low-level adapter. Callers must invoke the existing cryptographic approval verifier and derive tenant/reviewer authorization from trusted server-side context before persisting.
+- No migration has been applied and no production deployment has occurred.
