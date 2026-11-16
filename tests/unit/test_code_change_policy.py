@@ -33,12 +33,17 @@ def test_protected_branches_are_rejected():
 
 
 def test_unapproved_or_empty_branch_namespace_is_rejected():
-    for branch in ("release/production", "fix/", ""):
+    for branch in ("release/production", "fix/"):
         decision = CodeChangePolicy().evaluate(
             proposal(ProposedFileChange("iq_core/example.py", "VALUE = 1"), branch=branch)
         )
         assert decision.status == "BLOCKED"
         assert "UNAPPROVED_BRANCH_NAMESPACE" in decision.reason_codes
+
+    missing = CodeChangePolicy().evaluate(
+        proposal(ProposedFileChange("iq_core/example.py", "VALUE = 1"), branch="")
+    )
+    assert "TARGET_BRANCH_REQUIRED" in missing.reason_codes
 
 
 def test_path_traversal_and_repository_control_paths_are_rejected():
