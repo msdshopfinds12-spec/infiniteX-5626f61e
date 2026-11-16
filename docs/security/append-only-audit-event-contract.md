@@ -37,3 +37,16 @@ The application role must not be able to update or delete existing events. Expor
 - Data minimization and retention limits.
 
 The Python protocol and local digest do not provide durable immutability by themselves. No production storage adapter is included.
+
+
+## Integrity verification
+
+The pure-Python verifier recomputes each event digest from its immutable fields and
+checks a supplied ordered chain for a valid root, matching stream IDs, unique event
+IDs, and continuous previous-event links. It detects content alteration and broken
+links in the supplied sequence.
+
+It cannot independently prove that a database returned every event, that the
+sequence was not truncated, or that a privileged attacker did not rewrite the
+entire chain. Production must compare against a protected checkpoint and enforce
+atomic ordering in storage.

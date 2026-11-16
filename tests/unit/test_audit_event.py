@@ -79,3 +79,90 @@ def test_untrusted_event_is_rejected():
 
     with pytest.raises(TypeError, match="TRUSTED_AUDIT_EVENT_REQUIRED"):
         append_audit_event(event={"actor_id": "attacker"}, store=AcceptingStore())
+
+
+from dataclasses import replace
+
+from iq_core.audit.audit_event import (
+    AuditIntegrityError,
+    verify_audit_chain,
+    verify_audit_event,
+)
+
+
+def make_chain():
+    first = make_event(event_id="event-1", previous_event_sha256=None)
+    second = make_event(
+        event_id="event-2",
+        occurred_at=1_800_000_001,
+        previous_event_sha256=first.event_sha256,
+    )
+    third = make_event(
+        event_id="event-3",
+        occurred_at=1_800_000_002,
+        previous_event_sha256=second.event_sha256,
+    )
+    return [first, second, third]
+
+
+def test_valid_chain_returns_final_digest():
+    events = make_chain()
+    assert verify_audit_chain(events=events) == events[-1].event_sha256
+
+
+def test_empty_chain_is_valid():
+    assert verify_audit_chain(events=[]) is None
+
+
+def test_tampered_event_digest_is_rejected():
+    event = make_event()
+    tampered = replace(event, outcome="rejected")
+    with pytest.raises(AuditIntegrityError, match="AUDIT_EVENT_DIGEST_MISMATCH"):
+        verify_audit_event(event=tampered)
+
+
+def test_broken_chain_link_is_rejected():
+    first, second, third = make_chain()
+    disconnected = replace(second, previous_event_sha256="a" * 64)
+    with pytest.raises(AuditIntegrityError, match="AUDIT_CHAIN_LINK_INVALID"):
+        verify_audit_chain(events=[first, disconnected, third])
+
+
+def test_chain_must_start_at_root():
+    first, second, _ = make_chain()
+    rooted_wrongly = replace(first, previous_event_sha256="b" * 64)
+    with pytest.raises(AuditIntegrityError, match="AUDIT_CHAIN_ROOT_INVALID"):
+        verify_audit_chain(events=[rooted_wrongly, second])
+
+
+def test_mixed_streams_are_rejected():
+    first, second, _ = make_chain()
+    other_stream = make_event(
+        event_id="event-other",
+        stream_id="different-stream",
+        previous_event_sha256=first.event_sha256,
+    )
+    with pytest.raises(AuditIntegrityError, match="AUDIT_STREAM_MISMATCH"):
+        verify_audit_chain(events=[first, other_stream])
+
+
+def test_duplicate_event_ids_are_rejected():
+    first, _, _ = make_chain()
+    duplicate = make_event(
+        event_id=first.event_id,
+        occurred_at=1_800_000_001,
+        previous_event_sha256=first.event_sha256,
+    )
+    with pytest.raises(AuditIntegrityError, match="AUDIT_DUPLICATE_EVENT_ID"):
+        verify_audit_chain(events=[first, duplicate])
+
+
+def test_unordered_events_are_rejected_by_chain_link_check():
+    first, second, third = make_chain()
+    with pytest.raises(AuditIntegrityError, match="AUDIT_CHAIN_ROOT_INVALID"):
+        verify_audit_chain(events=[second, first, third])
+
+
+def test_non_sequence_input_is_rejected():
+    with pytest.raises(TypeError, match="AUDIT_EVENT_SEQUENCE_REQUIRED"):
+        verify_audit_chain(events="not-a-sequence")
