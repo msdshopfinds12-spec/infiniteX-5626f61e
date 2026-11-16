@@ -24,19 +24,27 @@ async function rollbackQuietly(client) {
 
 /**
  * PostgreSQL adapter for workspace membership changes.
- * All membership writers must lock the workspace row before mutating members.
+ *
+ * authenticatedPrincipal MUST come from a separately validated authentication
+ * boundary (for example, a verified OIDC/JWT middleware). This repository does
+ * not authenticate end users. It binds that principal to the current PostgreSQL
+ * transaction using a short-lived assertion that PostgreSQL verifies itself.
  */
-export function createWorkspaceMembershipRepository(pool) {
+export function createWorkspaceMembershipRepository(pool, { identityAssertionSigner } = {}) {
   if (!pool || typeof pool.connect !== "function") {
     throw new TypeError("A PostgreSQL-compatible pool is required");
   }
+  if (!identityAssertionSigner || typeof identityAssertionSigner.sign !== "function") {
+    throw new TypeError("A database identity assertion signer is required");
+  }
 
   return Object.freeze({
-    async changeRole({ workspaceId, actorUserId, targetUserId, newRole, requestId }) {
+    async changeRole({ workspaceId, authenticatedPrincipal, targetUserId, newRole, requestId }) {
       assertUuid(workspaceId, "workspaceId");
-      assertUuid(actorUserId, "actorUserId");
+      assertUuid(authenticatedPrincipal?.userId, "authenticatedPrincipal.userId");
       assertUuid(targetUserId, "targetUserId");
       assertRequestId(requestId);
+      const actorUserId = authenticatedPrincipal.userId;
 
       if (newRole !== null && !["owner", "admin", "member", "viewer"].includes(newRole)) {
         throw new TypeError("newRole is invalid");
@@ -49,15 +57,28 @@ export function createWorkspaceMembershipRepository(pool) {
         await client.query("BEGIN");
         transactionOpen = true;
 
-        // Transaction-local identity context is required by PostgreSQL RLS.
-        // Values are parameterized and disappear automatically at transaction end.
+        // Bind the assertion to this exact transaction. The database verifier
+        // independently checks txid_current(), session_user, MAC and expiry.
+        const transaction = await client.query(
+          "SELECT txid_current()::text AS transaction_id",
+        );
+        const transactionId = transaction.rows[0]?.transaction_id;
+        const assertion = identityAssertionSigner.sign({
+          userId: actorUserId,
+          workspaceId,
+          transactionId,
+          requestId,
+        });
+        if (typeof assertion !== "string" || assertion.length < 130 || assertion.length > 20000) {
+          throw new Error("Identity assertion signer returned an invalid assertion");
+        }
+
         await client.query(
-          "SELECT set_config('app.current_workspace_id', $1, true), " +
-          "set_config('app.current_user_id', $2, true)",
-          [workspaceId, actorUserId],
+          "SELECT set_config('app.identity_assertion', $1, true)",
+          [assertion],
         );
 
-        // Serializes membership mutations within this workspace.
+        // RLS permits this lock only after database-side assertion verification.
         const workspace = await client.query(
           "SELECT id FROM workspaces WHERE id = $1 FOR UPDATE",
           [workspaceId],
