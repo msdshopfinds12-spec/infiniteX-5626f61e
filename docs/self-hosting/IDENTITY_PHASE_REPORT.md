@@ -1,42 +1,45 @@
 # InfiniteX Identity Architecture Planning Report
 
 **Branch:** feat/provider-neutral-billing-sandbox  
-**Phase:** PLAN — identity, sessions and minimal database design  
+**Phase:** PLAN — identity, workspace authorization and database design  
 **Implementation:** Not started  
 **Migrations:** Not created or executed  
 **Deployment / merge:** Not performed
 
-## Deliverables
+## Deliverables added in this phase
 - docs/self-hosting/decisions/ADR-002-identity-and-api-stack.md
 - docs/self-hosting/IDENTITY_ARCHITECTURE.md
 - docs/self-hosting/DATABASE_SCHEMA_PROPOSAL.md
 - docs/self-hosting/IDENTITY_THREAT_MODEL_AND_TEST_PLAN.md
 
-## Proposed direction
-- Modular monolith with PostgreSQL.
-- Fastify + TypeScript is the preferred API candidate for review; the current Node built-in server remains a minimal health-check bootstrap only.
-- Opaque server-side sessions with hashed tokens and Secure, HttpOnly, SameSite cookies.
-- Server-derived authorization with default-deny resource ownership checks.
-- Minimal account/session/role schema; audit events are a later phase.
-- Billing remains mock-only.
+## Existing planning artifacts inspected
+- docs/self-hosting/IDENTITY_AND_DATABASE_DESIGN.md
+- docs/self-hosting/IDENTITY_DATABASE_IMPLEMENTATION_MANIFEST.md
 
-## Important reconciliation
-The earlier architecture document described Fastify + TypeScript as the target. The first runtime foundation intentionally used Node built-ins to avoid adding dependencies before review. ADR-002 makes this distinction explicit: no framework or auth dependency has been installed, and the API stack choice remains proposed.
+The existing design recommends evaluating OIDC rather than custom password authentication and defines workspace roles owner/admin/member/viewer. The new documents have been aligned to that direction. They are complementary planning artifacts, not evidence of implementation.
+
+## Proposed direction
+- Modular monolith with private PostgreSQL.
+- Fastify + TypeScript is the preferred API candidate for review; current Node built-in server remains a health-check bootstrap.
+- Evaluate self-hosted OIDC first; InfiniteX remains responsible for local authorization.
+- Workspace-scoped role and ownership checks.
+- Minimal users, identity_links, workspaces, workspace_memberships, optional sessions and later audit_events.
+- Billing remains mock-only.
 
 ## Evidence status
 | Item | Status |
 |---|---|
-| Planning documents committed to feature branch | VERIFIED if GitHub commit succeeds |
+| New planning documents committed and fetched from branch | VERIFIED |
+| Existing identity planning inspected | VERIFIED |
+| OIDC provider selected/installed | NOT DONE |
 | API framework installed | NOT DONE |
 | Authentication implemented | NOT DONE |
 | PostgreSQL schema created | NOT DONE |
 | SQL migration created/executed | NOT DONE |
-| Password hashing integrated | NOT DONE |
-| Session cookies/CSRF enforced | NOT DONE |
 | Authorization tests executed | NOT TESTED |
 | Security audit | NOT PERFORMED |
-| CI result for this commit | PENDING / NOT VERIFIED |
+| CI result for latest commit | PENDING / NOT VERIFIED |
 | Merge to main / deployment | NOT PERFORMED |
 
 ## Next approval gate
-Review ADR-002, identity architecture and schema proposal. After explicit approval, the next implementation plan can add the selected API framework and validation layer on the feature branch, followed by unit/integration tests using synthetic data. Database migrations remain a separate approval gate.
+Review ADR-002, the OIDC/session architecture, workspace authorization model and schema proposal. After explicit approval, prepare a provider comparison and implementation plan. Provider installation, dependencies, database connection and migrations remain separate approval gates.
