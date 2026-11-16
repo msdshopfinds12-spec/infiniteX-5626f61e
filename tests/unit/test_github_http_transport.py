@@ -145,3 +145,10 @@ def test_rejects_paths_outside_exact_git_object_endpoints(url):
     transport = GitHubHTTPTransport(opener=FakeOpener([]))
     with pytest.raises(GitHubTransportError):
         transport.get_json(url)
+
+def test_rejects_dot_segment_repository_names():
+    transport = GitHubHTTPTransport(opener=FakeOpener([]))
+    for owner, name in [(".", "repo"), ("..", "repo"), ("owner", "..")]:
+        url = f"https://api.github.com/repos/{owner}/{name}/git/commits/" + "a" * 40
+        with pytest.raises(GitHubTransportError):
+            transport.get_json(url)

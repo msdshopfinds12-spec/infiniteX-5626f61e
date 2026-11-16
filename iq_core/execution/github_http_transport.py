@@ -139,7 +139,7 @@ class GitHubHTTPTransport:
             ):
                 raise GitHubTransportError("GITHUB_URL_NOT_ALLOWLISTED")
             match = re.fullmatch(
-                r"/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/git/(commits|trees|blobs)/[0-9a-f]{40}",
+                r"/repos/[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*/git/(commits|trees|blobs)/[0-9a-f]{40}",
                 parsed.path,
             )
             if match is None:
