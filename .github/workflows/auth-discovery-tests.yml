@@ -1,0 +1,49 @@
+name: Authentication Discovery Tests
+
+on:
+  push:
+    branches:
+      - feat/provider-neutral-billing-sandbox
+    paths:
+      - "scripts/auth/**"
+      - "tests/auth/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/auth-discovery-tests.yml"
+  pull_request:
+    branches:
+      - feat/provider-neutral-billing-sandbox
+    paths:
+      - "scripts/auth/**"
+      - "tests/auth/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/auth-discovery-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-discovery-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discovery-validator:
+    name: OIDC discovery validator (Node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run authentication discovery tests
+        run: npm run test:auth-discovery
