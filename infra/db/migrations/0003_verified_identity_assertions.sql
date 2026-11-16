@@ -4,6 +4,20 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
+DO $
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+      FROM pg_extension AS extension
+      INNER JOIN pg_namespace AS namespace ON namespace.oid = extension.extnamespace
+     WHERE extension.extname = 'pgcrypto'
+       AND namespace.nspname = 'public'
+  ) THEN
+    RAISE EXCEPTION 'pgcrypto must be installed in schema public for this migration';
+  END IF;
+END
+$;
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'infinite_x_identity_verifier_owner') THEN
