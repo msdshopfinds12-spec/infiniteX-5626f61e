@@ -47,3 +47,14 @@ Run `npm run test:backend` to execute authentication and backend runtime tests. 
 - Unit tests cover idempotency, forced connection closure, observer failure, idle-connection cleanup failure, and invalid configuration.
 
 This is a reusable lifecycle primitive, not yet a complete process bootstrap or proof of deployment readiness.
+
+## Phase 3 — process signal integration (implemented as an injectable adapter)
+
+- `installShutdownHandlers(server, options)` registers one-shot SIGINT and SIGTERM handlers.
+- Signal names are captured explicitly because Node process signal callbacks do not supply the signal name as an argument.
+- The adapter delegates to the idempotent bounded shutdown controller and removes both listeners after the first signal.
+- It sets `processLike.exitCode = 1` when the server reports a failed close; it does not call `process.exit()`.
+- The adapter is injectable for unit testing and has no process side effects until explicitly called.
+- Tests cover signal dispatch, listener cleanup, close failure, and disposal.
+
+This adapter is not yet wired into a production entry point. No executable bootstrap, host/port binding, or deployable runtime is claimed.
