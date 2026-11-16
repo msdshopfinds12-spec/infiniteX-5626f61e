@@ -12,13 +12,14 @@
 Exit evidence: fetched source, commit comparison, CI run URL/result if available.
 
 ## Gate 1 — Provider selection
-- Complete OIDC scorecard using official docs and current license/security information.
-- Confirm Authorization Code + PKCE for browser and Android.
+- Evidence-backed comparison document created for Keycloak, authentik, ZITADEL and Ory.
+- Confirm Authorization Code + PKCE for browser and Android with a disposable compatibility test.
 - Confirm update, backup, restore and recovery ownership.
-- Confirm small-host resource requirements and no mandatory paid feature.
-- Select provider in an ADR.
+- Measure resource requirements on the intended Linux host.
+- Complete license review and paid-feature boundary review.
+- Select provider in an ADR only after tests and explicit approval.
 
-Exit evidence: completed scorecard, official-source links, selected version and reviewer approval.
+Exit evidence: comparison document and official-source links exist; compatibility tests, resource measurements, license review and provider selection remain outstanding.
 
 ## Gate 2 — Authorization and tenant model
 - Approve owner/admin/member/viewer permission matrix.
@@ -71,7 +72,7 @@ Requires separate explicit approval:
 | Gate | Status |
 |---|---|
 | 0 Repository baseline | PARTIAL — prior baseline exists; refresh before code changes |
-| 1 Provider selection | BLOCKED — no provider selected |
+| 1 Provider selection | PARTIAL — official-source comparison documented; tests, resource/license review and selection still blocked |
 | 2 Authorization model | PROPOSED — matrix needs review |
 | 3 Data and operations | PROPOSED — schema needs review |
 | 4 Implementation approval | BLOCKED |
