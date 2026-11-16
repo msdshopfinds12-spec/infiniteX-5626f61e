@@ -40,3 +40,27 @@ Run the existing identity/workspace migration against an ephemeral PostgreSQL 17
 
 ## Verification limits
 This validates the migration and relational constraints against real PostgreSQL. It does NOT yet execute the Node membership repository against PostgreSQL, verify concurrent membership operations, or establish database least-privilege grants. Those remain separate phases.
+
+
+## Security hardening follow-up — account status enforcement
+The membership repository now joins workspace_memberships to app_users and locks both membership and user rows before evaluating a role change. Both actor and target accounts must have status='active'. Disabled actor and target accounts are denied before mutation. Request IDs containing only whitespace are rejected before acquiring a database connection.
+
+Regression coverage added:
+- disabled actor account is denied and transaction rolled back;
+- disabled target account is denied and transaction rolled back;
+- whitespace-only request ID rejected before connecting.
+
+## Latest CI evidence
+- Run #18: https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/43956414805
+- Tested commit: 1b0457a5a281d001b5ac9a1fabedb5806ad7c309
+- Overall conclusion: success.
+- Node tests: 32 passed, 0 failed.
+- PostgreSQL 17 service health check: passed.
+- Migration application: passed.
+- Synthetic schema and constraint assertions: passed.
+- Runner and service-container cleanup: passed.
+
+## Remaining limitations
+- The Node repository adapter still has not been exercised through a real pg driver against PostgreSQL; the repository unit tests use a test double.
+- Concurrent role-change behavior and last-owner serialization still need real multi-connection integration tests.
+- Database least-privilege roles/grants, OIDC validation, protected HTTP endpoints, and production readiness remain unimplemented or unverified.
