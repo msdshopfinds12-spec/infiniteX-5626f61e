@@ -21,7 +21,7 @@ export default function App() {
         label: "Active Agents",
         value: "—",
         delta: "Not connected",
-        trend: "up" as const,
+        trend: "flat" as const,
         icon: Bot,
         accent: "primary" as const,
       },
@@ -75,7 +75,8 @@ export default function App() {
         <Sidebar view={view} onChange={setView} />
         <div className="main">
           <TopBar title={title} theme={theme} onToggleTheme={toggleTheme} />
-          <main className="content">\n          <div className="demo-notice" role="status"><strong>Integration preview</strong><span>Sample dashboard data only. Live agents, metrics, logs, authentication and pipeline actions are not connected yet.</span></div>
+          <main className="content">
+          <div className="demo-notice" role="status"><strong>Integration preview</strong><span>Sample dashboard data only. Live agents, metrics, logs, authentication and pipeline actions are not connected yet.</span></div>
           {view === "overview" && (
             <>
               <section className="metrics">
@@ -87,7 +88,7 @@ export default function App() {
                 <div className="panel">
                   <div className="panel-head">
                     <h2>
-                      <Cpu size={18} /> Live Agent Activity
+                      <Cpu size={18} /> Sample Agent Activity
                     </h2>
                     <span className="badge badge-neutral">demo data</span>
                   </div>
@@ -96,7 +97,7 @@ export default function App() {
                 <div className="panel">
                   <div className="panel-head">
                     <h2>
-                      <Terminal size={18} /> System Log Stream
+                      <Terminal size={18} /> Sample System Logs
                     </h2>
                     <span className="badge badge-neutral">demo data</span>
                   </div>
@@ -108,8 +109,8 @@ export default function App() {
                   <h2>
                     <GitBranch size={18} /> Pipeline Board
                   </h2>
-                  <button className="btn btn-ghost">
-                    <Play size={14} /> Run all
+                  <button className="btn btn-ghost" type="button" disabled title="Connect a pipeline runner to enable this action">
+                    <Play size={14} /> Run all (unavailable)
                   </button>
                 </div>
                 <PipelineBoard />
@@ -136,8 +137,8 @@ export default function App() {
                 <h2>
                   <GitBranch size={18} /> Pipeline Board
                 </h2>
-                <button className="btn btn-primary">
-                  <Play size={14} /> New pipeline
+                <button className="btn btn-primary" type="button" disabled title="Pipeline creation is not connected yet">
+                  <Play size={14} /> New pipeline (unavailable)
                 </button>
               </div>
               <PipelineBoard expanded />
@@ -147,7 +148,7 @@ export default function App() {
             <div className="panel">
               <div className="panel-head">
                 <h2>
-                  <Terminal size={18} /> Real-time Log Stream
+                  <Terminal size={18} /> Sample Log Entries
                 </h2>
                 <span className="badge badge-neutral">sample data</span>
               </div>
