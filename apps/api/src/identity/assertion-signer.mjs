@@ -13,7 +13,7 @@ function requiredString(value, name, maxLength = 255) {
 }
 
 function decodeSecret(secretHex) {
-  if (typeof secretHex !== "string" || !/^(?:[0-9a-f]{2}){32,}$/.test(secretHex)) {
+  if (typeof secretHex !== "string" || !/^(?:[0-9a-f]{2}){32,}$/i.test(secretHex)) {
     throw new TypeError("IDENTITY_HMAC_SECRET_HEX must be at least 32 bytes encoded as lowercase or uppercase hex");
   }
   return Buffer.from(secretHex, "hex");
