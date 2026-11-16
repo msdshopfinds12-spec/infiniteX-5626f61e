@@ -5,7 +5,13 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
-    BigInteger, CheckConstraint, DateTime, Index, Integer, String, func,
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    Index,
+    Integer,
+    String,
+    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
