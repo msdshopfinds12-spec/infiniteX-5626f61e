@@ -112,3 +112,27 @@ test("HEAD readiness requests return headers without a response body", async () 
     assert.ok(response.headers.get("content-length"));
   });
 });
+
+test("readiness probe is bounded when a dependency promise never settles", async () => {
+  await withServer({
+    readinessTimeoutMs: 15,
+    readinessCheck: () => new Promise(() => {}),
+  }, async (base) => {
+    const started = Date.now();
+    const response = await fetch(`${base}/ready`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { status: "not_ready" });
+    assert.ok(Date.now() - started < 2_000);
+  });
+});
+
+test("invalid readiness timeout configuration is rejected", () => {
+  assert.throws(
+    () => createInfiniteXServer({ readinessTimeoutMs: 0 }),
+    /readinessTimeoutMs/,
+  );
+  assert.throws(
+    () => createInfiniteXServer({ readinessTimeoutMs: 30_001 }),
+    /readinessTimeoutMs/,
+  );
+});
