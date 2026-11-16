@@ -1,8 +1,8 @@
 # InfiniteX Identity Trust Boundary — Engineering Decision Record
 
-**Status:** DESIGN GATE — no runtime identity implementation is approved by this record.
+**Status:** OPTION A APPROVED — feature-branch implementation committed; CI validation pending.
 **Target branch:** `feat/provider-neutral-billing-sandbox`
-**Scope:** additive documentation only; no schema changes, migrations, credentials, provider provisioning, merge, or deployment.
+**Scope:** feature-branch implementation of the signed identity verifier and disposable CI tests. No persistent database migration, production credentials, merge, or deployment.
 
 ## 1. Executive finding
 
@@ -112,12 +112,12 @@ Every negative test must assert both the denial result and the absence of unauth
 | Gate | Required evidence | Current status |
 |---|---|---|
 | Existing GUC weakness documented | Source inspection | VERIFIED |
-| Trust-boundary option selected | Reviewed decision | BLOCKED |
+| Trust-boundary option selected | Explicit approval | VERIFIED |
 | Authenticated principal source | Approved issuer and validation contract | BLOCKED |
 | Database verifier design | PostgreSQL/extension/privilege review | BLOCKED |
-| Runtime implementation | Code review and unit tests | NOT STARTED |
-| Adversarial PostgreSQL tests | Actual disposable CI run | NOT STARTED |
-| Independent security audit | Findings and remediation evidence | NOT STARTED |
+| Runtime implementation | Feature-branch code committed | IMPLEMENTED — REVIEW PENDING |
+| Adversarial PostgreSQL tests | Actual disposable CI run | PENDING |
+| Independent security audit | Findings and remediation evidence | PENDING |
 | Release | Separate human approval | BLOCKED |
 
 ## 10. Evidence and limitations
@@ -126,4 +126,4 @@ This record is an engineering design artifact. It does not implement signed iden
 
 The previously recorded 40-test CI pass is historical and must not be reused as evidence that this proposed trust boundary works.
 
-**Next approval required:** select Option A (database-verified signed context) or Option B (trusted database identity/proxy). Do not implement a partial HMAC layer and label it secure.
+**Next gates:** inspect GitHub Actions results, resolve failures, complete independent security review, and separately approve the trusted OIDC/JWT authentication integration. Do not use production until every gate is closed.
