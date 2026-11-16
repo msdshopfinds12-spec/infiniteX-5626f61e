@@ -4,7 +4,7 @@
 
 - IMPLEMENTED ON THE HARDENING BRANCH: immutable event contract, canonical SHA-256 hashing, SQLAlchemy audit/approval/nonce/outbox models, transaction-scoped persistence adapter, and persisted-chain verifier.
 - IMPLEMENTED ON THE HARDENING BRANCH: PostgreSQL 16 GitHub Actions service and isolated integration tests for concurrent appends, transaction rollback, restricted-role RLS isolation, and missing tenant context.
-- TEST EVIDENCE: GitHub Actions run `43938263758` executed 313 Python tests successfully, including the PostgreSQL integration tests, and the frontend TypeScript/build jobs passed. The changed-file Ruff step failed on two E501 formatting findings in the new PostgreSQL test file. Those two lines were corrected in commit `1230144e45b93aea2bceda025d28a8443e3c3ed3`; follow-up run `43938501823` is in progress. Do not treat the overall CI pipeline as green until that run completes successfully.
+- TEST EVIDENCE: GitHub Actions run `43938501823` on code commit `1230144e45b93aea2bceda025d28a8443e3c3ed3` completed successfully. Changed-file Ruff passed; all 313 Python tests passed (including the four PostgreSQL integration tests); frontend TypeScript and Vite production build passed. One non-blocking dependency deprecation warning remains. This evidence applies to that exact code commit. Subsequent documentation-only commits do not change the tested implementation.
 - NOT VERIFIED: production database grants, execution of Alembic revision `0003_durable_audit_approval`, PostgreSQL behavior using the actual production role/policies, independent external checkpoints, and production backup/restore.
 - NOT AUTHORIZED: running migrations, deploying, or changing production data.
 
