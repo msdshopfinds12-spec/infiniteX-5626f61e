@@ -1,4 +1,4 @@
-import { Activity, Bot, GitBranch, Settings, ShieldCheck, Terminal, Zap, type LucideIcon } from "lucide-react";
+import { Activity, Bot, GitBranch, Settings, ShieldCheck, Terminal, type LucideIcon } from "lucide-react";
 import type { ViewKey } from "../types";
 
 const nav: { key: ViewKey; label: string; icon: LucideIcon }[] = [
@@ -20,15 +20,20 @@ export default function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">
-          <Zap size={18} />
-        </div>
+        <img
+          className="brand-logo"
+          src="/infiniteX-logo.webp"
+          alt="InfiniteX logo"
+          width={44}
+          height={44}
+          decoding="async"
+        />
         <div className="brand-text">
-          <span className="brand-title">Bolt OS</span>
-          <span className="brand-sub">AI Engineering</span>
+          <span className="brand-title">InfiniteX</span>
+          <span className="brand-sub">AI Engineering OS</span>
         </div>
       </div>
-      <nav className="nav">
+      <nav className="nav" aria-label="Main navigation">
         {nav.map((item) => {
           const Icon = item.icon;
           const active = view === item.key;
@@ -37,6 +42,7 @@ export default function Sidebar({
               key={item.key}
               className={`nav-item${active ? " active" : ""}`}
               onClick={() => onChange(item.key)}
+              aria-current={active ? "page" : undefined}
             >
               <Icon size={18} />
               <span>{item.label}</span>
