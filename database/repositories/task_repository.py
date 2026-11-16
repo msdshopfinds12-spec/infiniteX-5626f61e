@@ -3,6 +3,7 @@ from typing import Any
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 from database.models.task import TaskRecord
+from database.tenant_context import set_tenant_context
 
 
 class TaskRepository:
@@ -11,11 +12,7 @@ class TaskRepository:
         self.tenant_id = tenant_id
 
     def _set_database_tenant(self) -> None:
-        if self.session.get_bind().dialect.name == "postgresql":
-            self.session.execute(
-                text("SELECT set_config('app.tenant_id', :tenant_id, true)"),
-                {"tenant_id": self.tenant_id},
-            )
+        set_tenant_context(self.session, self.tenant_id)
 
     def create(self, *, task_id: str, name: str, objective: str,
                input_data: dict[str, Any]) -> TaskRecord:
