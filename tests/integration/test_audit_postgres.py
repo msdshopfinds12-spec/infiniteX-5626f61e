@@ -20,7 +20,11 @@ from sqlalchemy.orm import Session
 
 from database.audit_persistence import append_audit_event, persist_verified_approval
 from database.models import (
-    ApprovalIntent, AuditEvent, Base, ConsumedNonce, OutboxEvent,
+    ApprovalIntent,
+    AuditEvent,
+    Base,
+    ConsumedNonce,
+    OutboxEvent,
 )
 from database.tenant_context import set_tenant_context
 from iq_core.agents.approval_contract import ApprovalClaims, canonical_approval_bytes
