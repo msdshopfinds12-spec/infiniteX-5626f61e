@@ -24,7 +24,7 @@ export default function Sidebar({
           <Zap size={18} />
         </div>
         <div className="brand-text">
-          <span className="brand-title">Bolt OS</span>
+          <span className="brand-title">InfiniteX</span>
           <span className="brand-sub">AI Engineering</span>
         </div>
       </div>
