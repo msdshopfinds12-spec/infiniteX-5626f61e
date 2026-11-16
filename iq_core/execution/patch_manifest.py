@@ -224,11 +224,15 @@ def validate_patch_manifest(
     if not isinstance(manifest.manifest_sha256, str) or not _SHA256_RE.fullmatch(manifest.manifest_sha256):
         errors.append("PATCH_MANIFEST_DIGEST_INVALID")
     else:
-        calculated = compute_manifest_sha256(manifest)
-        if calculated != manifest.manifest_sha256:
-            errors.append("PATCH_MANIFEST_DIGEST_MISMATCH")
-        if calculated != intent.proposal_sha256:
-            errors.append("PATCH_APPROVED_DIGEST_MISMATCH")
+        try:
+            calculated = compute_manifest_sha256(manifest)
+        except (AttributeError, TypeError, ValueError):
+            errors.append("PATCH_MANIFEST_CANONICALIZATION_FAILED")
+        else:
+            if calculated != manifest.manifest_sha256:
+                errors.append("PATCH_MANIFEST_DIGEST_MISMATCH")
+            if calculated != intent.proposal_sha256:
+                errors.append("PATCH_APPROVED_DIGEST_MISMATCH")
 
     unique_errors = tuple(dict.fromkeys(errors))
     return PatchValidationReport(
