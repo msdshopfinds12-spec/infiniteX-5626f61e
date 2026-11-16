@@ -149,7 +149,7 @@ test("admin cannot demote or remove an owner", () => {
       newRole,
       activeOwnerCount: 2,
     });
-    assert.deepEqual(result, { allowed: false, reason: "CANNOT_CHANGE_OWNER" });
+    assert.deepEqual(result, { allowed: false, reason: "CANNOT_CHANGE_PRIVILEGED_MEMBER" });
   }
 });
 
