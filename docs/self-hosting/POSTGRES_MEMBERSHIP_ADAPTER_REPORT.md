@@ -29,13 +29,20 @@ The workspace row lock serializes membership mutations only if every writer uses
 
 ## Verification status
 - GitHub writes: committed.
-- GitHub fetch-back: pending at report creation.
-- GitHub Actions: pending after the latest commit.
+- GitHub fetch-back: VERIFIED for migration, adapter, tests, docs, package and workflow.
+- GitHub Actions: PASS — run #14; syntax checks passed; 29 tests passed / 0 failed.
 - PostgreSQL integration: NOT TESTED.
 - Migration applied: NO.
 - Database started: NO.
 - API route/authentication integration: NO.
 - Merge/deployment: NO.
+
+## CI evidence
+- Run: https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/43955664713
+- Commit tested: 62704c8c5a7a46bf4fa774270277061d597a3e87
+- Workflow completed successfully; Node test runner reported 29 passed and 0 failed.
+- Earlier runs exposed a database-row naming mismatch (`user_id`/`workspace_id` versus policy contract fields). The adapter now maps trusted database rows into the policy contract; the corrected run passed.
+- These are unit tests using a pg-compatible test double, not a real PostgreSQL integration test.
 
 ## Scope controls
 No dependency installation, no DB startup, no migration execution, no secrets, no public ingress, no provider install, no live user data, no merge and no deployment.
