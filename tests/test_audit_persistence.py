@@ -10,7 +10,7 @@ from database.audit_persistence import (
     append_audit_event,
     persist_verified_approval,
     verify_persisted_audit_chain,
-)\nfrom iq_core.audit.audit_event import AuditEvent as ContractAuditEvent
+)
 from database.models import (
     ApprovalIntent,
     AuditEvent,
