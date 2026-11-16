@@ -71,3 +71,22 @@ If `apps/api/package-lock.json` is absent, stop and decide the approved lockfile
 ## 5. Conclusion
 
 Current result is **SOURCE REVIEWED / EXECUTION NOT VERIFIED**. Do not publish a test pass rate or completion percentage until real command output and browser/DB evidence are captured.
+
+
+---
+
+## Additional source review — task test coverage gap
+
+The existing `task-contract.test.ts` tests schema acceptance/rejection only. It does not call `createTask`, run a database transaction, verify tenant isolation or test idempotency conflict behavior.
+
+A source-level correctness issue was identified: on a duplicate tenant/idempotency key, `createTask` returns the existing row without verifying that the incoming `agentId` and `input` match the original request. A reused key with different content can therefore receive the wrong task record.
+
+Required tests before worker implementation:
+- same tenant + same key + same canonical payload => same task, `created=false`;
+- same tenant + same key + different payload => explicit conflict, not silent reuse;
+- same key across different tenants => independent records;
+- cross-tenant agent ID => rejected by DB constraint/authorization;
+- no tenant mapping => transaction rejected;
+- RLS under the actual application DB role => cross-tenant rows remain invisible.
+
+No tests were executed during this source review.
