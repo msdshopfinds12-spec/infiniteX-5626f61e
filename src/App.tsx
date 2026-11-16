@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Activity, Bot, CircleCheck as CheckCircle2, Cpu, GitBranch, Play, Search, Settings, ShieldCheck, Terminal, Zap } from "lucide-react";
+import { Activity, Bot, Cpu, GitBranch, Play, Search, Settings, ShieldCheck, Terminal, Zap } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -18,36 +18,36 @@ export default function App() {
     () => [
       {
         id: "agents",
-        label: "Active Agents",
-        value: "12",
-        delta: "+3",
+        label: "Agent telemetry",
+        value: "Not connected",
+        delta: "No live data",
         trend: "up" as const,
         icon: Bot,
         accent: "primary" as const,
       },
       {
         id: "runs",
-        label: "Pipelines / 24h",
-        value: "1,284",
-        delta: "+18%",
+        label: "Pipeline runs",
+        value: "Not connected",
+        delta: "No live data",
         trend: "up" as const,
         icon: GitBranch,
         accent: "success" as const,
       },
       {
         id: "tokens",
-        label: "Tokens Used",
-        value: "4.6M",
-        delta: "+0.9M",
+        label: "Token usage",
+        value: "Not connected",
+        delta: "No live data",
         trend: "up" as const,
         icon: Zap,
         accent: "warning" as const,
       },
       {
         id: "uptime",
-        label: "System Uptime",
-        value: "99.98%",
-        delta: "stable",
+        label: "Service uptime",
+        value: "Not measured",
+        delta: "No health probe",
         trend: "flat" as const,
         icon: Activity,
         accent: "neutral" as const,
@@ -76,6 +76,7 @@ export default function App() {
         <div className="main">
           <TopBar title={title} theme={theme} onToggleTheme={toggleTheme} />
           <main className="content">
+          <section className="panel" aria-label="Workspace data status"><div className="panel-head"><h2>Workspace data status</h2><span className="badge badge-warning">DEMO MODE</span></div><p className="muted">Sample interface only. Agent activity, logs, pipeline states, and metrics are illustrative; no live integrations or telemetry are currently connected.</p></section>
           {view === "overview" && (
             <>
               <section className="metrics">
@@ -87,18 +88,18 @@ export default function App() {
                 <div className="panel">
                   <div className="panel-head">
                     <h2>
-                      <Cpu size={18} /> Live Agent Activity
+                      <Cpu size={18} /> Sample Agent Activity
                     </h2>
-                    <span className="badge badge-success">online</span>
+                    <span className="badge badge-warning">sample</span>
                   </div>
                   <AgentList compact />
                 </div>
                 <div className="panel">
                   <div className="panel-head">
                     <h2>
-                      <Terminal size={18} /> System Log Stream
+                      <Terminal size={18} /> Sample Log Events
                     </h2>
-                    <span className="badge badge-neutral">tailing</span>
+                    <span className="badge badge-warning">sample</span>
                   </div>
                   <LogStream compact />
                 </div>
@@ -147,9 +148,9 @@ export default function App() {
             <div className="panel">
               <div className="panel-head">
                 <h2>
-                  <Terminal size={18} /> Real-time Log Stream
+                  <Terminal size={18} /> Sample Log Events
                 </h2>
-                <span className="badge badge-success">live</span>
+                <span className="badge badge-warning">sample</span>
               </div>
               <LogStream />
             </div>
@@ -160,21 +161,11 @@ export default function App() {
                 <h2>
                   <ShieldCheck size={18} /> Security Posture
                 </h2>
-                <span className="badge badge-success">healthy</span>
+                <span className="badge badge-warning">not verified</span>
               </div>
+              <p className="muted">Security controls are not yet connected to automated evidence. These are audit requirements, not claims that controls are enabled.</p>
               <ul className="checklist">
-                {[
-                  "Row Level Security enabled on all tables",
-                  "Service role key never exposed to the client",
-                  "Edge functions enforce CORS allowlist",
-                  "Secrets stored in vault, not in source",
-                  "Auth gates enforced on every mutation",
-                ].map((item) => (
-                  <li key={item}>
-                    <CheckCircle2 size={16} className="check-icon" />
-                    {item}
-                  </li>
-                ))}
+                {["Database Row Level Security: verification pending","Client bundle secret scan: verification pending","CORS and Origin policy: verification pending","Secret storage and rotation: verification pending","Authorization checks on mutations: verification pending"].map((item) => (<li key={item}><span className="badge badge-warning">pending</span>{item}</li>))}
               </ul>
             </div>
           )}
