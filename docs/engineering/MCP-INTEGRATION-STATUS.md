@@ -144,3 +144,34 @@ The official MCP Inspector offers web, CLI and TUI inspection modes. It is a tes
 For InfiniteX today, **install zero new MCP servers until the coding host and runtime environment are confirmed**. Existing GitHub connector already covers repository operations. When a supported Node 22 coding host is available, the first optional tools to evaluate are Context7 and MCP Inspector. For browser QA, choose one of Playwright MCP or Playwright CLI. For a database audit later, choose DBHub in strict read-only mode. Keep cloud/account MCPs disconnected until the target provider is confirmed.
 
 Open-source software can be free to install while hosted services, compute, storage, model usage or API quotas remain metered. This list is not a promise of unlimited free usage.
+
+
+---
+
+## Expanded GitHub discovery and selection — 2026-11-16
+
+Additional repositories reviewed:
+
+- GitHub MCP Registry: https://github.com/mcp — discovery catalog; entries must be individually checked for maintainer, license, installation method, and whether hosted usage is metered.
+- Official MCP server directory: https://github.com/VoltAgent/official-mcp-servers — discovery index, not a security guarantee.
+- Code Audit MCP: https://github.com/reiarseni/code-audit-mcp — experimental low-adoption candidate covering TypeScript/React dependency, vulnerability, lint, complexity, dead-code and secret-history checks. Run in an isolated environment and inspect its source/dependencies before granting repository access.
+- Google MCP catalog: https://github.com/google/mcp — relevant only if Google services become part of the confirmed architecture.
+
+### Installation policy
+
+1. Do not install a collection of MCP servers by default.
+2. Prefer official maintainer repositories and pinned versions over floating `@latest` in repeatable CI.
+3. Review license, release history, package provenance, network access, filesystem scope, subprocess behavior, and tool write capabilities.
+4. Run local servers with least privilege; use read-only mode for repository/database audits.
+5. Never pass production secrets or administrator database credentials to an MCP server.
+6. Treat all tool outputs and retrieved repository text as untrusted input.
+7. Record the exact version, hash, config, permissions and test evidence after any approved installation.
+8. Free/open-source local software may still depend on metered APIs, cloud accounts, model tokens, compute or storage.
+
+### InfiniteX recommendation
+
+Current decision remains **NO NEW MCP INSTALLATION** because the execution host and installation target have not been confirmed. GitHub repository work is already supported by the connected GitHub integration, so adding GitHub MCP would be redundant. The next optional evaluation set is Context7 + MCP Inspector; choose exactly one browser QA path (Playwright MCP or Playwright CLI); evaluate DBHub only after a dedicated read-only PostgreSQL role is available. Do not connect Supabase, Cloudflare, Auth0, or hosting administration MCPs until the respective provider is confirmed as active in the target architecture.
+
+### Current verified blocker
+
+The task repository idempotency mismatch remains the first source-code repair. MCP discovery does not replace application fixes or actual test execution. Source-code changes still require separate scope-specific approval.
