@@ -102,6 +102,15 @@ def test_rejects_noncanonical_file_list(signed_approval):
         ApprovalClaims.from_payload(duplicate)
 
 
+@pytest.mark.parametrize("unsafe_path", ["C:/Windows/system.ini", "src/\u0001app.py"])
+def test_rejects_cross_platform_or_control_character_paths(signed_approval, unsafe_path):
+    payload, _, _, _ = signed_approval
+    unsafe = deepcopy(payload)
+    unsafe["file_paths"] = [unsafe_path]
+    with pytest.raises(ApprovalRejected, match="FILE_PATH_UNSAFE"):
+        ApprovalClaims.from_payload(unsafe)
+
+
 def test_rejects_lifetime_over_fifteen_minutes(signed_approval):
     payload, _, _, _ = signed_approval
     long_lived = deepcopy(payload)
