@@ -122,6 +122,7 @@ def verify_ed25519_approval(
     expected_base_commit_sha: str,
     expected_proposal_id: str,
     expected_proposal_sha256: str,
+    expected_policy_version: str,
     expected_file_paths: tuple[str, ...],
     now: int,
 ) -> ApprovalClaims:
@@ -139,6 +140,8 @@ def verify_ed25519_approval(
         raise ApprovalRejected("PROPOSAL_ID_MISMATCH")
     if claims.proposal_sha256 != expected_proposal_sha256:
         raise ApprovalRejected("PROPOSAL_DIGEST_MISMATCH")
+    if claims.policy_version != expected_policy_version:
+        raise ApprovalRejected("POLICY_VERSION_MISMATCH")
     if claims.file_paths != tuple(sorted(set(expected_file_paths))):
         raise ApprovalRejected("FILE_SET_MISMATCH")
     if isinstance(now, bool) or not isinstance(now, int):
