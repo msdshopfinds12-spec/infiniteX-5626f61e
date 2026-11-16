@@ -117,11 +117,9 @@ Use the SDK default memory cache. Do not manually persist access tokens in local
 
 ## 6. Auth-aware API client pattern
 
-    import type { GetAccessTokenSilentlyOptions } from "@auth0/auth0-react";
-
-    type TokenProvider = (
-      options?: GetAccessTokenSilentlyOptions
-    ) => Promise<string>;
+    type TokenProvider = (options: {
+      authorizationParams: { audience: string };
+    }) => Promise<string>;
 
     export function createApiClient(getAccessToken: TokenProvider) {
       const baseUrl = import.meta.env.VITE_API_BASE_URL.replace(/\/$/, "");
