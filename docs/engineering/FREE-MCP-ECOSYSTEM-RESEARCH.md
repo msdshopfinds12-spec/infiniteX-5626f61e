@@ -189,3 +189,57 @@ Do not ship MCP credentials to the browser. Do not let a model choose arbitrary 
 - No database migration, deployment, DNS change, purchase, merge or production write was performed.
 
 Before any integration: confirm the target project/account, inspect the exact tool schemas and permission scopes, select read-only mode where possible, and obtain approval before writes or billable operations.
+
+
+---
+
+## 2026-11-16 official installation cross-check
+
+The current official Playwright getting-started documentation specifies Node.js 20 or newer and a compatible MCP client. The Playwright repository README may show a broader package engine requirement in some versions; use the stricter official setup-doc prerequisite (Node 20+) for a conservative setup. InfiniteX API package itself specifies Node >=22, so Node 22 is the practical common baseline for this repository.
+
+Playwright MCP official setup:
+- Docs: https://playwright.dev/docs/getting-started-mcp
+- Repository: https://github.com/microsoft/playwright-mcp
+- Standard client configuration:
+
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    }
+  }
+}
+```
+
+Playwright CLI alternative:
+- Repository: https://github.com/microsoft/playwright-cli
+- Upstream describes CLI + skills as potentially more token-efficient for coding agents than loading a large MCP tool schema and accessibility tree. Use CLI when concise repeatable commands are preferred; use MCP for stateful browser exploration.
+
+Chrome DevTools MCP alternative:
+- Repository: https://github.com/ChromeDevTools/chrome-devtools-mcp
+- Official setup: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/client-configurations.md
+- Example:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    }
+  }
+}
+```
+
+It requires Node.js LTS, npm and current Chrome. It can inspect and modify the connected browser context; do not attach a browser profile containing unrelated sensitive accounts.
+
+## Best-fit decision
+
+- First optional MCP to consider: Context7, because it supports current/version-specific documentation lookup and does not require InfiniteX production credentials.
+- First browser QA option: Playwright CLI for a coding-agent workflow; Playwright MCP if persistent interactive browser state is needed. Chrome DevTools MCP is an alternative when Chrome network/performance diagnostics are the priority.
+- Do not install all browser options. Pick one based on the actual coding host and test workflow.
+- Android note: local `npx` setup requires Node.js and a compatible MCP client. A GitHub repository link is source code, not an Android APK or one-tap ChatGPT Android installation.
+
+No installation or account connection was performed during this research update.
