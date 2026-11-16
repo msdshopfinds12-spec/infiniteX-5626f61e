@@ -67,3 +67,12 @@ test("shutdown controller rejects invalid dependencies and timeout values", () =
   assert.throws(() => createShutdownController({ close() {} }, { timeoutMs: 120_001 }), /timeoutMs/);
   assert.throws(() => createShutdownController({ close() {} }, { onTimeout: true }), /onTimeout/);
 });
+
+test("idle connection cleanup errors do not override server close result", async () => {
+  const server = {
+    close(callback) { queueMicrotask(() => callback(null)); },
+    closeIdleConnections() { throw new Error("idle cleanup failed"); },
+  };
+  const result = await createShutdownController(server).shutdown();
+  assert.deepEqual(result, { closed: true, timedOut: false, error: null });
+});
