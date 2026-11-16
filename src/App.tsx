@@ -39,7 +39,7 @@ export default function App() {
         label: "Tokens Used",
         value: "—",
         delta: "Not connected",
-        trend: "up" as const,
+        trend: "flat" as const,
         icon: Zap,
         accent: "warning" as const,
       },
