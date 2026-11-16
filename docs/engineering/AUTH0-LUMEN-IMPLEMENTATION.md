@@ -39,20 +39,26 @@ Status: source-reviewed blueprint; SDK installation and browser integration are 
 
 Authentication establishes identity. Authorization and tenant/resource ownership must still be enforced by every API operation.
 
-## 3. Dependency gate
+## 3. Dependency compatibility gate
 
-Do not import SDK components until dependencies and the npm lockfile are updated together.
+Auth0 React SDK and Lumen React must be evaluated independently.
 
-After a reviewed dependency change, from repository root:
+Auth0 React SDK:
+- The current React 18 SPA is a supported framework target for Auth0 React.
+- The SDK is not installed yet. Install only after reviewing the package/lockfile diff and confirming approved public configuration.
 
-    npm install @auth0/auth0-react
-    npm install @santi020k/lumen-react@5.0.0
-    npm run lint
-    npm run build
+Lumen React v5:
+- The connected catalog snapshot is 5.0.0.
+- The published package metadata declares peer dependencies react >=19 and motion ^14.0.0.
+- InfiniteX currently declares react/react-dom ^18.3.1 and does not have motion installed.
+- Therefore Lumen React v5 is NOT compatible with the current frontend dependency baseline. Do not run an install or add imports until a separate React 19 migration is planned and verified, or a compatible Lumen adapter/version is confirmed.
 
-Review package.json and package-lock.json as one change. Lumen 5.0.0 matches the connected catalog snapshot. Let npm resolve the current Auth0 SDK version and verify peer dependencies; do not guess a version.
+Safe alternatives:
+A. Keep React 18 and use current primitives or a React-18-compatible accessible component system.
+B. Plan a separate React 19 + required motion migration, verify all dependencies and app behavior, then evaluate Lumen React v5.
+C. Evaluate Lumen Elements integration separately; do not assume compatibility without checking its actual package and runtime contract.
 
-These install and build commands have NOT been executed in this session.
+Do not combine React major upgrade, Auth0 integration and chat rewrite into one unreviewed change. No install/build command has been executed in this session.
 
 ## 4. Auth0 configuration
 
@@ -158,7 +164,7 @@ Call getAccessTokenSilently before API requests; do not cache the token manually
 
 ## 7. Lumen chat component composition (after dependency install)
 
-The following React contracts were inspected in the Lumen catalog v5.0.0: MessageScroller, Message, Avatar, Bubble, StreamMessage and PromptComposer. The React components own their interactive behavior; do not mount the Astro runtime in this React app.
+The following React contracts were inspected in the Lumen catalog v5.0.0: MessageScroller, Message, Avatar, Bubble, StreamMessage and PromptComposer. These are API reference examples only; Lumen React v5 requires React >=19 and motion ^14.0.0, so do not import them into the current React 18.3.1 application. If a separately approved React 19 migration passes compatibility checks, the React components own their interactive behavior; do not mount the Astro runtime in this React app.
 
     import {
       Avatar, Bubble, Message, MessageScroller,
