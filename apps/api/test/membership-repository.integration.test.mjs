@@ -241,6 +241,34 @@ test("RLS: forged MAC, wrong transaction, wrong database role and unknown key al
   }
 });
 
+
+test("RLS: signed identity is rejected after membership revocation or account disablement", integration, async () => {
+  for (const mode of ["membership-revoked", "account-disabled"]) {
+    const fixture = await createFixture();
+    if (mode === "membership-revoked") {
+      await adminPool.query(
+        "UPDATE workspace_memberships SET status = 'revoked' WHERE workspace_id = $1 AND user_id = $2",
+        [fixture.workspaceId, fixture.actorId],
+      );
+    } else {
+      await adminPool.query("UPDATE app_users SET status = 'disabled' WHERE id = $1", [fixture.actorId]);
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await setIdentity(client, { userId: fixture.actorId, workspaceId: fixture.workspaceId });
+      const identity = await client.query("SELECT app_private.current_identity() AS identity");
+      assert.equal(identity.rows[0].identity, null);
+      const rows = await client.query("SELECT id FROM workspaces WHERE id = $1", [fixture.workspaceId]);
+      assert.equal(rows.rowCount, 0);
+      await client.query("ROLLBACK");
+    } finally {
+      client.release();
+    }
+  }
+});
+
 test("RLS: missing assertion returns no tenant rows", integration, async () => {
   const fixture = await createFixture();
   const client = await pool.connect();
