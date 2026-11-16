@@ -101,3 +101,20 @@ The current task route returns `execution: queued_no_worker_configured`. Do not 
 ## Explicit non-goals until approved
 
 No automatic migration, production DB write, paid plan activation, DNS change, secret rotation, merge, deployment or destructive operation is authorized by this roadmap.
+
+
+---
+
+## Source-level issue confirmed in task repository — 2026-11-16
+
+The current `createTask` implementation handles a unique-key conflict by selecting and returning the existing task. It does not compare the existing row's `agent_id` and `input` against the new request. Therefore, reusing the same tenant-scoped idempotency key for a different request can silently return an unrelated earlier task.
+
+**Required repair before worker implementation:**
+1. Normalize the idempotency payload deterministically (agent ID + canonical JSON input).
+2. On conflict, compare the stored request payload with the incoming payload.
+3. Return the existing task only when the request is identical.
+4. Return a deterministic 409 conflict for same key + different payload.
+5. Add repository integration tests for same-key/same-payload and same-key/different-payload cases.
+6. Preserve tenant isolation and ensure agent ownership is enforced by the composite tenant/agent foreign key and authorization checks.
+
+The current task contract test validates only the Zod request schema; it does not exercise database idempotency behavior. This repair should be a focused source-code patch, reviewed and tested before adding a worker.
