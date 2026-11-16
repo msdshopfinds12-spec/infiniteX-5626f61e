@@ -58,6 +58,9 @@ class ProviderPolicy:
         if current.tzinfo is None:
             return self._deny("INVALID_CLOCK", "Policy evaluation requires timezone-aware time.")
 
+        if not isinstance(provider_id, str) or not isinstance(model_id, str):
+            return self._deny("MODEL_ID_REQUIRED", "Provider and exact model ID must be strings.")
+
         provider = provider_id.strip().lower()
         model = model_id.strip()
 
@@ -88,6 +91,9 @@ class ProviderPolicy:
         if approval.verified_at.tzinfo is None or approval.expires_at.tzinfo is None:
             return self._deny("INVALID_APPROVAL_DATES", "Approval timestamps must include a timezone.")
 
+        if approval.expires_at <= approval.verified_at:
+            return self._deny("INVALID_APPROVAL_DATES", "Approval expiry must follow its verification time.")
+
         if approval.verified_at > current or approval.expires_at <= current:
             return self._deny("FREE_TIER_EVIDENCE_EXPIRED", "Free-tier evidence is stale or not yet valid.")
 
@@ -105,7 +111,11 @@ class ProviderPolicy:
         if cost != ZERO_USD:
             return self._deny("NONZERO_COST", "Strict $0 mode rejects every non-zero estimated cost.")
 
-        if quota_remaining is None or quota_remaining <= 0:
+        if (
+            isinstance(quota_remaining, bool)
+            or not isinstance(quota_remaining, int)
+            or quota_remaining <= 0
+        ):
             return self._deny("FREE_QUOTA_UNAVAILABLE", "Free quota is unknown or exhausted.")
 
         return PolicyDecision(True, "FREE_MODEL_ALLOWED", "Exact model is approved within verified free quota.")
