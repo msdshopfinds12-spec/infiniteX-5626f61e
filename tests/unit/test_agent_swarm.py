@@ -150,3 +150,49 @@ def test_coding_agent_without_proposal_does_not_claim_code_generation():
     assert response.execution_status == "NEEDS_REVIEW"
     assert response.provider_status == "NOT_CONFIGURED"
     assert "AI_PROVIDER_NOT_CONFIGURED" in response.issues
+
+
+def test_agent_request_rejects_blank_or_oversized_objectives():
+    with pytest.raises(ValueError, match="non-empty string"):
+        AgentRequest(objective=" ")
+    with pytest.raises(ValueError, match="4000-character"):
+        AgentRequest(objective="x" * 4001)
+
+
+def test_agent_request_rejects_non_object_or_non_json_payloads():
+    with pytest.raises(TypeError, match="JSON-compatible object"):
+        AgentRequest(objective="test", payload=["not", "an", "object"])
+    with pytest.raises(ValueError, match="JSON-compatible"):
+        AgentRequest(objective="test", payload={"not_serializable": object()})
+    with pytest.raises(ValueError, match="JSON-compatible"):
+        AgentRequest(objective="test", payload={"not_finite": float("nan")})
+
+
+def test_agent_request_bounds_payload_size_and_normalizes_correlation_id():
+    with pytest.raises(ValueError, match="65536-byte"):
+        AgentRequest(objective="test", payload={"data": "x" * 70_000})
+    request = AgentRequest(
+        objective="  inspect  ",
+        payload={"nested": {"value": 1}},
+        correlation_id="  corr-123  ",
+    )
+    assert request.objective == "inspect"
+    assert request.correlation_id == "corr-123"
+
+
+def test_agent_request_snapshots_json_payload_to_prevent_caller_mutation():
+    source = {"items": [1, 2]}
+    request = AgentRequest(objective="test", payload=source)
+    source["items"].append(3)
+    assert request.payload == {"items": [1, 2]}
+
+
+def test_master_agent_rejects_invalid_delegation_inputs_before_execution():
+    master = MasterAgent(IQEngine())
+    master.register_agent(ResearchAgent())
+    with pytest.raises(ValueError, match="non-empty string"):
+        master.delegate("research", 123)
+    with pytest.raises(TypeError, match="payload must be an object"):
+        master.delegate("research", "valid objective", payload=["bad"])
+    with pytest.raises(ValueError, match="Correlation ID"):
+        master.delegate("research", "valid objective", correlation_id=" ")
