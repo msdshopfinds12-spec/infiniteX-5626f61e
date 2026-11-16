@@ -8,7 +8,7 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'infinite_x_identity_verifier_owner') THEN
     CREATE ROLE infinite_x_identity_verifier_owner
-      NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+      NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION BYPASSRLS;
   END IF;
 END
 $$;
@@ -33,10 +33,15 @@ ALTER TABLE app_private.identity_signing_keys OWNER TO infinite_x_identity_verif
 REVOKE ALL ON TABLE app_private.identity_signing_keys FROM PUBLIC;
 REVOKE ALL ON TABLE app_private.identity_signing_keys FROM infinite_x_app_runtime_ci;
 
+-- This non-login BYPASSRLS role is used only by the fixed verifier below to
+-- confirm the signed subject still has an active membership and account.
+GRANT SELECT ON TABLE public.workspace_memberships, public.app_users
+  TO infinite_x_identity_verifier_owner;
+
 CREATE OR REPLACE FUNCTION app_private.current_identity()
 RETURNS jsonb
 LANGUAGE plpgsql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = pg_catalog, app_private
 AS $function$
@@ -126,6 +131,21 @@ BEGIN
      OR v_exp <= v_now
      OR v_exp <= v_iat
      OR v_exp - v_iat > 20 THEN
+    RETURN NULL;
+  END IF;
+
+  -- The signed subject must still be an active account and active member of
+  -- the signed workspace. The verifier owner's narrowly scoped BYPASSRLS grant
+  -- prevents recursive policy evaluation while checking this invariant.
+  IF NOT EXISTS (
+    SELECT 1
+      FROM public.workspace_memberships AS membership
+      INNER JOIN public.app_users AS account ON account.id = membership.user_id
+     WHERE membership.workspace_id = (v_claims->>'workspace_id')::uuid
+       AND membership.user_id = (v_claims->>'sub')::uuid
+       AND membership.status = 'active'
+       AND account.status = 'active'
+  ) THEN
     RETURN NULL;
   END IF;
 
