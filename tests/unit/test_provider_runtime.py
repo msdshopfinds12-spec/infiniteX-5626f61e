@@ -79,7 +79,7 @@ def test_local_rules_engine_is_deterministic_and_not_generative():
     result = LocalRulesEngine().classify("Please test the API and fix this database bug")
 
     assert result.category == "engineering"
-    assert result.matched_terms == ("test", "api", "database", "bug")
+    assert result.matched_terms == ("bug", "test", "api", "database")
     assert result.generative is False
 
 
