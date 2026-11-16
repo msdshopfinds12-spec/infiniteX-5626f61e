@@ -1,7 +1,5 @@
 """Immutable, hash-linked audit events with bounded, non-sensitive metadata."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import math
@@ -137,7 +135,7 @@ class AuditEvent:
         metadata: Mapping[str, object] | None = None,
         event_id: str,
         previous_event_sha256: str | None = None,
-    ) -> AuditEvent:
+    ) -> "AuditEvent":
         for name, value in (
             ("event_id", event_id),
             ("stream_id", stream_id),
