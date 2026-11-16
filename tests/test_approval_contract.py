@@ -45,6 +45,7 @@ def signed_approval():
         "expected_base_commit_sha": payload["base_commit_sha"],
         "expected_proposal_id": payload["proposal_id"],
         "expected_proposal_sha256": payload["proposal_sha256"],
+        "expected_policy_version": payload["policy_version"],
         "expected_file_paths": ("src/app.py",),
         "now": 1_100,
     }
@@ -114,3 +115,10 @@ def test_rejects_unknown_claims(signed_approval):
     extended = {**payload, "admin": True}
     with pytest.raises(ApprovalRejected, match="CLAIM_SET_INVALID"):
         ApprovalClaims.from_payload(extended)
+
+
+def test_rejects_wrong_policy_version(signed_approval):
+    payload, signature, public_key, expected = signed_approval
+    wrong_policy = {**expected, "expected_policy_version": "2.0"}
+    with pytest.raises(ApprovalRejected, match="POLICY_VERSION_MISMATCH"):
+        verify(payload, signature, public_key, wrong_policy)
