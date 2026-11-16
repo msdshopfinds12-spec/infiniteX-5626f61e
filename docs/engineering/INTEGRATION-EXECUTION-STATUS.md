@@ -28,7 +28,7 @@ Branch: `feature/infiniteX-platform-integrations`
 
 - `@auth0/auth0-react` is not installed.
 - No Auth0 tenant, SPA application, API audience, callback URLs or logout URLs have been verified.
-- The API verifier is present, but that alone does not establish a working browser login.
+- The API verifier is present and now explicitly restricts accepted JWT signing algorithms to RS256. This still does not establish a working browser login.
 - Before writing `.env`, obtain explicit user approval. Never read or commit real `.env` contents.
 - Use Universal Login with Authorization Code + PKCE, memory cache by default, an API audience, and server-side JWT verification. Do not accept ID tokens as API bearer tokens.
 
@@ -69,6 +69,14 @@ The install commands intentionally are not represented as executed. Review the r
 7. Add tests for login-required, unauthorized, expired token, conversation ownership, rate limit, streaming cancellation and API failure.
 8. Run lint, typecheck, build, browser tests, accessibility checks and security review.
 9. Release only after separate human approval.
+
+## Latest Auth0/Lumen implementation update
+
+- Auth0 React integration and token-handling guidance were inspected.
+- Lumen React v5.0.0 contracts were inspected for Message, MessageScroller, PromptComposer, StreamMessage, Avatar and Bubble.
+- API JWT verification now explicitly allowlists RS256.
+- The full implementation blueprint and code examples are in AUTH0-LUMEN-IMPLEMENTATION.md.
+- Frontend SDK imports are intentionally not committed yet because dependencies and lockfile have not been updated; importing them now would break the build.
 
 ## Evidence status
 
