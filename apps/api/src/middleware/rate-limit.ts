@@ -1,0 +1,5 @@
+import {createMiddleware} from "hono/factory";
+import type {AppBindings} from "../types.js";
+import {config} from "../config/env.js";
+type Bucket={count:number;resetAt:number};const buckets=new Map<string,Bucket>();
+export const userRateLimit=createMiddleware<AppBindings>(async(c,next)=>{const now=Date.now(),sub=c.get("principal").sub;let b=buckets.get(sub);if(!b||b.resetAt<=now){b={count:0,resetAt:now+config.RATE_LIMIT_WINDOW_MS};buckets.set(sub,b);}b.count++;if(buckets.size>10000)for(const[k,v]of buckets)if(v.resetAt<=now)buckets.delete(k);c.header("X-RateLimit-Limit",String(config.RATE_LIMIT_MAX_REQUESTS));c.header("X-RateLimit-Remaining",String(Math.max(0,config.RATE_LIMIT_MAX_REQUESTS-b.count)));if(b.count>config.RATE_LIMIT_MAX_REQUESTS){c.header("Retry-After",String(Math.max(1,Math.ceil((b.resetAt-now)/1000))));return c.json({error:{code:"RATE_LIMITED",message:"Request limit exceeded."}},429);}await next();});

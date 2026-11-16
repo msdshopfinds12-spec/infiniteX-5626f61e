@@ -1,0 +1,3 @@
+import {Hono} from "hono";
+import {config} from "../config/env.js";
+export const healthRoutes=new Hono().get("/health",c=>c.json({status:"ok",service:config.APP_NAME,timestamp:new Date().toISOString()})).get("/ready",c=>c.json({status:"ready",dependencies:{database:"not_configured",authentication:config.AUTH_ISSUER_URL?"configured":"not_configured",aiProvider:config.AI_BASE_URL&&config.AI_API_KEY&&config.AI_MODEL?"configured":"not_configured"}}));
