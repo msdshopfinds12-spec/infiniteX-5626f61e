@@ -8,7 +8,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$")
 _SENSITIVE_KEY_PARTS = (
