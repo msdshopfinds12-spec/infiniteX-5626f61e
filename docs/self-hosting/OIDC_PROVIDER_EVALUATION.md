@@ -1,91 +1,80 @@
-# InfiniteX OIDC Provider Evaluation
+# InfiniteX OIDC Provider Research and Comparison
 
-**Status:** EVALUATION TEMPLATE — no provider selected, installed or configured.  
-**Constraint:** self-hosted-first, free-tier-conscious, portable, Android-compatible client flow.  
-**Decision owner:** repository owner after reviewing operational responsibilities.
+Research date: 2026-11-17
+Status: evidence-backed shortlist; NO provider selected.
 
-## 1. Objective
+## Executive assessment
 
-Select an identity provider that implements standard OpenID Connect without making InfiniteX dependent on a specific vendor's proprietary user model. The provider authenticates the person; InfiniteX owns workspace membership, authorization, business rules and audit policy.
+Keep the API protocol-neutral and test candidates with the same relying-party test suite.
 
-## 2. Candidate shortlist
+- Keycloak documents OIDC endpoints, Authorization Code flow and a configurable PKCE S256 requirement. Its host resource use and operational complexity must be measured.
+- authentik documents OIDC provider behavior and PKCE support. Its official pricing page lists an Open Source tier and separates enterprise features/support.
+- ZITADEL documents self-hosting and broad identity features. Its GitHub repository identifies AGPL-3.0 with exceptions for selected directories; obtain license review.
+- Ory Kratos manages identities and sessions; Hydra provides OAuth2/OIDC. This is a composable multi-component architecture, not a single drop-in identity service. Ory documents separate enterprise offerings for additional features, security releases and support.
 
-The following are candidates for research, not endorsements or verified compatibility claims:
+No numeric winner is declared. Resource usage, restore behavior, Android redirects, upgrades and legal suitability have not been tested for this repository.
 
-- Keycloak
-- authentik
-- ZITADEL
-- Ory (Kratos/Hydra stack)
+## Evidence comparison
 
-A candidate must be checked against its current documentation, release cadence, license, supported deployment topology, resource requirements, backup/restore process and any paid feature boundary before selection. Do not infer that self-hosting automatically means zero operational cost.
+| Candidate | Documented capabilities | Important caveat | Disposition |
+|---|---|---|---|
+| Keycloak | OIDC provider endpoints, Authorization Code flow, PKCE S256 configuration | Measure host footprint; review realm/client hardening and upgrade/backup operations | Shortlist |
+| authentik | OAuth2/OIDC provider, authorization code and PKCE; Open Source offering | Confirm exact version and enterprise-only feature boundaries | Shortlist |
+| ZITADEL | OIDC, SAML, MFA/passkeys, multi-tenancy; self-host option | AGPL-3.0 repository license with directory-specific exceptions requires review | Conditional shortlist |
+| Ory Kratos + Hydra | Kratos identity/session management; Hydra OpenID Certified OAuth2/OIDC | Two-service composition and login/consent integration increase operational scope | Conditional alternative |
 
-## 3. Weighted scorecard
+## Official evidence
 
-Score each criterion from 1 (poor) to 5 (strong). Mark unknown items as NOT VERIFIED rather than guessing.
+### Keycloak
+- OIDC endpoints and Authorization Code flow: https://www.keycloak.org/securing-apps/oidc-layers
+- OIDC conformance: https://www.keycloak.org/securing-apps/specifications
+- PKCE S256 configuration: https://www.keycloak.org/docs/latest/server_admin/
+- Require PKCE S256 for public/native clients. Do not enable password/direct-access grant for this application.
 
-| Criterion | Weight | Evidence required |
+### authentik
+- OIDC/OAuth2 provider and PKCE: https://docs.goauthentik.io/add-secure-apps/providers/oauth2
+- Open Source and Enterprise distinction: https://docs.goauthentik.io/
+- Pricing/features: https://goauthentik.io/pricing/
+- Release notes: https://docs.goauthentik.io/releases/
+
+### ZITADEL
+- Product and self-hosting options: https://zitadel.com/docs
+- Repository/license: https://github.com/zitadel/zitadel
+
+### Ory
+- Open-source projects: https://www.ory.com/docs/oss/open-source
+- Kratos: https://github.com/ory/kratos
+- Hydra: https://github.com/ory/hydra
+
+## Weighted decision rubric
+
+| Criterion | Weight | Required proof |
 |---|---:|---|
-| OIDC standards and Authorization Code + PKCE | 15 | Official protocol documentation and interoperability test |
-| Security maintenance and release cadence | 15 | Security policy, advisories, supported versions |
-| Self-hosting and no mandatory managed service | 10 | Deployment docs and license |
-| Resource footprint for a small Linux host | 10 | Official sizing guidance and controlled test |
-| Backup, restore and upgrade process | 10 | Official operational docs and restore rehearsal |
-| Browser flow and secure session integration | 10 | Cookie, logout and CSRF integration design |
-| Android native system-browser flow | 10 | PKCE and redirect URI documentation |
-| User/identity export and portability | 5 | Export APIs and documented formats |
-| Admin RBAC and auditability | 5 | Admin access and audit documentation |
-| Total cost and paid-feature boundaries | 10 | Current license/pricing pages and deployment cost estimate |
+| OIDC code flow + PKCE S256 | 15 | Automated relying-party compatibility tests |
+| Security updates and vulnerability response | 15 | Security policy, supported versions and advisories |
+| License and intended use | 10 | Exact release license and legal review |
+| Resource use on target host | 10 | Repeatable CPU/RAM/storage measurement |
+| Backup and restore | 10 | Successful isolated restore rehearsal |
+| Android system-browser flow | 10 | Native PKCE redirect test |
+| Browser cookie/logout integration | 10 | CSRF, cookie and logout tests |
+| Export and portability | 5 | Identity export/import rehearsal |
+| Admin controls and auditability | 5 | Admin-role and event review |
+| Maintenance effort | 10 | Upgrade, rollback and monitoring procedure |
 
-Weighted score = sum(score / 5 × weight). Do not score an item until evidence is attached.
+Score 1–5 only when evidence is attached. Unknown means NOT VERIFIED, not zero and not a guessed score.
 
-## 4. Mandatory pass/fail gates
+## Recommended evaluation order
+1. Test authentik and Keycloak first using identical synthetic accounts and protocol cases.
+2. Measure both in the same disposable Linux environment.
+3. Evaluate ZITADEL only after license review.
+4. Evaluate Ory only if the separate Kratos/Hydra architecture is justified.
+5. Select only after resource, restore, security-maintenance, Android and license evidence is complete.
 
-A provider is rejected if any of these cannot be demonstrated:
-- Standard OIDC Authorization Code flow with PKCE for public clients.
-- Exact issuer, audience, signature, expiry, state and nonce validation support.
-- Secure redirect URI configuration and logout behavior.
-- No client secret embedded in Android application binaries.
-- Supported security updates and a documented upgrade process.
-- Export/backup and restore procedure.
-- No requirement to expose PostgreSQL or administrative interfaces publicly.
-- Clear license and commercial-use terms for the intended deployment.
-- No mandatory paid feature for baseline authentication.
-
-## 5. Integration boundary
-
-InfiniteX should depend on OIDC protocol behavior, not provider-specific database tables. Store a local identity key using the exact validated issuer + subject pair. Avoid automatic account linking based only on matching email addresses.
-
-Required configuration values must be supplied through server-side secret configuration after approval:
-- issuer URL
-- client ID
-- server-side client secret only for confidential backend clients, if the chosen flow requires one
-- exact redirect URI
-- allowed post-logout redirect URI
-- trusted audience/resource identifier where applicable
-
-Never commit actual values. Never put a confidential client secret in Vite environment variables or Android app code.
-
-## 6. Local development alternative
-
-Use a fake OIDC test issuer or isolated test fixtures only if they accurately exercise state, nonce, PKCE, issuer and signature validation. A development mock must be impossible to enable in production configuration. It must not be presented as real authentication.
-
-## 7. Decision record template
-
-- Candidate:
-- Version/release:
-- License:
-- Official docs reviewed:
-- Security policy reviewed:
-- OIDC PKCE evidence:
-- Android flow evidence:
-- Resource footprint:
-- Backup/restore evidence:
-- Paid-feature boundary:
-- Known limitations:
-- Test environment:
-- Decision: ACCEPT / REJECT / NEEDS EVIDENCE
-- Reviewer and date:
-
-## 8. Current result
-
-**NOT SELECTED.** No provider was installed, configured, exposed or connected. Next action is evidence collection and a controlled compatibility test after provider selection is explicitly approved.
+## Hard gates and safety
+- PKCE S256 for public clients; strict redirect URI allowlist.
+- Validate issuer, audience, signature, expiry, state and nonce.
+- Supported security update path and restorable backups.
+- Clear license; no public database/admin port; no secrets in client bundles.
+- No public exposure during evaluation; synthetic users only.
+- No provider installation, paid provisioning, firewall change, secrets, migrations or deployment without separate approval.
+- No provider is selected by this document.
