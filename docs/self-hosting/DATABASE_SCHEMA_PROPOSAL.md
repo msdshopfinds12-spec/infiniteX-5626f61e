@@ -15,7 +15,7 @@
 
 ## Proposed tables
 
-### users
+### app_users
 | Column | Type proposal | Notes |
 |---|---|---|
 | id | uuid | Primary key |
@@ -82,10 +82,10 @@ Never persist raw session tokens. Decide whether the selected OIDC provider or a
 Audit retention, partitioning, tamper-evidence and privileged access need separate review.
 
 ## Relationship sketch
-- users 1-to-many identity_links
-- users many-to-many workspaces through workspace_memberships
-- users 1-to-many sessions, if local sessions are selected
-- users 1-to-many audit_events as actor
+- app_users 1-to-many identity_links
+- app_users many-to-many workspaces through workspace_memberships
+- app_users 1-to-many sessions, if local sessions are selected
+- app_users 1-to-many audit_events as actor
 
 ## Constraints and transaction rules
 - Unique issuer + subject on identity_links.
