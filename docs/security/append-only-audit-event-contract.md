@@ -2,10 +2,11 @@
 
 ## Status
 
-- CODED: immutable event envelope, deterministic canonical SHA-256 digest, optional previous-event hash, bounded metadata, sensitive-key rejection, and append-only storage protocol.
-- NOT IMPLEMENTED: PostgreSQL schema, database permissions, transaction adapter, per-stream locking, key management, independent backup, and tamper-evidence verification job.
-- TESTED: the audit-event tests passed within GitHub Actions run `43935238843` on commit `99226a393510ea99c11450ce4976cec731545375`; the run also passed changed-file Ruff, the Python test job, frontend TypeScript, and Vite build. This evidence applies to that exact commit only.
-- NOT AUTHORIZED: schema migrations or deployment.
+- IMPLEMENTED ON THE HARDENING BRANCH: immutable event contract, canonical SHA-256 hashing, SQLAlchemy audit/approval/nonce/outbox models, transaction-scoped persistence adapter, and persisted-chain verifier.
+- IMPLEMENTED ON THE HARDENING BRANCH: PostgreSQL 16 GitHub Actions service and isolated integration tests for concurrent appends, transaction rollback, restricted-role RLS isolation, and missing tenant context.
+- TEST EVIDENCE: GitHub Actions run `43938263758` executed 313 Python tests successfully, including the PostgreSQL integration tests, and the frontend TypeScript/build jobs passed. The changed-file Ruff step failed on two E501 formatting findings in the new PostgreSQL test file. Those two lines were corrected in commit `1230144e45b93aea2bceda025d28a8443e3c3ed3`; follow-up run `43938501823` is in progress. Do not treat the overall CI pipeline as green until that run completes successfully.
+- NOT VERIFIED: production database grants, execution of Alembic revision `0003_durable_audit_approval`, PostgreSQL behavior using the actual production role/policies, independent external checkpoints, and production backup/restore.
+- NOT AUTHORIZED: running migrations, deploying, or changing production data.
 
 ## Event contents
 
