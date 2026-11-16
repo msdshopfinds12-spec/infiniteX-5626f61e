@@ -113,6 +113,8 @@ def test_coding_agent_validates_proposal_but_never_writes_or_executes():
     assert response.provider_status == "LOCAL_POLICY_ONLY"
     assert response.output["automatic_write_performed"] is False
     assert response.output["code_execution_performed"] is False
+    assert len(response.output["proposal_sha256"]) == 64
+    assert response.output["fingerprint_policy_version"] == "1.0"
     assert "HUMAN_APPROVAL_REQUIRED" in response.issues
 
 
