@@ -9,7 +9,7 @@ export const requireAuth=createMiddleware<AppBindings>(async(c,next)=>{
  const header=c.req.header("authorization");
  if(!header?.startsWith("Bearer "))return c.json({error:{code:"UNAUTHORIZED",message:"Bearer token required."}},401);
  let subject:string;
- try{jwks??=createRemoteJWKSet(new URL(jwksUrl));const verified=await jwtVerify(header.slice(7),jwks,{issuer,audience});if(typeof verified.payload.sub!=="string"||!verified.payload.sub)return c.json({error:{code:"UNAUTHORIZED",message:"Token subject is missing."}},401);subject=verified.payload.sub;}
+ try{jwks??=createRemoteJWKSet(new URL(jwksUrl));const verified=await jwtVerify(header.slice(7),jwks,{issuer,audience,algorithms:["RS256"]});if(typeof verified.payload.sub!=="string"||!verified.payload.sub)return c.json({error:{code:"UNAUTHORIZED",message:"Token subject is missing."}},401);subject=verified.payload.sub;}
  catch{return c.json({error:{code:"UNAUTHORIZED",message:"Token is invalid or expired."}},401);}
  c.set("principal",{sub:subject,issuer});
  await next();
