@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
-from types import MappingProxyType
-
 import hashlib
 import json
 import math
 import re
+from collections.abc import Mapping
+from dataclasses import dataclass
+from types import MappingProxyType
 
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
