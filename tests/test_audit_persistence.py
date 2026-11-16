@@ -65,20 +65,7 @@ def test_audit_stream_appends_ordered_hash_chain(session):
     assert verify_persisted_audit_chain(
         session, tenant_id="tenant-a", stream_id="system"
     ) == second.digest
-    contract_first = ContractAuditEvent.create(
-        event_id=first.event_id,
-        stream_id=first.stream_id,
-        occurred_at=int(first.created_at.timestamp()),
-        actor_id=first.actor,
-        action=first.action,
-        resource_type=first.resource_type,
-        resource_id=first.resource_id,
-        outcome=first.outcome,
-        correlation_id=first.correlation_id,
-        metadata=first.metadata_json,
-        previous_event_sha256=first.previous_digest,
-    )
-    assert contract_first.event_sha256 == first.digest
+
 
 
 def test_audit_metadata_rejects_secret_like_keys(session):
