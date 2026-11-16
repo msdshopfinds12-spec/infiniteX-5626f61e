@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any
-from sqlalchemy import select, text, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 from database.models.task import TaskRecord
 from database.tenant_context import set_tenant_context
