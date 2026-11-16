@@ -136,6 +136,14 @@ test("runtime role connects with restricted database identity and cannot read ve
   assert.equal(role.rows[0].rolcreaterole, false);
   assert.equal(role.rows[0].rolreplication, false);
   assert.equal(role.rows[0].rolbypassrls, false);
+
+  const verifier = await adminPool.query(
+    "SELECT rolcanlogin, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'infinite_x_identity_verifier_owner'",
+  );
+  assert.equal(verifier.rows.length, 1);
+  assert.equal(verifier.rows[0].rolcanlogin, false);
+  assert.equal(verifier.rows[0].rolsuper, false);
+  assert.equal(verifier.rows[0].rolbypassrls, true);
 });
 
 test("RLS: valid assertion sees its workspace but cannot read or mutate another workspace", integration, async () => {
