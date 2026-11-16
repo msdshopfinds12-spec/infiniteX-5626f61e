@@ -6,6 +6,7 @@ on:
       - feat/provider-neutral-billing-sandbox
     paths:
       - "apps/api/**"
+      - "infra/db/**"
       - ".github/workflows/self-hosted-api.yml"
   pull_request:
     paths:
