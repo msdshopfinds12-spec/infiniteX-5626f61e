@@ -18,7 +18,7 @@ BEGIN
 END
 $;
 
-DO $$
+DO $
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'infinite_x_identity_verifier_owner') THEN
     CREATE ROLE infinite_x_identity_verifier_owner
