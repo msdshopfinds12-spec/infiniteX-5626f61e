@@ -51,3 +51,16 @@ File: `apps/api/test/membership-repository.integration.test.mjs`
 - The CI role-creation SQL is not a production role-provisioning migration. Production role names, credentials, secret rotation, connection limits, network policy, ownership, and grants require a separate reviewed deployment plan.
 - The repository has no committed `package-lock.json`; exact direct dependency pinning does not lock all transitive dependencies. Reproducible lockfile work remains outstanding.
 - No production database was accessed or migrated. No merge, deployment, public release, or persistent data change was performed.
+
+
+## Follow-up: RLS and lockfile verification
+- Added forced workspace-scoped RLS migration: `infra/db/migrations/0002_workspace_row_level_security.sql`.
+- Repository sets transaction-local workspace/user context before tenant queries.
+- Added cross-workspace read/write and missing-context denial tests.
+- Committed `apps/api/package-lock.json`; CI now uses `npm ci --ignore-scripts --no-audit --no-fund`.
+- GitHub Actions Run #36: https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/43958614854
+- Tested commit: `44de305e1253429f6c7df191afd9ef2511c59bf3`
+- Results: 40 passed, 0 failed, 0 skipped; PostgreSQL migration, RLS, runtime least-privilege and schema integration checks passed.
+- Detailed RLS/build report: `docs/self-hosting/POSTGRES_RLS_AND_REPRODUCIBLE_BUILDS_REPORT.md`.
+
+Security qualification: custom GUC tenant context is caller-writable by a compromised runtime database session. This is defense-in-depth for query-scoping mistakes, not a cryptographic boundary against arbitrary SQL execution. A stronger signed-context trust design remains a production prerequisite.
