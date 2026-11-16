@@ -14,6 +14,10 @@ autonomous coding agent.
   paths, secret-like content, and proposal size.
 - `iq_core/agents/coding_agent.py` can evaluate a structured proposal supplied
   in an agent request and return a deterministic policy decision.
+- `iq_core/agents/proposal_fingerprint.py` computes a stable SHA-256 digest
+  over the proposal ID, target branch, rationale, policy version, and sorted
+  file paths and contents. The coding agent returns this digest for proposals
+  that pass screening.
 - `tests/unit/test_code_change_policy.py` and the coding-agent tests cover the
   safety boundaries.
 - A valid proposal returns `REVIEW_REQUIRED`, not `APPROVED`.
@@ -31,7 +35,9 @@ autonomous coding agent.
 4. **SCREEN** — run deterministic policy checks, secret scanning, path checks,
    dependency/license review, and static analysis.
 5. **HUMAN APPROVAL** — require an authenticated, explicit approval bound to
-   the exact proposal digest, target branch, file list, and expiry.
+   the exact proposal digest, target branch, file list, policy version, reviewer,
+  and expiry. Approval evidence must be authenticated by a trusted service;
+  a digest alone is not proof of reviewer identity or authorization.
 6. **APPLY** — only a separate trusted Git integration may write the approved
    patch. Re-read the branch head and use compare-and-swap semantics to avoid
    overwriting concurrent work.
@@ -59,8 +65,10 @@ autonomous coding agent.
 
 ## Important limitations
 
-The current validator is a first-pass deterministic screening layer, not a
-complete security scanner. Secret-pattern matching can miss unknown formats
+The current validator and proposal fingerprint are first-pass controls, not a
+complete security scanner or approval service. A SHA-256 digest detects changes
+when compared against a trusted previously approved digest; it does not
+authenticate the approver or authorize an apply operation. Secret-pattern matching can miss unknown formats
 and can produce false positives. It does not parse ASTs, prove code safety,
 verify dependency licenses, sandbox execution, or establish that a patch is
 correct. A separate review and test system remains mandatory.
