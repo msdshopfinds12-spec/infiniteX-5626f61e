@@ -60,7 +60,7 @@ atomic ordering in storage.
 - IMPLEMENTED, NOT EXECUTED: Alembic revision `0003_durable_audit_approval`. No database migration has been run.
 - AUTHORED, NOT EXECUTED: SQLite-backed unit tests for hash-chain sequencing, metadata rejection, atomic approval persistence, duplicate nonce rejection, and expired-intent rejection.
 - NOT VERIFIED: PostgreSQL integration behavior, concurrent first-writer retry behavior, actual RLS enforcement under the production application role, database grants, external checkpointing, and worker dispatch.
-- CI STATUS: no successful GitHub Actions result has been confirmed for these new commits. Vercel status contexts currently report build-rate-limit failures; these are not evidence of GitHub Actions test results.
+- CI STATUS (superseded by the later run below): earlier implementation commits did not yet have a confirmed successful Actions run. Vercel build-rate-limit status contexts are separate from GitHub Actions.
 
 The first event in a new stream is protected by a composite primary key on the stream head. If concurrent first writers race, one transaction may receive a uniqueness error and must retry the entire transaction. Existing stream appends use SELECT FOR UPDATE to serialize sequence assignment.
 
@@ -76,7 +76,7 @@ The persisted event payload binds the tenant identifier into the hashed metadata
 
 The adapter normalizes stored timestamps to UTC when rehydrating rows because SQLite may return timezone-naive values for timezone-aware columns. Input timestamps remain required to be timezone-aware.
 
-Additional tests have been authored for canonical digest parity, stored-chain verification, digest tampering, sequence gaps, and tenant binding. These tests are committed but have not yet been executed in this workflow.
+Additional tests cover canonical digest parity, stored-chain verification, digest tampering, sequence gaps, and tenant binding. GitHub Actions run `43937623350` on commit `64aaeeab16005ad36dde60acf8b6c71e6a4c5e14` completed successfully: changed-file Ruff passed, all 309 Python tests passed, frontend TypeScript passed, and the Vite production build passed. This CI evidence applies to that exact commit.
 
 Remaining limitations:
 - PostgreSQL concurrency and RLS behavior are not yet tested.
