@@ -51,6 +51,9 @@ export function createSessionService({
       if (!csrf || typeof csrf.token !== "string" || typeof csrf.tokenHash !== "string") {
         throw new TypeError("csrfFactory returned an invalid token pair");
       }
+      if (hashOpaqueToken(csrf.token) !== csrf.tokenHash) {
+        throw new TypeError("csrfFactory returned a mismatched token digest");
+      }
 
       const expiresAt = new Date(now + ttlSeconds * 1000).toISOString();
       await repository.create({
@@ -73,8 +76,12 @@ export function createSessionService({
 
       const now = assertClock(clock);
       const session = await repository.findActiveByTokenHash(tokenHash, new Date(now).toISOString());
-      if (!session || session.revokedAt || Date.parse(session.expiresAt) <= now) return null;
+      if (!session || session.revokedAt) return null;
+
+      const expiresAt = Date.parse(session.expiresAt);
+      if (!Number.isFinite(expiresAt) || expiresAt <= now) return null;
       if (typeof session.userId !== "string" || !UUID_PATTERN.test(session.userId)) return null;
+      if (typeof session.csrfTokenHash !== "string" || !/^[a-f0-9]{64}$/.test(session.csrfTokenHash)) return null;
 
       return Object.freeze({
         userId: session.userId,
