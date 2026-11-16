@@ -18,6 +18,10 @@ autonomous coding agent.
   over the proposal ID, target branch, rationale, policy version, and sorted
   file paths and contents. The coding agent returns this digest for proposals
   that pass screening.
+- `iq_core/agents/approval_gate.py` verifies short-lived HMAC-signed approval
+  evidence bound to the exact digest, branch, file set, reviewer identifier,
+  and policy version. It verifies evidence only; it does not issue approvals,
+  authenticate a reviewer, or apply a patch.
 - `tests/unit/test_code_change_policy.py` and the coding-agent tests cover the
   safety boundaries.
 - A valid proposal returns `REVIEW_REQUIRED`, not `APPROVED`.
@@ -36,8 +40,10 @@ autonomous coding agent.
    dependency/license review, and static analysis.
 5. **HUMAN APPROVAL** — require an authenticated, explicit approval bound to
    the exact proposal digest, target branch, file list, policy version, reviewer,
-  and expiry. Approval evidence must be authenticated by a trusted service;
-  a digest alone is not proof of reviewer identity or authorization.
+  and expiry. Approval evidence must be signed by a trusted server-side service only after
+  authenticating an authorized human reviewer. The verification key must stay
+  in that trusted service's secret store; never place it in a client, model
+  prompt, repository file, or log. A digest alone is not proof of identity.
 6. **APPLY** — only a separate trusted Git integration may write the approved
    patch. Re-read the branch head and use compare-and-swap semantics to avoid
    overwriting concurrent work.
@@ -68,7 +74,11 @@ autonomous coding agent.
 The current validator and proposal fingerprint are first-pass controls, not a
 complete security scanner or approval service. A SHA-256 digest detects changes
 when compared against a trusted previously approved digest; it does not
-authenticate the approver or authorize an apply operation. Secret-pattern matching can miss unknown formats
+authenticate the approver or authorize an apply operation. The HMAC verifier
+requires an externally managed key of at least 32 bytes and accepts approvals
+with a maximum 15-minute lifetime. Production key custody, reviewer identity
+and authorization, key rotation, replay prevention, and a trusted apply
+service remain integration requirements. Secret-pattern matching can miss unknown formats
 and can produce false positives. It does not parse ASTs, prove code safety,
 verify dependency licenses, sandbox execution, or establish that a patch is
 correct. A separate review and test system remains mandatory.
