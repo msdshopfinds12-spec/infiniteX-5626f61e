@@ -30,13 +30,22 @@ Date: 2026-11-17
 | Check | Status |
 |---|---|
 | GitHub file writes | VERIFIED by successful commit responses |
-| New source and test files fetch-back | PENDING at report creation |
-| Local Node tests | NOT RUN in this environment |
-| GitHub Actions run | PENDING inspection |
+| New source and test files fetch-back | VERIFIED |
+| Local Node tests | NOT RUN here; GitHub Actions executed the suite |
+| GitHub Actions run | PASS — run #8, Node 22, syntax checks passed, 22 tests passed / 0 failed |
 | Database integration | NOT IMPLEMENTED |
 | HTTP integration | NOT IMPLEMENTED |
 | OIDC integration | NOT IMPLEMENTED |
 | Production audit | NOT PERFORMED |
+
+## CI evidence
+- Workflow: Self-Hosted API Checks
+- Run: https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/43955027186
+- Commit tested: 1edda2aff82a4ec5aea98f178a0bf932cba76ac7
+- Result: completed / success
+- Syntax checks: success
+- Node test runner: 22 passed, 0 failed
+- Earlier run failed because one assertion expected an outdated denial reason; the assertion was corrected and the subsequent workflow passed.
 
 ## Scope controls
 No dependencies installed, no database schema or migrations changed, no secrets configured, no provider installed, no public ingress, no merge and no deployment.
