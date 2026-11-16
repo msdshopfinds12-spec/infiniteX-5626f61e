@@ -32,6 +32,19 @@ def test_protected_branches_are_rejected():
         assert "PROTECTED_BRANCH_FORBIDDEN" in decision.reason_codes
 
 
+def test_only_the_explicitly_authorized_branch_is_accepted():
+    for branch in (
+        "fix/another-branch",
+        "feat/new-feature",
+        "chore/maintenance",
+        "phase-9/capability-mesh",
+    ):
+        decision = CodeChangePolicy().evaluate(
+            proposal(ProposedFileChange("iq_core/example.py", "VALUE = 1"), branch=branch)
+        )
+        assert decision.status == "BLOCKED"
+
+
 def test_unapproved_or_empty_branch_namespace_is_rejected():
     for branch in ("release/production", "fix/"):
         decision = CodeChangePolicy().evaluate(
