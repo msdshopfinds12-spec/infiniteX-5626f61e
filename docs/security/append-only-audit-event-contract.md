@@ -4,7 +4,7 @@
 
 - CODED: immutable event envelope, deterministic canonical SHA-256 digest, optional previous-event hash, bounded metadata, sensitive-key rejection, and append-only storage protocol.
 - NOT IMPLEMENTED: PostgreSQL schema, database permissions, transaction adapter, per-stream locking, key management, independent backup, and tamper-evidence verification job.
-- NOT TESTED: tests are authored but have not been executed in this change.
+- TESTED: the audit-event tests passed within GitHub Actions run `43935238843` on commit `99226a393510ea99c11450ce4976cec731545375`; the run also passed changed-file Ruff, the Python test job, frontend TypeScript, and Vite build. This evidence applies to that exact commit only.
 - NOT AUTHORIZED: schema migrations or deployment.
 
 ## Event contents
