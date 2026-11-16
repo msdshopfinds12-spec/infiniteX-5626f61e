@@ -26,12 +26,13 @@ function sendJson(response, statusCode, body, requestId, headOnly = false) {
  */
 export function createInfiniteXServer({
   readinessCheck = async () => false,
+  readinessTimeoutMs = 2_000,
   logger = () => {},
 } = {}) {
   if (typeof readinessCheck !== "function") {
     throw new TypeError("readinessCheck must be a function");
   }
-  if (typeof logger !== "function") {
+  if (!Number.isSafeInteger(readinessTimeoutMs) || readinessTimeoutMs < 1 || readinessTimeoutMs > 30_000) {\n    throw new RangeError("readinessTimeoutMs must be an integer between 1 and 30000");\n  }\n  if (typeof logger !== "function") {
     throw new TypeError("logger must be a function");
   }
 
@@ -77,10 +78,19 @@ export function createInfiniteXServer({
 
       if (route === "/ready") {
         let ready = false;
+        let timeout;
         try {
-          ready = (await readinessCheck()) === true;
+          ready = await Promise.race([
+            Promise.resolve().then(() => readinessCheck()),
+            new Promise((resolve) => {
+              timeout = setTimeout(() => resolve(false), readinessTimeoutMs);
+              timeout.unref?.();
+            }),
+          ]).then((result) => result === true);
         } catch {
           ready = false;
+        } finally {
+          clearTimeout(timeout);
         }
         statusCode = ready ? 200 : 503;
         sendJson(
