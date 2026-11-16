@@ -103,3 +103,12 @@ test("HEAD health requests return headers without a response body", async () => 
     assert.ok(response.headers.get("content-length"));
   });
 });
+
+test("HEAD readiness requests return headers without a response body", async () => {
+  await withServer({ readinessCheck: async () => true }, async (base) => {
+    const response = await fetch(`${base}/ready`, { method: "HEAD" });
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), "");
+    assert.ok(response.headers.get("content-length"));
+  });
+});
