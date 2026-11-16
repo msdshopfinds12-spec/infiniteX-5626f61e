@@ -1,4 +1,5 @@
 import {Hono} from "hono";
+import {bodyLimit} from "hono/body-limit";
 import {cors} from "hono/cors";
 import {logger} from "hono/logger";
 import {requestId} from "hono/request-id";
@@ -14,6 +15,8 @@ const app=new Hono<AppBindings>();
 app.use("*",requestId());
 app.use("*",logger(message=>console.info(message)));
 app.use("*",secureHeaders());
+// Bound request-body memory use before JSON parsing or route validation.
+app.use("*",bodyLimit({maxSize:128*1024}));
 app.use("*",cors({origin:origin=>allowedOrigins.includes(origin)?origin:"",allowMethods:["GET","POST","OPTIONS"],allowHeaders:["Content-Type","Authorization"],maxAge:600}));
 app.onError(onError);
 app.get("/",c=>c.json({name:config.APP_NAME,apiVersion:"v1",status:"ok"}));
