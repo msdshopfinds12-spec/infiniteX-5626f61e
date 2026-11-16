@@ -4,7 +4,8 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
-DO $$BEGIN
+DO $
+BEGIN
   IF NOT EXISTS (
     SELECT 1
       FROM pg_extension AS extension
