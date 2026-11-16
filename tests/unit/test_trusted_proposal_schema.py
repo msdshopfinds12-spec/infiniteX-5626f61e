@@ -9,7 +9,7 @@ def valid_payload(**overrides):
         "proposal_id": "proposal-1", "repository_id": 42,
         "repository_full_name": "owner/repo", "target_branch": "fix/example",
         "base_commit_sha": "a" * 40, "policy_version": "trusted-proposal-policy/1",
-        "files": [{"path": "src/app.py", "content": "print('safe')\\n"}],
+        "files": [{"path": "src/app.py", "content": "print('safe')\n"}],
     }
     return data | overrides
 
@@ -20,7 +20,10 @@ def test_valid_proposal_schema_accepts_exact_repository_and_manifest():
     assert item.files[0].path == "src/app.py"
 
 
-@pytest.mark.parametrize("path", ["../escape.py", "/absolute.py", "a\\\\b.py", ".git/config", ".github/workflows/ci.yml", ".env", "keys/private.pem"])
+@pytest.mark.parametrize("path", [
+    "../escape.py", "/absolute.py", "a\\b.py", ".git/config",
+    ".github/workflows/ci.yml", ".env", "keys/private.pem",
+])
 def test_schema_rejects_unsafe_paths(path):
     with pytest.raises(ValidationError):
         TrustedProposalCreate.model_validate(valid_payload(files=[{"path": path, "content": "x"}]))

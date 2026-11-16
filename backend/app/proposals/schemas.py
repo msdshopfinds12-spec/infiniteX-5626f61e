@@ -17,7 +17,7 @@ class ProposalFileInput(BaseModel):
     @field_validator("path")
     @classmethod
     def validate_path(cls, value: str) -> str:
-        if "\\\\" in value or value.startswith("/") or "\\x00" in value:
+        if "\\" in value or value.startswith("/") or "\x00" in value:
             raise ValueError("path must be a relative POSIX path")
         path = PurePosixPath(value)
         if str(path) != value or any(part in {".", ".."} for part in path.parts):
@@ -27,7 +27,7 @@ class ProposalFileInput(BaseModel):
         if path.parts[:2] == (".github", "workflows"):
             raise ValueError("workflow changes require a separate privileged process")
         lowered = value.lower()
-        if any(part == "secrets" for part in path.parts) or lowered.endswith((".pem", ".key", ".p12", ".pfx")):
+        if any(part.lower() == "secrets" for part in path.parts) or lowered.endswith((".pem", ".key", ".p12", ".pfx")):
             raise ValueError("sensitive file paths are forbidden")
         if path.name in {".env", ".env.local", ".env.production"} or path.name.startswith(".env."):
             raise ValueError("environment files are forbidden")
