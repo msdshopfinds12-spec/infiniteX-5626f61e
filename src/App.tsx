@@ -30,7 +30,7 @@ export default function App() {
         label: "Pipelines / 24h",
         value: "—",
         delta: "Not connected",
-        trend: "up" as const,
+        trend: "flat" as const,
         icon: GitBranch,
         accent: "success" as const,
       },
