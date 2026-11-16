@@ -6,7 +6,11 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from database.audit_persistence import (\n    append_audit_event,\n    persist_verified_approval,\n    verify_persisted_audit_chain,\n)\nfrom iq_core.audit.audit_event import AuditEvent as ContractAuditEvent
+from database.audit_persistence import (
+    append_audit_event,
+    persist_verified_approval,
+    verify_persisted_audit_chain,
+)\nfrom iq_core.audit.audit_event import AuditEvent as ContractAuditEvent
 from database.models import (
     ApprovalIntent,
     AuditEvent,
@@ -58,6 +62,23 @@ def test_audit_stream_appends_ordered_hash_chain(session):
     assert head is not None
     assert head.sequence == 2
     assert head.last_digest == second.digest
+    assert verify_persisted_audit_chain(
+        session, tenant_id="tenant-a", stream_id="system"
+    ) == second.digest
+    contract_first = ContractAuditEvent.create(
+        event_id=first.event_id,
+        stream_id=first.stream_id,
+        occurred_at=int(first.created_at.timestamp()),
+        actor_id=first.actor,
+        action=first.action,
+        resource_type=first.resource_type,
+        resource_id=first.resource_id,
+        outcome=first.outcome,
+        correlation_id=first.correlation_id,
+        metadata=first.metadata_json,
+        previous_event_sha256=first.previous_digest,
+    )
+    assert contract_first.event_sha256 == first.digest
 
 
 def test_audit_metadata_rejects_secret_like_keys(session):
