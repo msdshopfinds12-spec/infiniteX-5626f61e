@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 
 import pytest
@@ -95,7 +95,7 @@ def test_approval_nonce_intent_audit_and_outbox_are_atomic(session):
             raw_nonce="one-time-random-nonce",
             request_digest=request_digest,
             signer_key_id="owner-key-1",
-            expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+            expires_at=datetime.now(UTC) + timedelta(minutes=5),
             actor="owner",
         )
 
@@ -108,7 +108,7 @@ def test_approval_nonce_intent_audit_and_outbox_are_atomic(session):
 
 def test_duplicate_nonce_rejects_second_intent(session):
     request_digest = sha256(b"approved request").hexdigest()
-    expiry = datetime.now(timezone.utc) + timedelta(minutes=5)
+    expiry = datetime.now(UTC) + timedelta(minutes=5)
     with session.begin():
         persist_verified_approval(
             session,
@@ -150,7 +150,7 @@ def test_approval_persistence_rejects_expired_intent(session):
                 raw_nonce="nonce",
                 request_digest=sha256(b"request").hexdigest(),
                 signer_key_id="owner-key-1",
-                expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+                expires_at=datetime.now(UTC) - timedelta(seconds=1),
                 actor="owner",
             )
     assert session.scalar(select(ApprovalIntent)) is None
