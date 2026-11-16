@@ -2,7 +2,7 @@
 
 Date: 2026-11-17
 Branch: feat/provider-neutral-billing-sandbox
-Status at commit: IMPLEMENTED; CI result pending.
+Status: IMPLEMENTED; PostgreSQL 17 integration workflow PASS.
 
 ## Scope
 Run the existing identity/workspace migration against an ephemeral PostgreSQL 17 service in GitHub Actions. Use synthetic fixtures, assert schema constraints, and roll back test fixtures. The CI database is isolated to the workflow run.
@@ -29,6 +29,14 @@ Run the existing identity/workspace migration against an ephemeral PostgreSQL 17
 - No persistent volume or public deployment.
 - No migration executed outside the ephemeral CI service.
 - No merge or deployment.
+
+## CI evidence
+- Run: https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/43956081993
+- Run #16 completed successfully.
+- PostgreSQL 17 service initialized and passed its health check.
+- Migration application passed.
+- Synthetic relational and constraint assertions passed.
+- Existing Node syntax checks and 29 unit tests passed in the same job.
 
 ## Verification limits
 This validates the migration and relational constraints against real PostgreSQL. It does NOT yet execute the Node membership repository against PostgreSQL, verify concurrent membership operations, or establish database least-privilege grants. Those remain separate phases.
