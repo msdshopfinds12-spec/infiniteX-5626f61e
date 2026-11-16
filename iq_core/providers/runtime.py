@@ -81,7 +81,8 @@ class ProviderRuntime:
         if not decision.allowed:
             raise ProviderDenied(decision.reason_code)
 
-        adapter = self._adapters.get(provider_id.strip().lower())
+        normalized_provider_id = provider_id.strip().lower()
+        adapter = self._adapters.get(normalized_provider_id)
         if adapter is None:
             raise ProviderDenied("PROVIDER_ADAPTER_NOT_REGISTERED")
         if not adapter.supports(model_id):
@@ -93,12 +94,12 @@ class ProviderRuntime:
 
         return InferenceResult(
             request_id=request.request_id,
-            provider_id=provider_id.strip().lower(),
+            provider_id=normalized_provider_id,
             model_id=model_id,
             output=output,
             policy_reason_code=decision.reason_code,
             estimated_cost_usd="0.00",
-            execution_mode="MOCK" if provider_id == "mock" else "EXTERNAL",
+            execution_mode="MOCK" if normalized_provider_id == "mock" else "EXTERNAL",
         )
 
 
