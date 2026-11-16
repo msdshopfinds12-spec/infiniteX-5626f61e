@@ -21,7 +21,7 @@ permissions:
 jobs:
   api-checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17-alpine
@@ -46,10 +46,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Syntax checks
-        run: npm run check
-      - name: Unit and HTTP integration tests
-        run: npm test
+      - name: Install pinned API dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
       - name: Install PostgreSQL client
         working-directory: .
         run: |
@@ -61,6 +59,12 @@ jobs:
           PGPASSWORD: ci_test_only_password
         run: |
           psql --host 127.0.0.1 --username postgres --dbname infinite_x_ci --set ON_ERROR_STOP=1 --file infra/db/migrations/0001_identity_workspace_foundation.sql
+      - name: Syntax checks
+        run: npm run check
+      - name: Unit, HTTP, and real PostgreSQL repository integration tests
+        env:
+          DATABASE_URL: postgres://postgres:ci_test_only_password@127.0.0.1:5432/infinite_x_ci
+        run: npm test
       - name: Verify schema constraints with synthetic fixtures
         working-directory: .
         env:
