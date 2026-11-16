@@ -6,10 +6,10 @@ migrations or touch any configured application database.
 """
 from __future__ import annotations
 
-import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from hashlib import sha256
+import os
 from uuid import uuid4
 
 import pytest
