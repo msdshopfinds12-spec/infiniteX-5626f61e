@@ -133,3 +133,15 @@ def test_constructor_rejects_unbounded_limits():
         GitHubHTTPTransport(timeout_seconds=1000)
     with pytest.raises(ValueError):
         GitHubHTTPTransport(max_retries=100)
+
+
+@pytest.mark.parametrize("url", [
+    "https://api.github.com/repos/owner/repo/git/commits/" + "a" * 40 + "/extra",
+    "https://api.github.com/repos/owner/repo/git/commits/%2e%2e",
+    "https://api.github.com/repos/owner/repo/git/blobs/" + "a" * 40 + "?recursive=1",
+    "https://api.github.com/repos/owner/repo/contents/file",
+])
+def test_rejects_paths_outside_exact_git_object_endpoints(url):
+    transport = GitHubHTTPTransport(opener=FakeOpener([]))
+    with pytest.raises(GitHubTransportError):
+        transport.get_json(url)

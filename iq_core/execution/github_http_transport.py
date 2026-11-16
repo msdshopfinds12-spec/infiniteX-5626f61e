@@ -6,6 +6,7 @@ size-bounded, and rate-limit retries are finite. No write method is exposed.
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -124,18 +125,32 @@ class GitHubHTTPTransport:
     def _validate_url(url: str) -> None:
         if not isinstance(url, str) or len(url) > 2048:
             raise GitHubTransportError("GITHUB_URL_INVALID")
-        parsed = urllib.parse.urlsplit(url)
-        if (
-            parsed.scheme != "https"
-            or parsed.netloc != "api.github.com"
-            or parsed.username is not None
-            or parsed.password is not None
-            or parsed.fragment
-            or not parsed.path.startswith("/repos/")
-        ):
-            raise GitHubTransportError("GITHUB_URL_NOT_ALLOWLISTED")
-        if parsed.query not in {"", "recursive=1"}:
+        try:
+            parsed = urllib.parse.urlsplit(url)
+            # Reject encoded path delimiters and ambiguous URL forms before routing.
+            if "%" in parsed.path:
+                raise GitHubTransportError("GITHUB_URL_NOT_ALLOWLISTED")
+            if (
+                parsed.scheme != "https"
+                or parsed.netloc != "api.github.com"
+                or parsed.username is not None
+                or parsed.password is not None
+                or parsed.fragment
+            ):
+                raise GitHubTransportError("GITHUB_URL_NOT_ALLOWLISTED")
+            match = re.fullmatch(
+                r"/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/git/(commits|trees|blobs)/[0-9a-f]{40}",
+                parsed.path,
+            )
+            if match is None:
+                raise GitHubTransportError("GITHUB_URL_PATH_NOT_ALLOWLISTED")
+            if parsed.query == "":
+                return
+            if parsed.query == "recursive=1" and match.group(1) == "trees":
+                return
             raise GitHubTransportError("GITHUB_QUERY_NOT_ALLOWLISTED")
+        except ValueError:
+            raise GitHubTransportError("GITHUB_URL_INVALID") from None
 
     def _read_token(self) -> str | None:
         if self._token_provider is None:
