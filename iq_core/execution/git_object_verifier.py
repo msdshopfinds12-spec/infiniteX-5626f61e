@@ -43,7 +43,7 @@ def git_blob_sha1(content: bytes) -> str:
     """Compute Git's canonical SHA-1 object ID for a blob's raw bytes."""
     if not isinstance(content, bytes):
         raise TypeError("GIT_BLOB_CONTENT_MUST_BE_BYTES")
-    header = f"blob {len(content)}\\0".encode("ascii")
+    header = f"blob {len(content)}\0".encode("ascii")
     return hashlib.sha1(header + content).hexdigest()
 
 
@@ -88,6 +88,15 @@ def verify_git_snapshot(
         manifest=manifest, intent=intent, policy=policy
     )
     errors.extend(manifest_report.error_codes)
+    if not manifest_report.valid:
+        unique_errors = tuple(dict.fromkeys(errors))
+        return GitObjectVerificationReport(
+            valid=False,
+            base_commit_sha=manifest.base_commit_sha if isinstance(manifest.base_commit_sha, str) else "",
+            verified_paths=(),
+            verified_blob_count=0,
+            error_codes=unique_errors,
+        )
 
     by_path: dict[str, GitTreeEntry] = {}
     folded: set[str] = set()
