@@ -18,6 +18,10 @@ autonomous coding agent.
   over the proposal ID, target branch, rationale, policy version, and sorted
   file paths and contents. The coding agent returns this digest for proposals
   that pass screening.
+- `iq_core/agents/base_agent.py` enforces bounded objectives and JSON-only
+  request payloads, snapshots the payload at the agent boundary, and rejects
+  malformed correlation IDs. Master-agent delegation validates inputs before
+  task submission.
 - `iq_core/agents/approval_gate.py` verifies short-lived HMAC-signed approval
   evidence bound to the exact digest, branch, file set, reviewer identifier,
   and policy version. It verifies evidence only; it does not issue approvals,
