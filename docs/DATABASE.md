@@ -3,9 +3,9 @@
 ## Current implementation
 - Optional PostgreSQL connection pool using DATABASE_URL.
 - Bounded pool size, connection timeout, statement timeout and query timeout.
-- AI usage writes occur in a transaction after provider success.
-- Tenant context is set transaction-locally before writing usage.
-- If a user has no provisioned issuer/subject-to-tenant mapping, usage persistence is denied.
+- When persistence is enabled, the API checks for an issuer/subject tenant mapping before sending an AI request.
+- After provider success, usage is written in a transaction with tenant context set transaction-locally.
+- Missing tenant mapping is rejected before calling the AI provider.
 
 ## Migration
 `database/migrations/0001_core.sql` defines tenants, OIDC subject mappings, agents, tasks, AI usage, and audit events. Tenant-owned tables use forced row-level security policies.
@@ -28,4 +28,5 @@ The app_users identity mapping table is intentionally not covered by tenant RLS 
 - No user/tenant provisioning endpoint exists.
 - No retention or deletion worker exists.
 - Usage persistence records token counts, not provider invoice cost.
+- A provider may complete a request before a database write fails; reconcile usage against provider records.
 - No durable quotas or spend caps exist.
