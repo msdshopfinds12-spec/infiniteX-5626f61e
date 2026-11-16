@@ -95,6 +95,18 @@ BEGIN
   v_claims := v_payload::jsonb;
 
   IF jsonb_typeof(v_claims) <> 'object'
+     OR NOT (v_claims ?& ARRAY['v', 'iss', 'sub', 'workspace_id', 'aud', 'db_role', 'txid', 'iat', 'exp', 'jti', 'kid'])
+     OR jsonb_typeof(v_claims->'v') <> 'number'
+     OR jsonb_typeof(v_claims->'iat') <> 'number'
+     OR jsonb_typeof(v_claims->'exp') <> 'number'
+     OR jsonb_typeof(v_claims->'iss') <> 'string'
+     OR jsonb_typeof(v_claims->'sub') <> 'string'
+     OR jsonb_typeof(v_claims->'workspace_id') <> 'string'
+     OR jsonb_typeof(v_claims->'aud') <> 'string'
+     OR jsonb_typeof(v_claims->'db_role') <> 'string'
+     OR jsonb_typeof(v_claims->'txid') <> 'string'
+     OR jsonb_typeof(v_claims->'jti') <> 'string'
+     OR jsonb_typeof(v_claims->'kid') <> 'string'
      OR v_claims->>'v' <> '1'
      OR v_claims->>'iss' <> 'https://identity.infinite-x.invalid'
      OR v_claims->>'aud' <> 'infinite-x-api'
