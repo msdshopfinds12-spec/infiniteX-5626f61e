@@ -111,7 +111,10 @@ def test_postgres_concurrent_appends_serialize_existing_stream(pg_engine):
         sequences = list(
             executor.map(
                 lambda index: _append(
-                    pg_engine, "11111111-1111-4111-8111-111111111111", "concurrent", f"parallel-{index}"
+                    pg_engine,
+                    "11111111-1111-4111-8111-111111111111",
+                    "concurrent",
+                    f"parallel-{index}",
                 ),
                 range(8),
             )
@@ -168,7 +171,9 @@ def test_postgres_rls_hides_other_tenants_from_restricted_role(pg_engine):
             assert rows
             assert {row.tenant_id for row in rows} == {"11111111-1111-4111-8111-111111111111"}
             assert session.scalar(
-                select(AuditEvent).where(AuditEvent.tenant_id == "22222222-2222-4222-8222-222222222222")
+                select(AuditEvent).where(
+                    AuditEvent.tenant_id == "22222222-2222-4222-8222-222222222222"
+                )
             ) is None
 
 
