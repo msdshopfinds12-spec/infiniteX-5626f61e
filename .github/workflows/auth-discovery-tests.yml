@@ -1,4 +1,4 @@
-name: Authentication Discovery Tests
+name: InfiniteX Backend Quality Gate
 
 on:
   push:
@@ -32,7 +32,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  discovery-validator:
+  backend-quality:
     name: Authentication and backend runtime tests (Node 22)
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -49,5 +49,5 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Run authentication discovery tests
-        run: npm run test:auth
+      - name: Run backend and authentication tests
+        run: npm run test:backend
