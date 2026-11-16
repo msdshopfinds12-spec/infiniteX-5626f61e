@@ -18,11 +18,11 @@ Branch: `feature/infiniteX-platform-integrations`
 
 ### Lumen UI
 
-- Lumen MCP catalog is healthy; React catalog version is 5.0.0.
+- Lumen MCP catalog is healthy; React catalog version is 5.0.0. The published React package declares peer dependencies react >=19 and motion ^14.0.0, while this app uses React 18.3.1. Lumen React v5 is therefore incompatible with the current frontend until a separately planned React 19 migration or a verified alternative adapter/version.
 - The repository does not declare an installed Lumen package, so resolved-version compatibility cannot be checked.
 - Do not import Lumen components or CSS until the dependency is installed and the lockfile regenerated with npm.
-- Candidate package from the React catalog: `@santi020k/lumen-react`.
-- Use the v5 React selective CSS contract: foundation CSS once plus CSS for each used component, or the full stylesheet if intentionally selected. Do not mount the Astro runtime in React.
+- Candidate package from the React catalog: `@santi020k/lumen-react`, but direct installation is BLOCKED by the React 18 vs React >=19 peer dependency mismatch.
+- If a React 19 migration is separately approved and verified, use the v5 React selective CSS contract: foundation CSS once plus CSS for each used component, or the full stylesheet if intentionally selected. Do not mount the Astro runtime in React.
 
 ### Auth0
 
@@ -69,6 +69,12 @@ The install commands intentionally are not represented as executed. Review the r
 7. Add tests for login-required, unauthorized, expired token, conversation ownership, rate limit, streaming cancellation and API failure.
 8. Run lint, typecheck, build, browser tests, accessibility checks and security review.
 9. Release only after separate human approval.
+
+## MCP ecosystem research update
+
+- Public official repositories and licenses were reviewed for GitHub, Auth0, Supabase, Cloudflare, Microsoft Playwright and Context7.
+- The detailed shortlist, risks and recommended adoption sequence are in FREE-MCP-ECOSYSTEM-RESEARCH.md.
+- Hostinger official MCP endpoint is documented, but no Hostinger connector tools are exposed in this session.
 
 ## Latest Auth0/Lumen implementation update
 
