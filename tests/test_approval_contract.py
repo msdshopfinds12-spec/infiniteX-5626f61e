@@ -40,6 +40,8 @@ def signed_approval():
     expected = {
         "expected_issuer": payload["iss"],
         "expected_audience": payload["aud"],
+        "expected_reviewer_subject": payload["sub"],
+        "expected_reviewer_role": payload["reviewer_role"],
         "expected_repository_id": payload["repository_id"],
         "expected_branch": payload["target_branch"],
         "expected_base_commit_sha": payload["base_commit_sha"],
@@ -131,3 +133,17 @@ def test_rejects_wrong_policy_version(signed_approval):
     wrong_policy = {**expected, "expected_policy_version": "2.0"}
     with pytest.raises(ApprovalRejected, match="POLICY_VERSION_MISMATCH"):
         verify(payload, signature, public_key, wrong_policy)
+
+
+def test_rejects_unexpected_authenticated_reviewer(signed_approval):
+    payload, signature, public_key, expected = signed_approval
+    wrong_reviewer = {**expected, "expected_reviewer_subject": "different-reviewer"}
+    with pytest.raises(ApprovalRejected, match="REVIEWER_SUBJECT_MISMATCH"):
+        verify(payload, signature, public_key, wrong_reviewer)
+
+
+def test_rejects_server_role_mismatch(signed_approval):
+    payload, signature, public_key, expected = signed_approval
+    wrong_role = {**expected, "expected_reviewer_role": "security_reviewer"}
+    with pytest.raises(ApprovalRejected, match="REVIEWER_ROLE_MISMATCH"):
+        verify(payload, signature, public_key, wrong_role)
