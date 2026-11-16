@@ -77,8 +77,15 @@ class HumanApprovalGate:
             return ApprovalVerification("BLOCKED", ("INVALID_PROPOSAL",))
 
         current = now or datetime.now(timezone.utc)
+        if not isinstance(current, datetime):
+            return ApprovalVerification("BLOCKED", ("INVALID_VERIFICATION_TIME",))
         if current.tzinfo is None or current.utcoffset() is None:
             return ApprovalVerification("BLOCKED", ("NAIVE_VERIFICATION_TIME",))
+        if (
+            not isinstance(evidence.approved_at, datetime)
+            or not isinstance(evidence.expires_at, datetime)
+        ):
+            return ApprovalVerification("BLOCKED", ("INVALID_APPROVAL_TIMESTAMP",))
         if (
             evidence.approved_at.tzinfo is None
             or evidence.approved_at.utcoffset() is None
@@ -95,8 +102,13 @@ class HumanApprovalGate:
         if evidence.policy_version != CODE_CHANGE_POLICY_VERSION:
             return ApprovalVerification("BLOCKED", ("POLICY_VERSION_MISMATCH",))
 
+        if (
+            not isinstance(evidence.file_paths, tuple)
+            or any(not isinstance(path, str) or not path.strip() for path in evidence.file_paths)
+        ):
+            return ApprovalVerification("BLOCKED", ("INVALID_APPROVED_FILE_SET",))
         expected_paths = tuple(sorted(change.path for change in proposal.changes))
-        if not isinstance(evidence.file_paths, tuple) or tuple(sorted(evidence.file_paths)) != expected_paths:
+        if tuple(sorted(evidence.file_paths)) != expected_paths:
             return ApprovalVerification("BLOCKED", ("APPROVED_FILE_SET_MISMATCH",))
         if evidence.approved_at > current:
             return ApprovalVerification("BLOCKED", ("APPROVAL_FROM_FUTURE",))
