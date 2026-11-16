@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node src/server.mjs",
     "test": "node --test",
-    "check": "node --check src/config.mjs && node --check src/app.mjs && node --check src/server.mjs && node --check test/app.test.mjs && node --check src/authorization/policy.mjs && node --check test/authorization.test.mjs && node --check src/workspaces/membership-repository.mjs && node --check test/membership-repository.test.mjs && node --check test/membership-repository.integration.test.mjs"
+    "check": "node --check src/config.mjs && node --check src/app.mjs && node --check src/server.mjs && node --check src/authorization/policy.mjs && node --check src/identity/assertion-signer.mjs && node --check src/workspaces/membership-repository.mjs && node --check test/app.test.mjs && node --check test/authorization.test.mjs && node --check test/identity-assertion-signer.test.mjs && node --check test/membership-repository.test.mjs && node --check test/membership-repository.integration.test.mjs"
   },
   "dependencies": {
     "pg": "8.16.3"
