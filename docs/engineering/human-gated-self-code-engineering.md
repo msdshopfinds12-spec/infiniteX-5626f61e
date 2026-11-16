@@ -9,8 +9,9 @@ autonomous coding agent.
 
 ## Current implementation
 
-- `iq_core/agents/code_change_policy.py` validates branch namespace, protected
-  branches, file paths, repository-control paths, sensitive paths, duplicate
+- `iq_core/agents/code_change_policy.py` restricts proposals to the exact
+  authorized branch `fix/infiniteX-foundation-hardening`; it also validates
+  protected branches, file paths, repository-control paths, sensitive paths, duplicate
   paths, secret-like content, and proposal size.
 - `iq_core/agents/coding_agent.py` can evaluate a structured proposal supplied
   in an agent request and return a deterministic policy decision.
