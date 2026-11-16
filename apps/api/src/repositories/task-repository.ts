@@ -73,7 +73,8 @@ export async function createTask(issuer: string, subject: string, value: TaskInp
     if (!existingTask) throw new TaskIdempotencyLookupError();
     if (!existingTask.request_matches) throw new TaskIdempotencyConflictError();
 
-    const {request_matches: _requestMatches, ...task} = existingTask;
+    const task = {...existingTask};
+    delete task.request_matches;
     return {task, created: false};
   });
 }
