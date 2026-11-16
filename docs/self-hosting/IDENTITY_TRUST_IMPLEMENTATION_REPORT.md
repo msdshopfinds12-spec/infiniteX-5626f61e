@@ -1,6 +1,6 @@
 # InfiniteX — Database-Verified Identity Implementation Report
 
-**Status:** IMPLEMENTED IN FEATURE BRANCH — CI evidence pending.
+**Status:** FEATURE-BRANCH IMPLEMENTATION — disposable PostgreSQL CI passed; authentication-provider gate remains open.
 **Branch:** `feat/provider-neutral-billing-sandbox`
 **Scope:** API assertion primitive, PostgreSQL verifier, RLS policy replacement, transaction integration, disposable CI tests.
 **Not included:** end-user authentication provider, production secrets, persistent-database migration, merge, deployment.
@@ -73,7 +73,7 @@ Therefore:
 
 ## 5. CI and test plan
 
-The workflow provisions PostgreSQL 17 as an ephemeral GitHub Actions service, applies migrations 0001–0003 to that disposable database, seeds only the fixed synthetic CI key, and runs Node unit and PostgreSQL integration tests.
+The workflow provisions PostgreSQL 17 as an ephemeral GitHub Actions service, applies migrations 0001–0003 to that disposable database, seeds only the fixed synthetic CI key, and runs Node unit and PostgreSQL integration tests. Verified run #54 passed all 53 tests (53 passed, 0 failed), including PostgreSQL adversarial integration tests and the schema fixture step. Run: https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/43965363006
 
 Adversarial coverage includes:
 - Legacy GUC impersonation attempt.
@@ -102,8 +102,8 @@ Every denial case also checks that protected rows are not returned or changed.
 | RLS uses verified identity | IMPLEMENTED | Replacement policies in migration 0003 |
 | Runtime cannot read verifier keys | TEST ADDED | PostgreSQL adversarial test |
 | Invalid/expired/replayed-across-tx assertion rejection | TEST ADDED | PostgreSQL adversarial test |
-| Node unit test execution | PENDING | Await GitHub Actions result |
-| PostgreSQL integration execution | PENDING | Await GitHub Actions result |
+| Node unit test execution | VERIFIED — 53 passed, 0 failed | GitHub Actions run #54 |
+| PostgreSQL integration execution | VERIFIED — adversarial suite passed | GitHub Actions run #54, PostgreSQL 17 |
 | Independent security review | PENDING | Required before release |
 | Trusted OIDC/JWT authentication | BLOCKED | Provider and issuer configuration not selected |
 | Production key provisioning | NOT STARTED | Explicitly out of scope |
