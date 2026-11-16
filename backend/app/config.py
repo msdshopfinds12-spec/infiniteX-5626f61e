@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     jwt_jwks_url: str | None = None
     jwt_issuer: str | None = None
     jwt_audience: str | None = None
+    approval_public_keys_json: str | None = None
     owner_subject: str | None = None
     owner_tenant_id: UUID | None = None
     database_url: SecretStr = SecretStr(
