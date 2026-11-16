@@ -101,9 +101,14 @@ test("runtime role connects with restricted database identity", integration, asy
   }
   const role = await adminPool.query(
     "SELECT rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls " +
-      "FROM pg_roles WHERE rolname = current_user",
+      "FROM pg_roles WHERE rolname = 'infinite_x_app_runtime_ci'",
   );
   assert.equal(role.rows.length, 1);
+  assert.equal(role.rows[0].rolsuper, false);
+  assert.equal(role.rows[0].rolcreatedb, false);
+  assert.equal(role.rows[0].rolcreaterole, false);
+  assert.equal(role.rows[0].rolreplication, false);
+  assert.equal(role.rows[0].rolbypassrls, false);
 });
 
 test("real PostgreSQL: role mutation and audit event commit atomically", integration, async () => {
