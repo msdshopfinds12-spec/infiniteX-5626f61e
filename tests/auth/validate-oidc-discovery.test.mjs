@@ -88,3 +88,11 @@ test("rejects credential-bearing and fragment-bearing endpoint URLs", () => {
   assert.equal(result.ok, false);
   assert.ok(result.errors.some((error) => error.includes("credentials or a fragment")));
 });
+
+
+test("rejects configured issuer identifiers containing query strings", () => {
+  const issuerWithQuery = "https://id.example.test/realms/infiniteX?tenant=other";
+  const result = validateOidcDiscovery({ ...valid, issuer: issuerWithQuery }, issuerWithQuery);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((error) => error.includes("query string")));
+});
