@@ -130,3 +130,13 @@ def test_idempotency_key_reuse_with_different_body_conflicts():
         )
     assert first.status_code == 201
     assert second.status_code == 409
+
+
+def test_empty_idempotency_key_is_rejected():
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/tasks",
+            headers={"Idempotency-Key": ""},
+            json={"name": "research", "objective": "empty key"},
+        )
+    assert response.status_code == 400

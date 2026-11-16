@@ -45,7 +45,7 @@ def create_task(
     try:
         task_id = (
             task_id_for_idempotency_key(principal.tenant_id, idempotency_key)
-            if idempotency_key
+            if idempotency_key is not None
             else str(uuid4())
         )
     except ValueError as exc:
@@ -60,7 +60,7 @@ def create_task(
         )
     except IntegrityError as exc:
         session.rollback()
-        if not idempotency_key:
+        if idempotency_key is None:
             raise HTTPException(status_code=409, detail="Task creation conflict") from exc
         existing = repository.get(task_id)
         if existing is None:
