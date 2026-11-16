@@ -40,10 +40,17 @@ def _utc(value: datetime) -> datetime:
 def _to_contract_event(row: AuditEventRow) -> ContractAuditEvent:
     """Rehydrate a stored row using the canonical immutable event contract."""
     metadata = dict(row.metadata_json)
+    # SQLite drops timezone offsets for DateTime(timezone=True); values written
+    # by this adapter are normalized to UTC before insertion.
+    stored_at = row.created_at
+    if stored_at.tzinfo is None or stored_at.utcoffset() is None:
+        stored_at = stored_at.replace(tzinfo=timezone.utc)
+    else:
+        stored_at = stored_at.astimezone(timezone.utc)
     return ContractAuditEvent.create(
         event_id=row.event_id,
         stream_id=row.stream_id,
-        occurred_at=int(_utc(row.created_at).timestamp()),
+        occurred_at=int(stored_at.timestamp()),
         actor_id=row.actor,
         action=row.action,
         resource_type=row.resource_type,
