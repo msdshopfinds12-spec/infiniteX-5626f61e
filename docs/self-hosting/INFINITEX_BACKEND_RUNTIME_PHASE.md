@@ -10,7 +10,7 @@ This phase introduces a dependency-injected Node.js HTTP server factory using bu
 
 - `createInfiniteXServer()` factory in `server/http/create-server.mjs`.
 - `GET /health`: process liveness only; does not claim the database or provider is available.
-- `GET /ready`: injected readiness check; fails closed with a generic 503 response if the check returns false or throws.
+- `GET /ready`: injected readiness check; fails closed with a generic 503 response if the check returns false, throws, or exceeds its bounded timeout. The default readiness check is false.
 - Unknown route: generic 404.
 - Unsupported methods: 405 and `Allow: GET, HEAD`.
 - Baseline API security headers and no-store caching.
@@ -18,13 +18,14 @@ This phase introduces a dependency-injected Node.js HTTP server factory using bu
 - Structured request logs contain method, route path, status, duration and request ID only. Query strings, headers, cookies, authorization values and request bodies are excluded.
 - Logging exceptions are isolated from request handling.
 - Bounded Node HTTP header/request timeout settings.
+- Readiness-probe timeout (default 2 seconds; configurable within a bounded 1–30,000 ms range) so a stalled dependency cannot hold the probe open indefinitely.
 
 ## Explicit limitations
 
 - No production entry point or deployment command is added.
 - No CORS is enabled.
 - No authentication, authorization, OIDC, sessions, database or billing routes exist.
-- `/ready` reports only the result of the dependency function supplied by the host; the default is true and must not be treated as production readiness.
+- `/ready` reports only the result of the dependency function supplied by the host; the default is false and is not proof that all production dependencies are healthy.
 - No proxy trust, TLS termination, rate limiting, body parser, graceful shutdown coordinator or distributed tracing is configured.
 - A hosting adapter must explicitly inject real dependency checks before using readiness for deployment orchestration.
 
@@ -34,4 +35,4 @@ Before deployment, implement a reviewed process entry point, explicit host/port 
 
 ## Verification
 
-Run `npm run test:auth` after CI includes `tests/server/**`. These tests use only Node's built-in test runner and ephemeral loopback ports. No external service or paid resource is required.
+Run `npm run test:backend` to execute authentication and backend runtime tests. These tests use only Node's built-in test runner and ephemeral loopback ports. No external service or paid resource is required.
