@@ -13,7 +13,7 @@ test("session cookie uses secure host-only browser defaults", () => {
   assert.match(cookie, /^__Host-infinite_x_session=/);
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /Secure/);
-  assert.match(cookie, /Path=//);
+  assert.match(cookie, /Path=\//);
   assert.match(cookie, /SameSite=Lax/);
   assert.doesNotMatch(cookie, /Domain=/);
 });
