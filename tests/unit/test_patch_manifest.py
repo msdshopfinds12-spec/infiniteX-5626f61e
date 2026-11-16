@@ -150,3 +150,21 @@ def test_rejects_delete_with_content():
     ))
     report = validate_patch_manifest(manifest=manifest, intent=intent_for(manifest))
     assert "PATCH_DELETE_MUST_NOT_INCLUDE_CONTENT" in report.error_codes
+
+
+
+def test_malformed_entry_fails_closed_without_crashing():
+    from iq_core.execution.patch_manifest import PatchManifest
+
+    manifest = PatchManifest(
+        proposal_id="proposal-1",
+        repository_id="repo-1",
+        target_branch="fix/infiniteX-foundation-hardening",
+        base_commit_sha="a" * 40,
+        files=(PatchFileEntry("iq_core/example.py", "run-anything", "b" * 64, 1),),
+        manifest_sha256="c" * 64,
+    )
+    report = validate_patch_manifest(manifest=manifest, intent=intent_for(valid_manifest()))
+    assert not report.valid
+    assert "PATCH_ACTION_INVALID" in report.error_codes
+    assert "PATCH_MANIFEST_CANONICALIZATION_FAILED" in report.error_codes

@@ -212,11 +212,6 @@ def validate_patch_manifest(
         elif entry.action in {PatchAction.ADD, PatchAction.MODIFY}:
             if not isinstance(entry.content_sha256, str) or not _SHA256_RE.fullmatch(entry.content_sha256):
                 errors.append("PATCH_CONTENT_DIGEST_INVALID")
-        if entry.action is PatchAction.ADD and entry.path in intent.file_paths:
-            # An approved path can be added or modified; the action itself is not
-            # inferred from Git state here. This branch intentionally adds no error.
-            pass
-
     if total_bytes > policy.max_total_bytes:
         errors.append("PATCH_TOTAL_SIZE_EXCEEDED")
 
