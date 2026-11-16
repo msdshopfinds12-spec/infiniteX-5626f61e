@@ -26,7 +26,7 @@ This phase introduces a dependency-injected Node.js HTTP server factory using bu
 - No CORS is enabled.
 - No authentication, authorization, OIDC, sessions, database or billing routes exist.
 - `/ready` reports only the result of the dependency function supplied by the host; the default is false and is not proof that all production dependencies are healthy.
-- No proxy trust, TLS termination, rate limiting, body parser, graceful shutdown coordinator or distributed tracing is configured.
+- No proxy trust, TLS termination, rate limiting, body parser, executable signal handler or distributed tracing is configured. A reusable graceful-shutdown coordinator is implemented separately, but it is not wired to process signals.
 - A hosting adapter must explicitly inject real dependency checks before using readiness for deployment orchestration.
 
 ## Security follow-up
@@ -37,13 +37,13 @@ Before deployment, implement a reviewed process entry point, explicit host/port 
 
 Run `npm run test:backend` to execute authentication and backend runtime tests. These tests use only Node's built-in test runner and ephemeral loopback ports. No external service or paid resource is required.
 
-## Phase 2 — shutdown coordination
+## Phase 2 — shutdown coordination (implemented, not wired to process signals)
 
 - `createShutdownController(server, options)` provides an idempotent shutdown operation.
 - The controller stops accepting new connections, closes idle connections, and force-closes remaining connections after a bounded timeout.
 - The timeout defaults to 10 seconds and is restricted to 1–120,000 ms.
 - Timeout observer errors are isolated from shutdown.
 - Signal registration and process exit policy remain the responsibility of a future reviewed executable entry point; importing the module never installs process handlers.
-- Unit tests cover idempotency, forced connection closure, observer failure, and invalid configuration.
+- Unit tests cover idempotency, forced connection closure, observer failure, idle-connection cleanup failure, and invalid configuration.
 
 This is a reusable lifecycle primitive, not yet a complete process bootstrap or proof of deployment readiness.
