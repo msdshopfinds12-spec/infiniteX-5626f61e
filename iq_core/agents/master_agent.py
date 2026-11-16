@@ -60,10 +60,16 @@ class MasterAgent:
         agent = self.registry.get(agent_name)
         if agent is None:
             raise ValueError(f"Unknown agent: {agent_name}")
-        if not objective.strip():
-            raise ValueError("Objective cannot be empty")
+        if not isinstance(objective, str) or not objective.strip():
+            raise ValueError("Objective must be a non-empty string")
+        if payload is not None and not isinstance(payload, dict):
+            raise TypeError("Agent payload must be an object")
+        if correlation_id is not None and (
+            not isinstance(correlation_id, str) or not correlation_id.strip()
+        ):
+            raise ValueError("Correlation ID must be a non-empty string when supplied")
 
-        request_id = correlation_id or str(uuid4())
+        request_id = correlation_id.strip() if correlation_id else str(uuid4())
         task = IQTask(
             name=agent.task_type,
             objective=objective,
