@@ -20,10 +20,10 @@ Determine which of Keycloak, authentik, ZITADEL, or Ory is the safest and most m
 
 ## 3. Candidate evaluation
 
-Evaluate both candidates against the same protocol contract and test harness. Record exact release versions and source URLs at evaluation time; do not silently use `latest`.
+Evaluate all four candidates against the same protocol contract and test harness. Record exact release versions and source URLs at evaluation time; do not silently use `latest`.
 
 | Dimension | Keycloak | authentik | ZITADEL | Ory | Evidence required |
-|---|---|---|---|
+|---|---|---|---|---|---|
 | OIDC Authorization Code + PKCE S256 | Verify | Verify | Verify | Verify | Successful and negative protocol tests |
 | Discovery and JWKS rotation | Verify | Verify | Verify | Verify | Metadata/JWKS behavior and rotation test |
 | Issuer/audience/nonce validation | Verify | Verify | Verify | Verify | Wrong-issuer, audience and nonce rejection |
@@ -31,7 +31,7 @@ Evaluate both candidates against the same protocol contract and test harness. Re
 | Admin hardening | Verify | Verify | Verify | Verify | Admin interface isolated from public ingress |
 | Resource footprint | Measure | Measure | Measure | Measure | Actual idle/peak RAM, CPU and disk |
 | Backup/restore | Verify | Verify | Verify | Verify | Successful disposable restore test |
-| Security maintenance | Review | Review | Release cadence, advisories and supported version |
+| Security maintenance | Review | Review | Review | Review | Release cadence, advisories and supported version |
 | License | Review | Review | Review | Review | Exact release license and notices |
 | Zero-cost feasibility | Verify | Verify | Verify | Verify | Existing compute only; no paid resources |
 
