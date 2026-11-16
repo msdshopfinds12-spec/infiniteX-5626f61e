@@ -4,8 +4,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
-DO $
-BEGIN
+DO $$BEGIN
   IF NOT EXISTS (
     SELECT 1
       FROM pg_extension AS extension
@@ -16,7 +15,7 @@ BEGIN
     RAISE EXCEPTION 'pgcrypto must be installed in schema public for this migration';
   END IF;
 END
-$;
+$$;
 
 DO $
 BEGIN
