@@ -745,7 +745,7 @@ body {
 }
 
 .check-icon {
-  color: var(--success);
+  color: var(--neutral);
   flex-shrink: 0;
 }
 
