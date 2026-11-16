@@ -50,3 +50,20 @@ It cannot independently prove that a database returned every event, that the
 sequence was not truncated, or that a privileged attacker did not rewrite the
 entire chain. Production must compare against a protected checkpoint and enforce
 atomic ordering in storage.
+
+
+## Durable persistence implementation status
+
+- IMPLEMENTED ON THE HARDENING BRANCH: SQLAlchemy models for audit stream heads, audit events, approval intents, consumed nonce hashes, and a transactional outbox.
+- IMPLEMENTED ON THE HARDENING BRANCH: transaction-scoped persistence primitives. The caller owns the SQLAlchemy transaction; the adapter does not commit. Approval signature verification must occur before calling the persistence function.
+- IMPLEMENTED ON THE HARDENING BRANCH: nonce hashing before storage, database uniqueness for tenant/nonce, stream-head row locking, sequence uniqueness, scalar metadata limits, sensitive-key rejection, and an append-only database trigger for audit event UPDATE/DELETE.
+- IMPLEMENTED, NOT EXECUTED: Alembic revision `0003_durable_audit_approval`. No database migration has been run.
+- AUTHORED, NOT EXECUTED: SQLite-backed unit tests for hash-chain sequencing, metadata rejection, atomic approval persistence, duplicate nonce rejection, and expired-intent rejection.
+- NOT VERIFIED: PostgreSQL integration behavior, concurrent first-writer retry behavior, actual RLS enforcement under the production application role, database grants, external checkpointing, and worker dispatch.
+- CI STATUS: no successful GitHub Actions result has been confirmed for these new commits. Vercel status contexts currently report build-rate-limit failures; these are not evidence of GitHub Actions test results.
+
+The first event in a new stream is protected by a composite primary key on the stream head. If concurrent first writers race, one transaction may receive a uniqueness error and must retry the entire transaction. Existing stream appends use SELECT FOR UPDATE to serialize sequence assignment.
+
+The persistence function named `persist_verified_approval` does not perform cryptographic verification. It accepts only a previously verified approval context; callers must verify signature, signer authorization, request binding, expiry, and owner/tenant authorization before invoking it. The database transaction then atomically persists the nonce hash, intent, audit event, stream head, and outbox event.
+
+The migration has not been applied. Before any migration is authorized, validate it against an isolated PostgreSQL database, inspect generated SQL and rollback behavior, and verify RLS and append-only behavior using the same restricted role intended for the application.
