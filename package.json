@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "tsc -b --noEmit",
     "test:auth-discovery": "node --test tests/auth/validate-oidc-discovery.test.mjs",
-    "test:auth": "node --test tests/auth/*.test.mjs"
+    "test:auth": "node --test tests/auth/*.test.mjs tests/server/*.test.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
