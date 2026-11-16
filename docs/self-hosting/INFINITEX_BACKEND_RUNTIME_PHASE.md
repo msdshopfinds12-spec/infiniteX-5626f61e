@@ -36,3 +36,14 @@ Before deployment, implement a reviewed process entry point, explicit host/port 
 ## Verification
 
 Run `npm run test:backend` to execute authentication and backend runtime tests. These tests use only Node's built-in test runner and ephemeral loopback ports. No external service or paid resource is required.
+
+## Phase 2 — shutdown coordination
+
+- `createShutdownController(server, options)` provides an idempotent shutdown operation.
+- The controller stops accepting new connections, closes idle connections, and force-closes remaining connections after a bounded timeout.
+- The timeout defaults to 10 seconds and is restricted to 1–120,000 ms.
+- Timeout observer errors are isolated from shutdown.
+- Signal registration and process exit policy remain the responsibility of a future reviewed executable entry point; importing the module never installs process handlers.
+- Unit tests cover idempotency, forced connection closure, observer failure, and invalid configuration.
+
+This is a reusable lifecycle primitive, not yet a complete process bootstrap or proof of deployment readiness.
