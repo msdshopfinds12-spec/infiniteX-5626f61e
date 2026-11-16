@@ -14,6 +14,7 @@ from iq_core.agents.code_change_policy import (
     ProposedFileChange,
 )
 from iq_core.agents.provider_agents import ProviderUnconfiguredAgent
+from iq_core.agents.proposal_fingerprint import proposal_fingerprint
 
 
 class CodingAgent(ProviderUnconfiguredAgent):
@@ -63,6 +64,11 @@ class CodingAgent(ProviderUnconfiguredAgent):
             proposal_id=proposal_data.get("proposal_id"),
         )
         decision = self._code_change_policy.evaluate(proposal)
+        fingerprint = (
+            proposal_fingerprint(proposal)
+            if decision.status == "REVIEW_REQUIRED"
+            else None
+        )
         return AgentResponse(
             agent_name=self.name,
             execution_status=decision.status,
@@ -76,6 +82,8 @@ class CodingAgent(ProviderUnconfiguredAgent):
             output={
                 "proposal_id": proposal.proposal_id,
                 "target_branch": proposal.target_branch,
+                "proposal_sha256": fingerprint,
+                "fingerprint_policy_version": "1.0",
                 "file_count": decision.file_count,
                 "total_bytes": decision.total_bytes,
                 "reason_codes": list(decision.reason_codes),
