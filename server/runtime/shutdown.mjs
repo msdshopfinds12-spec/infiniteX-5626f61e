@@ -52,13 +52,20 @@ export function createShutdownController(server, {
             error: error ?? null,
           });
         });
-        // Stop accepting new work first, then close idle keep-alive sockets.
-        server.closeIdleConnections?.();
       } catch (error) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
         resolve({ closed: false, timedOut, error });
+        return;
+      }
+
+      // A best-effort idle-connection close must not override close() outcome.
+      try {
+        server.closeIdleConnections?.();
+      } catch {
+        // The server close callback remains authoritative.
+      }
       }
     });
 
