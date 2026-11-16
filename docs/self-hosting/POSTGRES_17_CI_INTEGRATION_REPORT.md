@@ -64,3 +64,39 @@ Regression coverage added:
 - The Node repository adapter still has not been exercised through a real pg driver against PostgreSQL; the repository unit tests use a test double.
 - Concurrent role-change behavior and last-owner serialization still need real multi-connection integration tests.
 - Database least-privilege roles/grants, OIDC validation, protected HTTP endpoints, and production readiness remain unimplemented or unverified.
+
+
+## PostgreSQL-backed Node repository integration — verified
+The Node.js membership repository is now exercised through the real `pg` driver against the disposable PostgreSQL 17 service in GitHub Actions.
+
+Implementation:
+- Added exact direct dependency `pg@8.16.3` to `apps/api/package.json`.
+- Added `apps/api/test/membership-repository.integration.test.mjs`.
+- CI installs the declared dependency, applies migration 0001 to its ephemeral PostgreSQL 17 service, then runs unit, HTTP, and repository integration tests with a CI-only `DATABASE_URL`.
+- Synthetic users, workspaces, memberships, and audit rows are generated per test and cleaned up.
+- A temporary CI-only trigger deliberately fails one audit insert to verify transaction rollback; trigger/function are removed after the suite.
+
+Verified real-PostgreSQL cases:
+1. Role update and audit event commit atomically.
+2. The only active owner cannot revoke itself.
+3. Concurrent owner self-demotion and another owner revocation cannot leave the workspace without an active owner.
+4. Audit insertion failure rolls back the membership update.
+5. Disabled target accounts are denied.
+
+CI evidence:
+- Run #22: https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/43957068074
+- Tested commit: `06f0c255f31ce704302028789d678430cb90fcb8`
+- Overall conclusion: success.
+- Node test runner: 37 passed, 0 failed, 0 skipped.
+- Real PostgreSQL repository integration cases: 5 passed.
+- PostgreSQL 17 migration, schema assertions, and cleanup: passed.
+
+Reproducibility caveat:
+- The direct `pg` version is exact-pinned, but this branch does not yet contain a committed npm lockfile. CI currently installs with `--package-lock=false`, so transitive dependency resolution is not fully locked across separate runs. Add and review a committed lockfile before release.
+
+Remaining limitations:
+- No production database has been connected or migrated.
+- No production OIDC provider, authentication routes, or HTTP authorization middleware are wired.
+- The integration tests cover workspace membership mutations, not every tenant-scoped business-data query.
+- Database least-privilege roles/grants and broader backup/restore operations remain outstanding.
+- No merge or deployment was performed.
