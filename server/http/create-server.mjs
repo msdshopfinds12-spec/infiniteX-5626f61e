@@ -88,6 +88,7 @@ export function createInfiniteXServer({
           statusCode,
           ready ? { status: "ready" } : { status: "not_ready" },
           requestId,
+          request.method === "HEAD",
         );
         return;
       }
