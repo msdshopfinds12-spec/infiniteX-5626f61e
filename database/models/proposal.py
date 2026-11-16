@@ -28,14 +28,18 @@ class TrustedProposal(Base):
                         name="ck_trusted_proposals_repo_name"),
         CheckConstraint("length(target_branch) BETWEEN 1 AND 255",
                         name="ck_trusted_proposals_branch"),
-        CheckConstraint("base_commit_sha ~ '^[0-9a-f]{40}$'",
-                        name="ck_trusted_proposals_base_sha"),
-        CheckConstraint("proposal_digest ~ '^[0-9a-f]{64}$'",
-                        name="ck_trusted_proposals_digest"),
+        CheckConstraint(
+            "base_commit_sha ~ '^[0-9a-f]{40}$'",
+            name="ck_trusted_proposals_base_sha",
+        ).ddl_if(dialect="postgresql"),
+        CheckConstraint(
+            "proposal_digest ~ '^[0-9a-f]{64}$'",
+            name="ck_trusted_proposals_digest",
+        ).ddl_if(dialect="postgresql"),
         CheckConstraint(
             "jsonb_typeof(file_manifest) = 'array' AND jsonb_array_length(file_manifest) > 0",
             name="ck_trusted_proposals_manifest_array",
-        ),
+        ).ddl_if(dialect="postgresql"),
         CheckConstraint("fingerprint_schema_version > 0",
                         name="ck_trusted_proposals_fingerprint_version"),
         Index("ix_trusted_proposals_tenant_repo_created",
