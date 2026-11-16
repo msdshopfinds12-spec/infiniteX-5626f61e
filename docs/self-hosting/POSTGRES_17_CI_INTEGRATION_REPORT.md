@@ -100,3 +100,17 @@ Remaining limitations:
 - The integration tests cover workspace membership mutations, not every tenant-scoped business-data query.
 - Database least-privilege roles/grants and broader backup/restore operations remain outstanding.
 - No merge or deployment was performed.
+
+
+## Least-privilege PostgreSQL runtime role — verified
+- Added CI-only role bootstrap: `infra/db/ci/0002_runtime_role.sql`.
+- Repository integration tests now use a restricted runtime login through `DATABASE_URL`; a separate administrator connection is limited to fixture setup, assertions, trigger setup, and cleanup.
+- Runtime identity has no superuser, database creation, role creation, replication, BYPASSRLS, schema CREATE, or audit read/update/delete privileges.
+- Table/column grants are restricted to authorization reads, membership role/status changes, and audit inserts. Timestamp-only UPDATE on app_users/workspaces is retained for current SELECT FOR UPDATE locking.
+- Forbidden SQL operations are tested and expected to return SQLSTATE 42501.
+- GitHub Actions Run #27: https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/43957624810
+- Tested commit: `7260c0e151ab1a658f3764af6739acc25d6ca00c`
+- Node tests: 38 passed, 0 failed, 0 skipped; five PostgreSQL repository integration cases passed.
+- Detailed report: `docs/self-hosting/DATABASE_LEAST_PRIVILEGE_REPORT.md`.
+
+Important: these grants do not implement row-level tenant isolation. RLS and tenant-scoped business-data query verification remain separate work. No production DB, merge, or deployment was involved.
