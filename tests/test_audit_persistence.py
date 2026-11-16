@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from database.audit_persistence import append_audit_event, persist_verified_approval
+from database.audit_persistence import (\n    append_audit_event,\n    persist_verified_approval,\n    verify_persisted_audit_chain,\n)\nfrom iq_core.audit.audit_event import AuditEvent as ContractAuditEvent
 from database.models import (
     ApprovalIntent,
     AuditEvent,
@@ -146,3 +146,65 @@ def test_approval_persistence_rejects_expired_intent(session):
                 actor="owner",
             )
     assert session.scalar(select(ApprovalIntent)) is None
+
+
+
+def test_persisted_chain_detects_digest_tampering(session):
+    with session.begin():
+        event = append_audit_event(
+            session,
+            tenant_id="tenant-a",
+            stream_id="tamper-test",
+            actor="tester",
+            action="created",
+            resource_type="test",
+            resource_id="one",
+            outcome="success",
+        )
+    event.digest = "0" * 64
+    session.commit()
+
+    with pytest.raises(ValueError, match="DIGEST_MISMATCH"):
+        verify_persisted_audit_chain(
+            session, tenant_id="tenant-a", stream_id="tamper-test"
+        )
+
+
+def test_persisted_chain_detects_sequence_gap(session):
+    with session.begin():
+        append_audit_event(
+            session,
+            tenant_id="tenant-a",
+            stream_id="gap-test",
+            actor="tester",
+            action="created",
+            resource_type="test",
+            resource_id="one",
+            outcome="success",
+        )
+    row = session.scalar(select(AuditEvent))
+    row.sequence = 3
+    session.commit()
+
+    with pytest.raises(ValueError, match="SEQUENCE_GAP"):
+        verify_persisted_audit_chain(
+            session, tenant_id="tenant-a", stream_id="gap-test"
+        )
+
+
+def test_tenant_id_is_bound_into_canonical_event_digest(session):
+    with session.begin():
+        event = append_audit_event(
+            session,
+            tenant_id="tenant-a",
+            stream_id="shared-name",
+            actor="tester",
+            action="created",
+            resource_type="test",
+            resource_id="one",
+            outcome="success",
+        )
+    assert event.metadata_json["tenant_id"] == "tenant-a"
+    assert verify_persisted_audit_chain(
+        session, tenant_id="tenant-a", stream_id="shared-name"
+    ) == event.digest
