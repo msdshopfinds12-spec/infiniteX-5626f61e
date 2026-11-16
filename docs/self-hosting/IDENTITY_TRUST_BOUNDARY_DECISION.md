@@ -1,6 +1,6 @@
 # InfiniteX Identity Trust Boundary — Engineering Decision Record
 
-**Status:** OPTION A APPROVED — feature-branch implementation committed; CI validation pending.
+**Status:** OPTION A APPROVED — feature-branch implementation committed; disposable PostgreSQL CI passed.
 **Target branch:** `feat/provider-neutral-billing-sandbox`
 **Scope:** feature-branch implementation of the signed identity verifier and disposable CI tests. No persistent database migration, production credentials, merge, or deployment.
 
@@ -115,8 +115,8 @@ Every negative test must assert both the denial result and the absence of unauth
 | Trust-boundary option selected | Explicit approval | VERIFIED |
 | Authenticated principal source | Approved issuer and validation contract | BLOCKED |
 | Database verifier design | PostgreSQL/extension/privilege review | BLOCKED |
-| Runtime implementation | Feature-branch code committed | IMPLEMENTED — REVIEW PENDING |
-| Adversarial PostgreSQL tests | Actual disposable CI run | PENDING |
+| Runtime implementation | Feature-branch code committed and CI-checked | IMPLEMENTED — INDEPENDENT REVIEW PENDING |
+| Adversarial PostgreSQL tests | GitHub Actions run #54: 53 passed, 0 failed | VERIFIED |
 | Independent security audit | Findings and remediation evidence | PENDING |
 | Release | Separate human approval | BLOCKED |
 
@@ -124,6 +124,6 @@ Every negative test must assert both the denial result and the absence of unauth
 
 This record is an engineering design artifact. It does not implement signed identity, change RLS, execute tests, apply migrations, or certify production security.
 
-The previously recorded 40-test CI pass is historical and must not be reused as evidence that this proposed trust boundary works.
+The historical 40-test CI pass is not used as evidence for this design. The current implementation passed GitHub Actions run #54 on PostgreSQL 17: 53 tests passed, 0 failed. See IDENTITY_TRUST_IMPLEMENTATION_REPORT.md for scope and remaining authentication/release gates.
 
 **Next gates:** inspect GitHub Actions results, resolve failures, complete independent security review, and separately approve the trusted OIDC/JWT authentication integration. Do not use production until every gate is closed.
