@@ -3,12 +3,12 @@
 **Status:** DOCUMENTATION ONLY — no provider selected, installed, provisioned, or exposed.
 **Repository:** `msdshopfinds12-spec/infiniteX-5626f61e`
 **Branch:** `feat/provider-neutral-billing-sandbox`
-**Decision:** Evaluate Keycloak and authentik side by side with synthetic identities before selecting either.
+**Decision:** Evaluate Keycloak, authentik, ZITADEL, and Ory side by side using the same synthetic-identity test contract before selecting any provider.
 **Cost policy:** Free-first; no paid plan, trial requiring payment details, cloud resource, domain, SMS, or email service is authorized.
 
 ## 1. Objective
 
-Determine whether Keycloak or authentik is the safer and more maintainable disposable OIDC issuer for validating the existing provider-neutral InfiniteX authentication contract. This evaluation is not production authentication and must not use real user accounts or production secrets.
+Determine which of Keycloak, authentik, ZITADEL, or Ory is the safest and most maintainable disposable OIDC issuer for validating the existing provider-neutral InfiniteX authentication contract. This evaluation is not production authentication and must not use real user accounts or production secrets.
 
 ## 2. Current verified boundary
 
@@ -22,18 +22,18 @@ Determine whether Keycloak or authentik is the safer and more maintainable dispo
 
 Evaluate both candidates against the same protocol contract and test harness. Record exact release versions and source URLs at evaluation time; do not silently use `latest`.
 
-| Dimension | Keycloak | authentik | Evidence required |
+| Dimension | Keycloak | authentik | ZITADEL | Ory | Evidence required |
 |---|---|---|---|
-| OIDC Authorization Code + PKCE S256 | Verify | Verify | Successful and negative protocol tests |
-| Discovery and JWKS rotation | Verify | Verify | Metadata/JWKS behavior and rotation test |
-| Issuer/audience/nonce validation | Verify | Verify | Wrong-issuer, audience and nonce rejection |
-| Logout and session behavior | Verify | Verify | RP-initiated logout and local-session revocation |
-| Admin hardening | Verify | Verify | Admin interface isolated from public ingress |
-| Resource footprint | Measure | Measure | Actual idle/peak RAM, CPU and disk |
-| Backup/restore | Verify | Verify | Successful disposable restore test |
+| OIDC Authorization Code + PKCE S256 | Verify | Verify | Verify | Verify | Successful and negative protocol tests |
+| Discovery and JWKS rotation | Verify | Verify | Verify | Verify | Metadata/JWKS behavior and rotation test |
+| Issuer/audience/nonce validation | Verify | Verify | Verify | Verify | Wrong-issuer, audience and nonce rejection |
+| Logout and session behavior | Verify | Verify | Verify | Verify | RP-initiated logout and local-session revocation |
+| Admin hardening | Verify | Verify | Verify | Verify | Admin interface isolated from public ingress |
+| Resource footprint | Measure | Measure | Measure | Measure | Actual idle/peak RAM, CPU and disk |
+| Backup/restore | Verify | Verify | Verify | Verify | Successful disposable restore test |
 | Security maintenance | Review | Review | Release cadence, advisories and supported version |
-| License | Review | Review | Exact release license and notices |
-| Zero-cost feasibility | Verify | Verify | Existing compute only; no paid resources |
+| License | Review | Review | Review | Review | Exact release license and notices |
+| Zero-cost feasibility | Verify | Verify | Verify | Verify | Existing compute only; no paid resources |
 
 Do not assign a winner based on feature claims alone. Missing evidence is **UNVERIFIED**, not a pass.
 
@@ -51,7 +51,7 @@ If no existing computer/host is available, stop at documentation and static revi
 
 ## 5. Common protocol test suite
 
-Run the same relying-party test suite against each candidate:
+Run the same relying-party test suite against all four candidates:
 
 1. Discovery document issuer exactly matches the configured HTTPS issuer.
 2. Authorization Code flow succeeds with PKCE S256.
@@ -80,7 +80,7 @@ Score each dimension from 0 to 5 only when evidence exists:
 
 Weight protocol/security 35%, maintenance/license 20%, operational simplicity 15%, measured resource footprint 15%, backup/restore 10%, and free-tier feasibility 5%.
 
-A candidate is ineligible regardless of total score if it fails issuer/signature/nonce/PKCE validation, exposes administration publicly, requires paid infrastructure contrary to the zero-cost constraint, or cannot be backed up and restored safely. If evidence is incomplete for either candidate, record **NO SELECTION**.
+A candidate is ineligible regardless of total score if it fails issuer/signature/nonce/PKCE validation, exposes administration publicly, requires paid infrastructure contrary to the zero-cost constraint, or cannot be backed up and restored safely. If evidence is incomplete for any candidate, record **NO SELECTION**.
 
 ## 7. Evidence record template
 
@@ -109,4 +109,4 @@ Never paste secrets, raw tokens, private keys, or personal data into this record
 
 ## 9. Recommendation
 
-Keep the application provider-neutral. First complete a static comparison of exact supported releases and license/security-maintenance evidence. Only then request approval for a disposable side-by-side test on already-available compute. Select neither provider until both have comparable test evidence.
+Keep the application provider-neutral. First complete a static comparison of exact supported releases and license/security-maintenance evidence. Only then request approval for a disposable side-by-side test on already-available compute. Select no provider until all shortlisted candidates have comparable evidence; document any evidence-based reduction in shortlist before hands-on testing.
