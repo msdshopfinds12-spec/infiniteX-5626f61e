@@ -25,7 +25,7 @@ export default function Sidebar({
         </div>
         <div className="brand-text">
           <span className="brand-title">InfiniteX</span>
-          <span className="brand-sub">AI Engineering</span>
+          <span className="brand-sub">Engineering OS</span>
         </div>
       </div>
       <nav className="nav">
