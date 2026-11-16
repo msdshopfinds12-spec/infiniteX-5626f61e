@@ -6,9 +6,9 @@ import hashlib
 import json
 import math
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Mapping
 
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
