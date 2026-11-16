@@ -38,7 +38,7 @@ class CodeChangePolicy:
     MAX_FILES = 20
     MAX_FILE_BYTES = 200_000
     MAX_TOTAL_BYTES = 1_000_000
-    ALLOWED_BRANCH_PREFIXES = ("fix/", "feat/", "chore/")
+    ALLOWED_TARGET_BRANCH = "fix/infiniteX-foundation-hardening"
     PROTECTED_BRANCHES = {"main", "master", "phase-9/capability-mesh"}
     PROTECTED_PATHS = {
         ".env",
@@ -68,10 +68,7 @@ class CodeChangePolicy:
             normalized_branch = branch.strip()
             if normalized_branch in self.PROTECTED_BRANCHES:
                 reasons.append("PROTECTED_BRANCH_FORBIDDEN")
-            elif not any(
-                normalized_branch.startswith(prefix) and len(normalized_branch) > len(prefix)
-                for prefix in self.ALLOWED_BRANCH_PREFIXES
-            ):
+            elif normalized_branch != self.ALLOWED_TARGET_BRANCH:
                 reasons.append("UNAPPROVED_BRANCH_NAMESPACE")
 
         if not isinstance(proposal.proposal_id, str) or not proposal.proposal_id.strip():
