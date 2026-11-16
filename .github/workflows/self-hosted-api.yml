@@ -11,6 +11,7 @@ on:
   pull_request:
     paths:
       - "apps/api/**"
+      - "infra/db/**"
       - ".github/workflows/self-hosted-api.yml"
   workflow_dispatch:
 
@@ -20,7 +21,21 @@ permissions:
 jobs:
   api-checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_test_only_password
+          POSTGRES_DB: infinite_x_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d infinite_x_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     defaults:
       run:
         working-directory: apps/api
@@ -35,3 +50,20 @@ jobs:
         run: npm run check
       - name: Unit and HTTP integration tests
         run: npm test
+      - name: Install PostgreSQL client
+        working-directory: .
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Apply migration to disposable PostgreSQL
+        working-directory: .
+        env:
+          PGPASSWORD: ci_test_only_password
+        run: |
+          psql --host 127.0.0.1 --username postgres --dbname infinite_x_ci --set ON_ERROR_STOP=1 --file infra/db/migrations/0001_identity_workspace_foundation.sql
+      - name: Verify schema constraints with synthetic fixtures
+        working-directory: .
+        env:
+          PGPASSWORD: ci_test_only_password
+        run: |
+          psql --host 127.0.0.1 --username postgres --dbname infinite_x_ci --set ON_ERROR_STOP=1 --file infra/db/tests/0001_identity_workspace.integration.sql
