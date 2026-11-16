@@ -69,7 +69,14 @@ export function createWorkspaceMembershipRepository(pool) {
           [workspaceId, [actorUserId, targetUserId]],
         );
 
-        const byUser = new Map(membershipRows.rows.map((row) => [row.user_id, row]));
+        const byUser = new Map(membershipRows.rows.map((row) => [
+          row.user_id,
+          {
+            ...row,
+            userId: row.user_id,
+            workspaceId: row.workspace_id,
+          },
+        ]));
         const actor = byUser.get(actorUserId);
         const target = byUser.get(targetUserId);
 
