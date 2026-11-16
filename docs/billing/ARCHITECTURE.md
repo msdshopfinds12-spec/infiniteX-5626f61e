@@ -1,161 +1,132 @@
 # InfiniteX Billing — Provider-Neutral Sandbox Architecture
 
-**Status:** PLAN ONLY — implementation not yet approved  
-**Branch:** feat/provider-neutral-billing-sandbox  
-**Target:** React + Vite + TypeScript frontend currently in this repository  
-**Payment mode:** MOCK / SANDBOX ONLY  
+**Status:** APPROVED FOR OPTION B — backend contract documentation only  
+**Branch:** `feat/provider-neutral-billing-sandbox`  
+**Payment mode:** MOCK / SANDBOX DESIGN ONLY  
+**Runtime status:** NO backend deployed or provisioned  
 **Live payments:** DISABLED — no merchant account, provider credentials, live checkout, real charges, or payout configuration
 
 ## 1. Executive decision
 
-Build a provider-neutral billing boundary first. The application must not depend directly on PayMongo, Xendit, Maya, or another gateway. A future provider adapter may be selected only after an eligible adult merchant account owner completes provider eligibility, identity verification, business review, and payout-account setup.
+Option B is approved: define a provider-neutral mock billing domain and backend contracts that can later be hosted by Supabase Edge Functions or Cloudflare Workers. This phase creates documentation only. It does not add application runtime code, database migrations, secrets, cloud resources, or deployments.
 
-This repository currently presents a React/Vite UI. The inspected package.json has no backend framework, payment SDK, database SDK, or test runner. Therefore this plan does not claim that payment processing, subscription persistence, webhook verification, or entitlement enforcement already exists.
+The repository currently presents a React/Vite frontend. Its inspected `package.json` has no backend framework, payment SDK, database SDK, or test runner. No production payment processing, subscription persistence, webhook verification, or entitlement enforcement is established.
 
 ## 2. How the owner receives subscription money
 
 1. A customer selects a published plan in InfiniteX.
-2. The server creates a checkout session with an approved payment provider.
+2. In a future approved live system, a trusted server creates a checkout session with an approved payment provider.
 3. The customer pays on the provider-hosted checkout page.
-4. The provider independently confirms the payment to the server through a signed webhook.
-5. The server validates the signature, amount, currency, merchant account, event freshness, and idempotency key.
-6. The server records the immutable payment event and updates the subscription state.
+4. The provider independently confirms payment to the server through a signed webhook.
+5. The server validates signature, amount, currency, merchant account, event freshness, and idempotency.
+6. The server records the payment event and updates subscription state.
 7. InfiniteX grants entitlements only after verified server-side confirmation.
 8. The provider settles eligible net proceeds to the merchant's verified payout account, subject to provider fees, reserves, settlement timing, refunds, disputes, and account eligibility.
 
-**Important:** GitHub stores source code; Vercel hosts the app; neither receives customer payments. Supabase is a possible future database/backend option, not a payment processor. Payout details belong only in the payment provider's secure merchant dashboard, never in this repository or browser storage.
+**GitHub stores source code; Vercel hosts the app; neither receives customer payments.** Supabase or Cloudflare can host trusted backend logic but is not the payment processor. Payout details belong only in the payment provider's secure merchant dashboard, never in this repository or browser storage.
+
+For any future real merchant onboarding, an eligible adult account owner must handle provider eligibility, identity/business verification, and payout setup. Never bypass age or KYC requirements.
 
 ## 3. Scope and non-goals
 
-### In scope for the first implementation
-- Explicit mock payment provider with deterministic fixtures.
-- Typed plan, checkout, payment, subscription, entitlement, and ledger domain models.
-- Billing status UI that clearly labels every record as DEMO.
-- Server-contract interfaces and webhook verification design.
-- Unit tests for state transitions, duplicate events, invalid signatures, amount mismatch, and failed/cancelled payments.
-- Documentation for eventual provider selection and deployment gates.
+### Approved in this phase
+- Backend API and webhook contracts.
+- Logical data model and access-control requirements.
+- Runtime mapping for Supabase Edge Functions and Cloudflare Workers.
+- Mock-only behavior, state transitions, idempotency rules, and threat model.
+- Documentation acceptance checklist.
 
-### Out of scope
-- Live provider account creation or KYC.
-- Real card, e-wallet, bank, or QR payment collection.
-- Real payout or withdrawal operations.
-- Production webhook endpoint or secrets.
-- Real customer billing, automatic renewal, refund execution, or tax/legal advice.
-- Storing card numbers, CVV, bank credentials, wallet PINs, or payout account credentials.
+### Explicitly not approved
+- Runtime implementation or dependencies.
+- Supabase project changes, Cloudflare resources, database migrations, or data writes.
+- Provider account creation, KYC, merchant/payout details, or provider SDKs.
+- Live checkout, real card/e-wallet/bank/QR collection, recurring charges, refunds, or payouts.
+- Secrets, production webhook endpoints, deployment, merge, or release.
 
 ## 4. Proposed architecture
 
-React UI (plan picker / billing status / demo history)
-  -> Typed Billing Client (no provider secrets)
-  -> Server API boundary (NOT PRESENT YET; future approved runtime)
-  -> Subscription Service
-  -> Payment Provider Adapter (mock first; real provider only later)
-  -> Hosted Checkout + Signed Webhooks (future provider integration)
-  -> Append-only Billing Ledger + Subscription Store
-  -> Reconciliation / Admin Reporting
-  -> Provider settlement to verified merchant payout account
+React UI  
+  -> typed billing client (public, no provider secrets)  
+  -> authenticated backend API boundary (future; not deployed)  
+  -> subscription application service  
+  -> provider adapter interface (mock only in this phase)  
+  -> future hosted checkout + signed provider webhooks  
+  -> append-only billing event/ledger records + subscription state  
+  -> entitlement authorization check
 
-The frontend must never decide that a payment succeeded. It may display a pending state while awaiting server confirmation. The server is the sole authority for payment and entitlement state.
+The frontend is never authoritative for payment success. Browser redirects and client-submitted payment statuses are untrusted hints only. The backend is the sole authority for subscription and entitlement state.
 
-## 5. Domain model
+## 5. Domain invariants
 
-- **Plan:** immutable plan identifier, display name, amount in minor currency units, currency, billing interval, active flag, and version.
-- **CheckoutSession:** opaque internal ID, user ID, plan ID, provider session reference, status, expiry, and creation timestamp. Never contains payment credentials.
-- **Payment:** internal ID, checkout ID, provider payment reference, amount, currency, status, paid timestamp, and provider metadata allowlist.
-- **Subscription:** internal ID, user ID, plan ID, status, period start/end, cancellation-at-period-end flag, and provider subscription reference.
-- **Entitlement:** user ID, feature key, effective start/end, and source subscription ID.
-- **BillingEvent:** append-only event ID, provider event ID, event type, received timestamp, verified flag, payload digest, and processing outcome. Do not store unnecessary raw personal or payment data.
-- **LedgerEntry:** append-only debit/credit record with currency, amount in minor units, source event, and idempotency key. Never silently overwrite financial history.
+- Money is integer minor units with an explicit ISO 4217 currency; no floating-point arithmetic.
+- Every ID is opaque and server-generated.
+- Every payment/subscription record is scoped to its owner.
+- A plan's amount/currency/interval is snapshotted into a checkout attempt.
+- Payment events and ledger entries are append-only.
+- A provider event ID and internal idempotency key are unique within their defined scope.
+- Only a verified server-side payment event may activate paid entitlements.
+- Refund/dispute/reversal events must trigger a defined entitlement review/revocation policy; never erase financial history.
 
-Suggested statuses:
-- Checkout: created | pending | completed | expired | cancelled | failed
-- Payment: pending | succeeded | failed | refunded | disputed
-- Subscription: incomplete | trialing | active | past_due | cancelled | expired
+## 6. State vocabulary
 
-All money values use integer minor units (for PHP, centavos) and explicit ISO currency codes. Never use floating-point arithmetic for money.
+- Checkout: `created | pending | completed | expired | cancelled | failed`
+- Payment: `pending | succeeded | failed | refunded | disputed`
+- Subscription: `incomplete | trialing | active | past_due | cancelled | expired`
 
-## 6. Security invariants
+Transitions must be validated by a domain state machine. Terminal states cannot be silently reopened by a browser request.
+
+## 7. Security invariants
 
 1. No provider secret, service-role key, webhook signing secret, or database admin key in Vite client variables or client bundles.
-2. Verify webhook signatures against the raw request body using the provider's official verification procedure.
-3. Reject unsigned, invalid, stale, wrong-merchant, wrong-currency, and amount-mismatched events.
-4. Enforce idempotency with a unique provider event ID and a transaction-safe state update.
-5. Treat browser redirect/query parameters as untrusted display hints, never proof of payment.
-6. Grant or revoke entitlements only in trusted server-side code.
-7. Apply authenticated ownership checks and database row-level security to user billing records.
-8. Keep a minimal audit trail; redact secrets and sensitive personal/payment data from logs.
-9. Use least-privilege service credentials and rotate compromised secrets.
-10. Never expose a manual admin action that can mark a real payment as paid without verified provider evidence.
+2. Authenticate user routes and derive user identity from a verified server-side session/token; never trust a caller-supplied user ID.
+3. Verify future provider webhooks against the raw request body and official signature procedure.
+4. Reject invalid, stale, wrong-merchant, wrong-currency, and amount-mismatched events.
+5. Enforce idempotency and atomic event-to-payment/subscription updates.
+6. Treat browser redirects/query parameters as untrusted.
+7. Grant/revoke entitlements only in trusted server-side code.
+8. Apply database row-level security or equivalent owner checks; service credentials remain server-only.
+9. Redact secrets and sensitive personal/payment data from logs.
+10. Never store PAN, CVV, wallet PIN, bank login, or payout credentials.
 
-## 7. Proposed future data tables
+## 8. Runtime options — documented, not selected
 
-- billing_plans
-- checkout_sessions
-- payments
-- subscriptions
-- subscription_entitlements
-- billing_events (append-only, unique provider event ID)
-- billing_ledger_entries (append-only, unique idempotency key)
-- billing_reconciliation_runs
+### Supabase Edge Functions
+- Suggested functions: `billing-create-checkout`, `billing-get-subscription`, `billing-cancel-subscription` (future), and `billing-provider-webhook`.
+- User-facing functions require verified authentication and derive the subject from the auth context.
+- Webhook function is provider-authenticated by signature, not by a user session.
+- Any service-role credential is server-only and is not exposed to the browser.
+- RLS is required for user-readable billing rows.
+- No project configuration, secrets, SQL, or function deployment is included.
 
-Schema migrations are not part of this plan-only commit. Before implementation, select and approve the backend runtime and database. Every user-owned row must have explicit ownership policies; service-role access must remain server-only.
+### Cloudflare Workers
+- Suggested routes: `POST /v1/billing/checkout-sessions`, `GET /v1/billing/subscription`, `POST /v1/billing/subscription/cancel` (future), and `POST /v1/billing/webhooks/{provider}`.
+- User routes require verified auth middleware and derive the subject from verified claims.
+- Webhook route verifies provider signatures over the raw body before parsing/processing.
+- Durable storage/transaction strategy must provide unique event IDs and atomic state changes before any live use.
+- No Worker, D1 database, KV namespace, secret, route, or deployment is created.
 
-## 8. Provider adapter contract
+Both options implement the same domain contract in `API_CONTRACT.md`; do not maintain different business rules per runtime.
 
-The domain layer should depend on an interface, not a provider SDK:
+## 9. Logical data model
 
-- createCheckoutSession(input)
-- verifyWebhook(rawBody, headers)
-- normalizeWebhookEvent(verifiedEvent)
-- getPaymentStatus(providerPaymentId)
-- requestCancellation(providerSubscriptionId) (future, not implemented in mock scope)
+See `DATA_MODEL_CONTRACT.md`. Proposed logical entities: billing_plans, checkout_sessions, payments, subscriptions, subscription_entitlements, billing_events, billing_ledger_entries, and billing_reconciliation_runs. This is documentation, not a migration.
 
-The first adapter is MockPaymentProvider. It must use clearly synthetic test fixtures and must not make network calls or simulate real money movement. A future PayMongo or Xendit adapter requires official current documentation review, merchant eligibility confirmation by the adult account owner, sandbox credentials, and separate approval.
+## 10. Provider adapter boundary
 
-## 9. Repository implementation manifest (proposed)
+The domain depends on an interface, not a provider SDK:
+- `createCheckoutSession(input)`
+- `verifyWebhook(rawBody, headers)`
+- `normalizeWebhookEvent(verifiedEvent)`
+- `getPaymentStatus(providerPaymentId)`
+- `requestCancellation(providerSubscriptionId)` (future)
 
-| Path | Purpose | Initial mode |
-|---|---|---|
-| docs/billing/ARCHITECTURE.md | This architecture and security contract | Plan |
-| docs/billing/IMPLEMENTATION_MANIFEST.md | File-by-file implementation and acceptance gates | Plan |
-| src/billing/domain/types.ts | Typed domain contracts | Build after approval |
-| src/billing/domain/state-machine.ts | Pure, deterministic status transitions | Build after approval |
-| src/billing/providers/mock-provider.ts | Synthetic mock provider only | Build after approval |
-| src/billing/services/billing-service.ts | Mock orchestration and idempotency boundary | Build after approval |
-| src/billing/demo/fixtures.ts | Clearly labelled synthetic plans/events | Build after approval |
-| src/components/billing/BillingPanel.tsx | Demo billing UI | Build after approval |
-| src/billing/index.ts | Public module exports | Build after approval |
-| tests/billing/*.test.ts | State/security regression tests | Build after approval |
-| docs/billing/PROVIDER_ONBOARDING_GATE.md | Adult-owned provider and payout readiness checklist | Build after approval |
+The only adapter permitted in a future mock implementation is deterministic and offline. It must not make network calls or simulate real money movement. A real provider adapter requires current official documentation review, eligible adult merchant onboarding, sandbox verification, security review, and separate approval.
 
-No existing files are planned for deletion or replacement.
+## 11. Acceptance and release gates
 
-## 10. Test and acceptance plan
-
-- Valid mock payment transitions pending checkout to paid and active subscription.
-- A duplicate event does not create a second payment or ledger entry.
-- Invalid signature never changes payment or entitlement state.
-- Wrong amount or currency is rejected.
-- Browser-only success redirect never activates a subscription.
-- Failed, cancelled, expired, refunded, and disputed events do not grant active entitlements.
-- A user cannot read another user's billing records.
-- No secret or real payment credential appears in source, client bundle, logs, or fixtures.
-- UI labels all fixture transactions as DEMO / NOT REAL MONEY.
-- Run the repository's actual available checks after implementation. At planning time, package.json exposes npm run build and npm run lint; no test script or test runner is currently declared.
-
-## 11. Approval gates
-
-- **PLAN:** architecture and manifest committed on this feature branch.
-- **APPROVE:** human approval required before source implementation and dependency changes.
-- **BUILD:** implement mock-only billing module and UI.
-- **TEST:** run and record actual build/lint/test output; fix failures.
-- **AUDIT:** inspect auth boundaries, secrets, idempotency, event verification, RLS design, and UI demo labeling.
-- **RELEASE:** separate human approval required before merge, deployment, live credentials, real charges, database migrations, or production provider activation.
-
-## 12. Decision still required
-
-Before implementation, confirm the backend target for trusted billing operations:
-- Keep this as a frontend-only mock prototype for now; or
-- Design the future server boundary for an approved backend (Supabase Edge Functions or Cloudflare Workers) without deploying it.
-
-Until then, the implementation must remain mock-only and must not collect real payments.
+- **PLAN:** architecture and implementation manifest documented.
+- **APPROVE:** explicit approval for Option B received.
+- **BUILD:** complete the approved backend contract documentation only.
+- **TEST:** documentation consistency review; no runtime tests are implied by docs-only work.
+- **AUDIT:** verify trust boundaries, auth, signature, idempotency, ownership, RLS, and secret handling are specified.
+- **RELEASE:** not authorized. Separate approval is required for runtime code, dependencies, migrations, cloud provisioning, merge, deployment, credentials, live payments, or production provider activation.
