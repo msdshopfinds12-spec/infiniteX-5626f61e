@@ -59,11 +59,18 @@ jobs:
           PGPASSWORD: ci_test_only_password
         run: |
           psql --host 127.0.0.1 --username postgres --dbname infinite_x_ci --set ON_ERROR_STOP=1 --file infra/db/migrations/0001_identity_workspace_foundation.sql
+      - name: Create restricted runtime role in disposable PostgreSQL
+        working-directory: .
+        env:
+          PGPASSWORD: ci_test_only_password
+        run: |
+          psql --host 127.0.0.1 --username postgres --dbname infinite_x_ci --set ON_ERROR_STOP=1 --file infra/db/ci/0002_runtime_role.sql
       - name: Syntax checks
         run: npm run check
-      - name: Unit, HTTP, and real PostgreSQL repository integration tests
+      - name: Unit, HTTP, and least-privilege PostgreSQL integration tests
         env:
-          DATABASE_URL: postgres://postgres:ci_test_only_password@127.0.0.1:5432/infinite_x_ci
+          DATABASE_URL: postgres://infinite_x_app_runtime_ci:ci_runtime_only_password@127.0.0.1:5432/infinite_x_ci
+          ADMIN_DATABASE_URL: postgres://postgres:ci_test_only_password@127.0.0.1:5432/infinite_x_ci
         run: npm test
       - name: Verify schema constraints with synthetic fixtures
         working-directory: .
