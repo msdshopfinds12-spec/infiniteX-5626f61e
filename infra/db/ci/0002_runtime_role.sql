@@ -25,6 +25,10 @@ GRANT USAGE ON SCHEMA public TO infinite_x_app_runtime_ci;
 GRANT SELECT ON TABLE app_users, workspaces, workspace_memberships
   TO infinite_x_app_runtime_ci;
 
+-- FOR UPDATE requires UPDATE privilege; expose only the non-sensitive timestamp column.
+GRANT UPDATE (updated_at) ON TABLE app_users, workspaces
+  TO infinite_x_app_runtime_ci;
+
 -- Runtime may change membership state but cannot rewrite grant provenance.
 GRANT UPDATE (role, status, updated_at) ON TABLE workspace_memberships
   TO infinite_x_app_runtime_ci;
