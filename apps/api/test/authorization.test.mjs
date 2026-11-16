@@ -202,6 +202,19 @@ test("admin can manage member and viewer but cannot grant admin", () => {
   assert.deepEqual(admin, { allowed: false, reason: "ADMIN_SCOPE_LIMIT" });
 });
 
+test("admin cannot modify another admin membership", () => {
+  const result = authorizeWorkspaceRoleChange({
+    actorMembership: membership("admin"),
+    targetMembership: membership("admin", { userId: "user-b" }),
+    newRole: "viewer",
+    activeOwnerCount: 1,
+  });
+  assert.deepEqual(result, {
+    allowed: false,
+    reason: "CANNOT_CHANGE_PRIVILEGED_MEMBER",
+  });
+});
+
 test("invalid owner counts fail closed", () => {
   const result = authorizeWorkspaceRoleChange({
     actorMembership: membership("owner"),
