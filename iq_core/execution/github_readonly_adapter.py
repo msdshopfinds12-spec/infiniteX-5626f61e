@@ -20,7 +20,7 @@ from iq_core.execution.git_object_verifier import (
 )
 from iq_core.execution.patch_manifest import PatchManifest, PatchPolicy
 
-_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_REPO_SEGMENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
 _DEFAULT_API = "https://api.github.com"
 _MAX_TREE_ENTRIES = 100_000
@@ -62,7 +62,18 @@ class GitHubReadOnlyObjectAdapter:
         max_blob_bytes: int = _MAX_BLOB_BYTES,
         max_total_blob_bytes: int = _MAX_TOTAL_BLOB_BYTES,
     ) -> None:
-        if not isinstance(repository_full_name, str) or not _REPO_RE.fullmatch(repository_full_name):
+        parts = (
+            repository_full_name.split("/")
+            if isinstance(repository_full_name, str)
+            else []
+        )
+        if (
+            len(parts) != 2
+            or any(
+                part in {"", ".", ".."} or not _REPO_SEGMENT_RE.fullmatch(part)
+                for part in parts
+            )
+        ):
             raise ValueError("GITHUB_REPOSITORY_NAME_INVALID")
         if not isinstance(repository_id, str) or not repository_id.strip() or len(repository_id) > 128:
             raise ValueError("GITHUB_REPOSITORY_ID_INVALID")
