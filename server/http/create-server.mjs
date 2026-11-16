@@ -32,7 +32,10 @@ export function createInfiniteXServer({
   if (typeof readinessCheck !== "function") {
     throw new TypeError("readinessCheck must be a function");
   }
-  if (!Number.isSafeInteger(readinessTimeoutMs) || readinessTimeoutMs < 1 || readinessTimeoutMs > 30_000) {\n    throw new RangeError("readinessTimeoutMs must be an integer between 1 and 30000");\n  }\n  if (typeof logger !== "function") {
+  if (!Number.isSafeInteger(readinessTimeoutMs) || readinessTimeoutMs < 1 || readinessTimeoutMs > 30_000) {
+    throw new RangeError("readinessTimeoutMs must be an integer between 1 and 30000");
+  }
+  if (typeof logger !== "function") {
     throw new TypeError("logger must be a function");
   }
 
