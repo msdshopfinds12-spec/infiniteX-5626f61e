@@ -1,0 +1,36 @@
+name: Self-Hosted API Checks
+
+on:
+  push:
+    branches:
+      - feat/provider-neutral-billing-sandbox
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/self-hosted-api.yml"
+  pull_request:
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/self-hosted-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax checks
+        run: npm run check
+      - name: Unit and HTTP integration tests
+        run: npm test
