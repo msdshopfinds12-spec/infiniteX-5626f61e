@@ -6,9 +6,11 @@ import { createWorkspaceMembershipRepository } from "../src/workspaces/membershi
 
 const { Pool } = pg;
 const databaseUrl = process.env.DATABASE_URL;
+const adminDatabaseUrl = process.env.ADMIN_DATABASE_URL;
 const pool = databaseUrl ? new Pool({ connectionString: databaseUrl, max: 8 }) : null;
+const adminPool = adminDatabaseUrl ? new Pool({ connectionString: adminDatabaseUrl, max: 4 }) : null;
 const fixtures = [];
-const integration = { skip: !databaseUrl };
+const integration = { skip: !databaseUrl || !adminDatabaseUrl };
 
 async function createFixture({ actorRole = "owner", targetRole = "member", extraOwner = false } = {}) {
   const actorId = randomUUID();
@@ -16,16 +18,16 @@ async function createFixture({ actorRole = "owner", targetRole = "member", extra
   const workspaceId = randomUUID();
   const extraOwnerId = extraOwner ? randomUUID() : null;
 
-  await pool.query(
+  await adminPool.query(
     "INSERT INTO app_users (id, status) VALUES ($1, 'active'), ($2, 'active')" +
       (extraOwner ? ", ($3, 'active')" : ""),
     extraOwner ? [actorId, targetId, extraOwnerId] : [actorId, targetId],
   );
-  await pool.query(
+  await adminPool.query(
     "INSERT INTO workspaces (id, name, created_by) VALUES ($1, $2, $3)",
     [workspaceId, "CI integration " + workspaceId, actorId],
   );
-  await pool.query(
+  await adminPool.query(
     "INSERT INTO workspace_memberships (workspace_id, user_id, role, granted_by) VALUES " +
       "($1, $2, $3, $2), ($1, $4, $5, $2)" +
       (extraOwner ? ", ($1, $6, 'owner', $2)" : ""),
@@ -38,8 +40,8 @@ async function createFixture({ actorRole = "owner", targetRole = "member", extra
 }
 
 before(async () => {
-  if (!pool) return;
-  await pool.query(`
+  if (!pool || !adminPool) return;
+  await adminPool.query(`
     CREATE OR REPLACE FUNCTION public.ci_reject_selected_audit_event()
     RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
@@ -50,8 +52,8 @@ before(async () => {
     END;
     $$;
   `);
-  await pool.query("DROP TRIGGER IF EXISTS ci_reject_selected_audit_event ON audit_events");
-  await pool.query(`
+  await adminPool.query("DROP TRIGGER IF EXISTS ci_reject_selected_audit_event ON audit_events");
+  await adminPool.query(`
     CREATE TRIGGER ci_reject_selected_audit_event
     BEFORE INSERT ON audit_events
     FOR EACH ROW EXECUTE FUNCTION public.ci_reject_selected_audit_event()
@@ -59,22 +61,49 @@ before(async () => {
 });
 
 afterEach(async () => {
-  if (!pool) return;
+  if (!adminPool) return;
   const fixture = fixtures.pop();
   if (!fixture) return;
-  await pool.query("DELETE FROM audit_events WHERE workspace_id = $1", [fixture.workspaceId]);
-  await pool.query("DELETE FROM workspace_memberships WHERE workspace_id = $1", [fixture.workspaceId]);
-  await pool.query("DELETE FROM workspaces WHERE id = $1", [fixture.workspaceId]);
-  await pool.query("DELETE FROM app_users WHERE id = ANY($1::uuid[])", [
+  await adminPool.query("DELETE FROM audit_events WHERE workspace_id = $1", [fixture.workspaceId]);
+  await adminPool.query("DELETE FROM workspace_memberships WHERE workspace_id = $1", [fixture.workspaceId]);
+  await adminPool.query("DELETE FROM workspaces WHERE id = $1", [fixture.workspaceId]);
+  await adminPool.query("DELETE FROM app_users WHERE id = ANY($1::uuid[])", [
     [fixture.actorId, fixture.targetId, fixture.extraOwnerId].filter(Boolean),
   ]);
 });
 
 after(async () => {
-  if (!pool) return;
-  await pool.query("DROP TRIGGER IF EXISTS ci_reject_selected_audit_event ON audit_events");
-  await pool.query("DROP FUNCTION IF EXISTS public.ci_reject_selected_audit_event()");
-  await pool.end();
+  if (adminPool) {
+    await adminPool.query("DROP TRIGGER IF EXISTS ci_reject_selected_audit_event ON audit_events");
+    await adminPool.query("DROP FUNCTION IF EXISTS public.ci_reject_selected_audit_event()");
+    await adminPool.end();
+  }
+  if (pool) await pool.end();
+});
+
+test("runtime role connects with restricted database identity", integration, async () => {
+  const identity = await pool.query("SELECT current_user AS role_name");
+  assert.equal(identity.rows[0].role_name, "infinite_x_app_runtime_ci");
+  const deniedStatements = [
+    "INSERT INTO app_users (id, status) VALUES ($1, 'active')",
+    "UPDATE app_users SET status = 'disabled' WHERE false",
+    "UPDATE workspaces SET name = 'forbidden' WHERE false",
+    "DELETE FROM workspace_memberships WHERE false",
+    "SELECT * FROM audit_events",
+    "CREATE TABLE public.ci_runtime_must_not_create (id integer)",
+  ];
+  for (const statement of deniedStatements) {
+    await assert.rejects(
+      pool.query(statement, statement.includes("$1") ? [randomUUID()] : undefined),
+      (error) => error.code === "42501",
+      "runtime role unexpectedly had privilege for: " + statement,
+    );
+  }
+  const role = await adminPool.query(
+    "SELECT rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls " +
+      "FROM pg_roles WHERE rolname = current_user",
+  );
+  assert.equal(role.rows.length, 1);
 });
 
 test("real PostgreSQL: role mutation and audit event commit atomically", integration, async () => {
@@ -88,7 +117,7 @@ test("real PostgreSQL: role mutation and audit event commit atomically", integra
   });
   assert.equal(result.allowed, true);
   assert.equal(result.membership.role, "viewer");
-  const audit = await pool.query(
+  const audit = await adminPool.query(
     "SELECT event_type, metadata FROM audit_events WHERE workspace_id = $1 AND target_user_id = $2",
     [fixture.workspaceId, fixture.targetId],
   );
@@ -107,14 +136,14 @@ test("real PostgreSQL: the only active owner cannot revoke itself", integration,
     requestId: "ci-last-owner-" + randomUUID(),
   });
   assert.deepEqual(result, { allowed: false, reason: "LAST_OWNER_INVARIANT" });
-  const membership = await pool.query(
+  const membership = await adminPool.query(
     "SELECT role, status FROM workspace_memberships WHERE workspace_id = $1 AND user_id = $2",
     [fixture.workspaceId, fixture.actorId],
   );
   assert.deepEqual(membership.rows[0], { role: "owner", status: "active" });
 });
 
-test("real PostgreSQL: concurrent owner revocations preserve one active owner", integration, async () => {
+test("real PostgreSQL: concurrent owner mutations preserve an active owner", integration, async () => {
   const fixture = await createFixture({ extraOwner: true, targetRole: "owner" });
   const repository = createWorkspaceMembershipRepository(pool);
   const results = await Promise.all([
@@ -134,7 +163,7 @@ test("real PostgreSQL: concurrent owner revocations preserve one active owner", 
     }),
   ]);
   assert.ok(results.every((result) => result.allowed || result.reason === "PERMISSION_DENIED"));
-  const owners = await pool.query(
+  const owners = await adminPool.query(
     "SELECT count(*)::int AS count FROM workspace_memberships " +
       "WHERE workspace_id = $1 AND role = 'owner' AND status = 'active'",
     [fixture.workspaceId],
@@ -154,12 +183,12 @@ test("real PostgreSQL: audit insert failure rolls back the membership mutation",
     }),
     /synthetic audit failure/,
   );
-  const membership = await pool.query(
+  const membership = await adminPool.query(
     "SELECT role, status FROM workspace_memberships WHERE workspace_id = $1 AND user_id = $2",
     [fixture.workspaceId, fixture.targetId],
   );
   assert.deepEqual(membership.rows[0], { role: "member", status: "active" });
-  const audit = await pool.query(
+  const audit = await adminPool.query(
     "SELECT count(*)::int AS count FROM audit_events WHERE workspace_id = $1",
     [fixture.workspaceId],
   );
@@ -168,7 +197,7 @@ test("real PostgreSQL: audit insert failure rolls back the membership mutation",
 
 test("real PostgreSQL: disabled target accounts cannot be modified", integration, async () => {
   const fixture = await createFixture();
-  await pool.query("UPDATE app_users SET status = 'disabled' WHERE id = $1", [fixture.targetId]);
+  await adminPool.query("UPDATE app_users SET status = 'disabled' WHERE id = $1", [fixture.targetId]);
   const result = await createWorkspaceMembershipRepository(pool).changeRole({
     workspaceId: fixture.workspaceId,
     actorUserId: fixture.actorId,
