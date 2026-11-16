@@ -19,8 +19,8 @@ export default function App() {
       {
         id: "agents",
         label: "Active Agents",
-        value: "12",
-        delta: "+3",
+        value: "—",
+        delta: "Not connected",
         trend: "up" as const,
         icon: Bot,
         accent: "primary" as const,
@@ -28,8 +28,8 @@ export default function App() {
       {
         id: "runs",
         label: "Pipelines / 24h",
-        value: "1,284",
-        delta: "+18%",
+        value: "—",
+        delta: "Not connected",
         trend: "up" as const,
         icon: GitBranch,
         accent: "success" as const,
@@ -37,8 +37,8 @@ export default function App() {
       {
         id: "tokens",
         label: "Tokens Used",
-        value: "4.6M",
-        delta: "+0.9M",
+        value: "—",
+        delta: "Not connected",
         trend: "up" as const,
         icon: Zap,
         accent: "warning" as const,
@@ -46,8 +46,8 @@ export default function App() {
       {
         id: "uptime",
         label: "System Uptime",
-        value: "99.98%",
-        delta: "stable",
+        value: "—",
+        delta: "Not connected",
         trend: "flat" as const,
         icon: Activity,
         accent: "neutral" as const,
@@ -75,7 +75,7 @@ export default function App() {
         <Sidebar view={view} onChange={setView} />
         <div className="main">
           <TopBar title={title} theme={theme} onToggleTheme={toggleTheme} />
-          <main className="content">
+          <main className="content">\n          <div className="demo-notice" role="status"><strong>Integration preview</strong><span>Sample dashboard data only. Live agents, metrics, logs, authentication and pipeline actions are not connected yet.</span></div>
           {view === "overview" && (
             <>
               <section className="metrics">
@@ -89,7 +89,7 @@ export default function App() {
                     <h2>
                       <Cpu size={18} /> Live Agent Activity
                     </h2>
-                    <span className="badge badge-success">online</span>
+                    <span className="badge badge-neutral">demo data</span>
                   </div>
                   <AgentList compact />
                 </div>
@@ -98,7 +98,7 @@ export default function App() {
                     <h2>
                       <Terminal size={18} /> System Log Stream
                     </h2>
-                    <span className="badge badge-neutral">tailing</span>
+                    <span className="badge badge-neutral">demo data</span>
                   </div>
                   <LogStream compact />
                 </div>
@@ -149,7 +149,7 @@ export default function App() {
                 <h2>
                   <Terminal size={18} /> Real-time Log Stream
                 </h2>
-                <span className="badge badge-success">live</span>
+                <span className="badge badge-neutral">sample data</span>
               </div>
               <LogStream />
             </div>
@@ -160,15 +160,15 @@ export default function App() {
                 <h2>
                   <ShieldCheck size={18} /> Security Posture
                 </h2>
-                <span className="badge badge-success">healthy</span>
+                <span className="badge badge-neutral">not audited</span>
               </div>
               <ul className="checklist">
                 {[
-                  "Row Level Security enabled on all tables",
-                  "Service role key never exposed to the client",
-                  "Edge functions enforce CORS allowlist",
-                  "Secrets stored in vault, not in source",
-                  "Auth gates enforced on every mutation",
+                  "Database RLS status: not verified",
+                  "Service-role key exposure: not audited",
+                  "API CORS policy: source inspected; runtime not tested",
+                  "Secret storage: not verified",
+                  "Mutation authorization: not fully verified",
                 ].map((item) => (
                   <li key={item}>
                     <CheckCircle2 size={16} className="check-icon" />
