@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -19,6 +20,10 @@ from database.models import (
     ConsumedNonce,
     OutboxEvent,
 )
+from iq_core.agents.approval_contract import (
+    ApprovalClaims,
+    canonical_approval_bytes,
+)
 
 
 @pytest.fixture
@@ -28,6 +33,61 @@ def session():
     with Session(engine) as value:
         yield value
     engine.dispose()
+
+
+def _signed_approval(*, nonce: str, proposal_id: str = "proposal-1"):
+    private_key = Ed25519PrivateKey.generate()
+    now = int(datetime.now(UTC).timestamp())
+    digest = sha256(proposal_id.encode("utf-8")).hexdigest()
+    payload = {
+        "iss": "infiniteX-local-approval",
+        "aud": "infiniteX-apply",
+        "jti": nonce,
+        "sub": "reviewer-test-1",
+        "reviewer_role": "owner",
+        "repository_id": "1426264287",
+        "target_branch": "fix/infiniteX-foundation-hardening",
+        "base_commit_sha": "a" * 40,
+        "proposal_id": proposal_id,
+        "proposal_sha256": digest,
+        "file_paths": ["src/app.py"],
+        "policy_version": "1.0",
+        "schema_version": 1,
+        "iat": now - 10,
+        "nbf": now - 10,
+        "exp": now + 300,
+    }
+    claims = ApprovalClaims.from_payload(payload)
+    signature = private_key.sign(canonical_approval_bytes(claims))
+    expected = {
+        "expected_issuer": payload["iss"],
+        "expected_audience": payload["aud"],
+        "expected_reviewer_subject": payload["sub"],
+        "expected_reviewer_role": payload["reviewer_role"],
+        "expected_repository_id": payload["repository_id"],
+        "expected_branch": payload["target_branch"],
+        "expected_base_commit_sha": payload["base_commit_sha"],
+        "expected_proposal_id": payload["proposal_id"],
+        "expected_proposal_sha256": payload["proposal_sha256"],
+        "expected_policy_version": payload["policy_version"],
+        "expected_file_paths": ("src/app.py",),
+        "now": now,
+    }
+    return payload, signature, private_key.public_key(), expected
+
+
+def _persist(session, signed):
+    payload, signature, public_key, expected = signed
+    return persist_verified_approval(
+        session,
+        tenant_id="tenant-a",
+        payload=payload,
+        signature=signature,
+        public_key=public_key,
+        **expected,
+        signer_key_id="trusted-key-1",
+        actor="reviewer-test-1",
+    )
 
 
 def test_audit_stream_appends_ordered_hash_chain(session):
@@ -67,7 +127,6 @@ def test_audit_stream_appends_ordered_hash_chain(session):
     ) == second.digest
 
 
-
 def test_audit_metadata_rejects_secret_like_keys(session):
     with pytest.raises(ValueError, match="SENSITIVE"):
         with session.begin():
@@ -85,76 +144,77 @@ def test_audit_metadata_rejects_secret_like_keys(session):
     assert session.scalar(select(AuditEvent)) is None
 
 
-def test_approval_nonce_intent_audit_and_outbox_are_atomic(session):
-    request_digest = sha256(b"approved request").hexdigest()
+def test_signed_approval_nonce_intent_audit_and_outbox_are_atomic(session):
     with session.begin():
-        intent = persist_verified_approval(
-            session,
-            tenant_id="tenant-a",
-            intent_id="intent-1",
-            raw_nonce="one-time-random-nonce",
-            request_digest=request_digest,
-            signer_key_id="owner-key-1",
-            expires_at=datetime.now(UTC) + timedelta(minutes=5),
-            actor="owner",
-        )
+        intent = _persist(session, _signed_approval(nonce="one-time-nonce-0001"))
 
-    assert intent.intent_id == "intent-1"
+    assert intent.status == "approved"
     assert session.scalar(select(ApprovalIntent)) is not None
     assert session.scalar(select(ConsumedNonce)) is not None
     assert session.scalar(select(AuditEvent)) is not None
     assert session.scalar(select(OutboxEvent)) is not None
 
 
-def test_duplicate_nonce_rejects_second_intent(session):
-    request_digest = sha256(b"approved request").hexdigest()
-    expiry = datetime.now(UTC) + timedelta(minutes=5)
+def test_duplicate_signed_nonce_rejects_second_intent(session):
     with session.begin():
-        persist_verified_approval(
-            session,
-            tenant_id="tenant-a",
-            intent_id="intent-1",
-            raw_nonce="same-nonce",
-            request_digest=request_digest,
-            signer_key_id="owner-key-1",
-            expires_at=expiry,
-            actor="owner",
-        )
+        _persist(session, _signed_approval(nonce="replay-nonce-0001"))
+    second = _signed_approval(
+        nonce="replay-nonce-0001", proposal_id="proposal-2"
+    )
 
     with pytest.raises(IntegrityError):
         with session.begin():
-            persist_verified_approval(
-                session,
-                tenant_id="tenant-a",
-                intent_id="intent-2",
-                raw_nonce="same-nonce",
-                request_digest=request_digest,
-                signer_key_id="owner-key-1",
-                expires_at=expiry,
-                actor="owner",
-            )
+            _persist(session, second)
 
-    assert session.scalar(select(ApprovalIntent).where(
-        ApprovalIntent.intent_id == "intent-2"
-    )) is None
+    assert len(session.scalars(select(ApprovalIntent)).all()) == 1
     assert len(session.scalars(select(AuditEvent)).all()) == 1
+    assert len(session.scalars(select(OutboxEvent)).all()) == 1
 
 
-def test_approval_persistence_rejects_expired_intent(session):
-    with pytest.raises(ValueError, match="expired"):
+def test_invalid_signature_writes_no_approval_records(session):
+    payload, signature, public_key, expected = _signed_approval(
+        nonce="invalid-signature-nonce"
+    )
+    invalid_signature = bytes([signature[0] ^ 1]) + signature[1:]
+
+    with pytest.raises(ValueError, match="SIGNATURE_INVALID"):
         with session.begin():
             persist_verified_approval(
                 session,
                 tenant_id="tenant-a",
-                intent_id="expired-intent",
-                raw_nonce="nonce",
-                request_digest=sha256(b"request").hexdigest(),
-                signer_key_id="owner-key-1",
-                expires_at=datetime.now(UTC) - timedelta(seconds=1),
-                actor="owner",
+                payload=payload,
+                signature=invalid_signature,
+                public_key=public_key,
+                **expected,
+                signer_key_id="trusted-key-1",
+                actor="reviewer-test-1",
+            )
+
+    assert session.scalar(select(ApprovalIntent)) is None
+    assert session.scalar(select(ConsumedNonce)) is None
+    assert session.scalar(select(AuditEvent)) is None
+    assert session.scalar(select(OutboxEvent)) is None
+
+
+def test_expired_signed_approval_is_rejected_before_persistence(session):
+    payload, signature, public_key, expected = _signed_approval(
+        nonce="expired-nonce-0001"
+    )
+    expected["now"] = payload["exp"]
+
+    with pytest.raises(ValueError, match="APPROVAL_EXPIRED"):
+        with session.begin():
+            persist_verified_approval(
+                session,
+                tenant_id="tenant-a",
+                payload=payload,
+                signature=signature,
+                public_key=public_key,
+                **expected,
+                signer_key_id="trusted-key-1",
+                actor="reviewer-test-1",
             )
     assert session.scalar(select(ApprovalIntent)) is None
-
 
 
 def test_persisted_chain_detects_digest_tampering(session):
