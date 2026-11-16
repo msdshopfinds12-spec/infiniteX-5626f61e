@@ -27,10 +27,46 @@ CREATE POLICY app_users_workspace_read ON app_users
     )
   );
 
+DROP POLICY IF EXISTS app_users_workspace_lock ON app_users;
+CREATE POLICY app_users_workspace_lock ON app_users
+  FOR UPDATE
+  USING (
+    id = NULLIF(current_setting('app.current_user_id', true), '')::uuid
+    OR EXISTS (
+      SELECT 1
+      FROM workspace_memberships AS membership
+      WHERE membership.workspace_id =
+        NULLIF(current_setting('app.current_workspace_id', true), '')::uuid
+        AND membership.user_id = app_users.id
+        AND membership.status = 'active'
+    )
+  )
+  WITH CHECK (
+    id = NULLIF(current_setting('app.current_user_id', true), '')::uuid
+    OR EXISTS (
+      SELECT 1
+      FROM workspace_memberships AS membership
+      WHERE membership.workspace_id =
+        NULLIF(current_setting('app.current_workspace_id', true), '')::uuid
+        AND membership.user_id = app_users.id
+        AND membership.status = 'active'
+    )
+  );
+
 DROP POLICY IF EXISTS workspaces_current_workspace_read ON workspaces;
 CREATE POLICY workspaces_current_workspace_read ON workspaces
   FOR SELECT
   USING (
+    id = NULLIF(current_setting('app.current_workspace_id', true), '')::uuid
+  );
+
+DROP POLICY IF EXISTS workspaces_current_workspace_lock ON workspaces;
+CREATE POLICY workspaces_current_workspace_lock ON workspaces
+  FOR UPDATE
+  USING (
+    id = NULLIF(current_setting('app.current_workspace_id', true), '')::uuid
+  )
+  WITH CHECK (
     id = NULLIF(current_setting('app.current_workspace_id', true), '')::uuid
   );
 
