@@ -7,10 +7,10 @@ migrations or touch any configured application database.
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from hashlib import sha256
 from uuid import uuid4
-from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -22,8 +22,8 @@ from database.audit_persistence import append_audit_event, persist_verified_appr
 from database.models import (
     ApprovalIntent, AuditEvent, Base, ConsumedNonce, OutboxEvent,
 )
-from iq_core.agents.approval_contract import ApprovalClaims, canonical_approval_bytes
 from database.tenant_context import set_tenant_context
+from iq_core.agents.approval_contract import ApprovalClaims, canonical_approval_bytes
 
 DATABASE_URL = os.getenv("PG_TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(
