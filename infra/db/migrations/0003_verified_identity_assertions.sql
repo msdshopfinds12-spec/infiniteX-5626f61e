@@ -4,7 +4,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
-DO $
+DO $verify$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
@@ -16,16 +16,16 @@ BEGIN
     RAISE EXCEPTION 'pgcrypto must be installed in schema public for this migration';
   END IF;
 END
-$$;
+$verify$;
 
-DO $
+DO $verify$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'infinite_x_identity_verifier_owner') THEN
     CREATE ROLE infinite_x_identity_verifier_owner
       NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION BYPASSRLS;
   END IF;
 END
-$$;
+$verify$;
 
 CREATE SCHEMA IF NOT EXISTS app_private AUTHORIZATION infinite_x_identity_verifier_owner;
 ALTER SCHEMA app_private OWNER TO infinite_x_identity_verifier_owner;
