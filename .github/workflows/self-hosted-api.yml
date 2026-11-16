@@ -46,8 +46,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install pinned API dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Install exact API dependency graph from committed lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Install PostgreSQL client
         working-directory: .
         run: |
