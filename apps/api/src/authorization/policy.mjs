@@ -139,10 +139,10 @@ export function authorizeWorkspaceRoleChange({
   }
 
   if (actorMembership.role === "admin") {
-    if (targetMembership.role === "owner") {
-      return deny("CANNOT_CHANGE_OWNER");
+    if (targetMembership.role === "owner" || targetMembership.role === "admin") {
+      return deny("CANNOT_CHANGE_PRIVILEGED_MEMBER");
     }
-    if (newRole === null || newRole === "admin") {
+    if (newRole === "admin") {
       return deny("ADMIN_SCOPE_LIMIT");
     }
   }
