@@ -9,7 +9,7 @@ function assertUuid(value, field) {
 }
 
 function assertRequestId(value) {
-  if (typeof value !== "string" || value.length < 1 || value.length > 128) {
+  if (typeof value !== "string" || value.trim().length < 1 || value.length > 128) {
     throw new TypeError("requestId must contain 1 to 128 characters");
   }
 }
@@ -62,10 +62,11 @@ export function createWorkspaceMembershipRepository(pool) {
         }
 
         const membershipRows = await client.query(
-          "SELECT user_id, workspace_id, role, status " +
-          "FROM workspace_memberships " +
-          "WHERE workspace_id = $1 AND user_id = ANY($2::uuid[]) " +
-          "ORDER BY user_id FOR UPDATE",
+          "SELECT m.user_id, m.workspace_id, m.role, m.status, u.status AS account_status " +
+          "FROM workspace_memberships AS m " +
+          "INNER JOIN app_users AS u ON u.id = m.user_id " +
+          "WHERE m.workspace_id = $1 AND m.user_id = ANY($2::uuid[]) " +
+          "ORDER BY m.user_id FOR UPDATE OF m, u",
           [workspaceId, [actorUserId, targetUserId]],
         );
 
@@ -86,10 +87,22 @@ export function createWorkspaceMembershipRepository(pool) {
           return Object.freeze({ allowed: false, reason: "ACTOR_NOT_ACTIVE" });
         }
 
+        if (actor.account_status !== "active") {
+          await client.query("ROLLBACK");
+          transactionOpen = false;
+          return Object.freeze({ allowed: false, reason: "ACTOR_ACCOUNT_DISABLED" });
+        }
+
         if (!target || target.status !== "active") {
           await client.query("ROLLBACK");
           transactionOpen = false;
           return Object.freeze({ allowed: false, reason: "TARGET_NOT_ACTIVE" });
+        }
+
+        if (target.account_status !== "active") {
+          await client.query("ROLLBACK");
+          transactionOpen = false;
+          return Object.freeze({ allowed: false, reason: "TARGET_ACCOUNT_DISABLED" });
         }
 
         const owners = await client.query(
