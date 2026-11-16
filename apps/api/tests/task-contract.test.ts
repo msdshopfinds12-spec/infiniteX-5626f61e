@@ -1,0 +1,4 @@
+import {describe,it,expect} from "vitest";
+import {z} from "zod";
+const schema=z.object({agentId:z.string().uuid().optional(),input:z.record(z.unknown()).default({}),idempotencyKey:z.string().min(8).max(160)}).strict();
+describe("task request contract",()=>{it("accepts an idempotent task request",()=>{expect(schema.safeParse({idempotencyKey:"request-123",input:{kind:"demo"}}).success).toBe(true);});it("rejects short idempotency keys",()=>{expect(schema.safeParse({idempotencyKey:"short"}).success).toBe(false);});it("rejects unexpected fields",()=>{expect(schema.safeParse({idempotencyKey:"request-123",admin:true}).success).toBe(false);});it("rejects invalid agent identifiers",()=>{expect(schema.safeParse({idempotencyKey:"request-123",agentId:"not-a-uuid"}).success).toBe(false);});});

@@ -1,0 +1,4 @@
+import {inTenantTransaction} from "./tenant-context.js";
+export type AgentInput={name:string;description?:string};
+export async function createAgent(issuer:string,subject:string,input:AgentInput){return inTenantTransaction(issuer,subject,async(client,identity)=>{const result=await client.query("INSERT INTO agents(tenant_id,name,description,created_by) VALUES($1,$2,$3,$4) RETURNING id,name,description,status,created_at,updated_at",[identity.tenantId,input.name,input.description??"",identity.userId]);return result.rows[0];});}
+export async function listAgents(issuer:string,subject:string){return inTenantTransaction(issuer,subject,async client=>{const result=await client.query("SELECT id,name,description,status,created_at,updated_at FROM agents ORDER BY created_at DESC LIMIT 100");return result.rows;});}
