@@ -23,6 +23,7 @@ test("signal handler drains server and removes both signal listeners", async () 
     "shutdown_started",
     "shutdown_completed",
   ]);
+  assert.equal(events[0].signal, "SIGTERM");
 });
 
 test("failed server close sets a nonzero process exit code", async () => {
