@@ -1,5 +1,4 @@
 """Contract tests for the trusted proposal persistence model."""
-from sqlalchemy import BigInteger, Integer, String
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 
@@ -27,14 +26,23 @@ def test_trusted_proposal_has_composite_tenant_scoped_primary_key():
 
 def test_trusted_proposal_has_digest_and_manifest_constraints():
     names = {constraint.name for constraint in TrustedProposal.__table__.constraints}
-    assert "ck_trusted_proposals_base_sha" in names
-    assert "ck_trusted_proposals_digest" in names
-    assert "ck_trusted_proposals_manifest_array" in names
-    assert "ck_trusted_proposals_repo_id" in names
+    assert {
+        "ck_trusted_proposals_repo_id",
+        "ck_trusted_proposals_repo_name",
+        "ck_trusted_proposals_branch",
+        "ck_trusted_proposals_base_sha",
+        "ck_trusted_proposals_digest",
+        "ck_trusted_proposals_manifest_array",
+        "ck_trusted_proposals_fingerprint_version",
+    }.issubset(names)
+
+
+def test_trusted_proposal_uses_postgresql_jsonb_manifest():
+    assert isinstance(TrustedProposal.__table__.c.file_manifest.type, postgresql.JSONB)
 
 
 def test_trusted_proposal_ddl_compiles_for_postgresql():
     ddl = str(CreateTable(TrustedProposal.__table__).compile(dialect=postgresql.dialect()))
     assert "trusted_proposals" in ddl
     assert "proposal_digest" in ddl
-    assert "file_manifest" in ddl
+    assert "JSONB" in ddl

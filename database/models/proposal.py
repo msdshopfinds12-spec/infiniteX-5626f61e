@@ -4,7 +4,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, Integer, JSON, String
+from sqlalchemy import (
+    BigInteger, CheckConstraint, DateTime, Index, Integer, String, func,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database.models.base import Base
@@ -21,6 +24,10 @@ class TrustedProposal(Base):
     __tablename__ = "trusted_proposals"
     __table_args__ = (
         CheckConstraint("repository_id > 0", name="ck_trusted_proposals_repo_id"),
+        CheckConstraint("length(repository_full_name) BETWEEN 3 AND 255",
+                        name="ck_trusted_proposals_repo_name"),
+        CheckConstraint("length(target_branch) BETWEEN 1 AND 255",
+                        name="ck_trusted_proposals_branch"),
         CheckConstraint("base_commit_sha ~ '^[0-9a-f]{40}$'",
                         name="ck_trusted_proposals_base_sha"),
         CheckConstraint("proposal_digest ~ '^[0-9a-f]{64}$'",
@@ -36,17 +43,17 @@ class TrustedProposal(Base):
         Index("ix_trusted_proposals_tenant_digest", "tenant_id", "proposal_digest"),
     )
 
-    proposal_id: Mapped[str] = mapped_column(String(100), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    proposal_id: Mapped[str] = mapped_column(String(100), primary_key=True)
     repository_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     repository_full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     target_branch: Mapped[str] = mapped_column(String(255), nullable=False)
     base_commit_sha: Mapped[str] = mapped_column(String(40), nullable=False)
     proposal_digest: Mapped[str] = mapped_column(String(64), nullable=False)
-    file_manifest: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False)
+    file_manifest: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
     policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
     fingerprint_schema_version: Mapped[int] = mapped_column(Integer, nullable=False)
     created_by: Mapped[str] = mapped_column(String(200), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
