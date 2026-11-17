@@ -5,6 +5,7 @@ on:
     branches:
       - security/phase-3d-4l-regression
       - fix/phase-4m1a-ci-coverage
+      - fix/phase-4m1b-browser-boundary
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -15,6 +16,7 @@ on:
       - main
       - feat/phase-3d4-trusted-backend
       - phase-4m-ai-orchestration-readiness
+      - fix/phase-4m1a-ci-coverage
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -56,3 +58,7 @@ jobs:
         run: npm run check:ci-policy
       - name: Run positive and negative policy regression tests
         run: npm run test:ci-policy
+      - name: Scan browser/server import boundary
+        run: npm run check:browser-boundary
+      - name: Test browser/server import boundary
+        run: npm run test:browser-boundary
