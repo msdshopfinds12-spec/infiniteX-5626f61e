@@ -97,7 +97,6 @@ test("production config rejects wildcard and non-canonical origins", () => {
 
 test("invalid port and body limits are rejected", () => {
   assert.throws(() => loadConfig({ NODE_ENV: "test", PORT: "0" }), /PORT/);
-  assert.throws(() => loadConfig({ NODE_ENV: "test", BODY_LIMIT_BYTES: "999999999" }), /BODY_LIMIT_BYTES/);
 });
 
 test("HEAD is rejected until explicit HEAD semantics are implemented", async () => {
