@@ -1,4 +1,4 @@
-name: InfiniteX CI — Lockfile Bootstrap
+name: InfiniteX CI
 
 on:
   push:
@@ -35,16 +35,6 @@ jobs:
           node-version: "22"
           cache: npm
 
-      # One-time bootstrap: this step is removed after its generated lockfile is committed.
-      - name: Bootstrap refreshed lockfile
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-
-      - name: Emit one-time lockfile payload
-        run: |
-          printf 'LOCKFILE_PAYLOAD_BEGIN\n'
-          base64 -w0 package-lock.json
-          printf '\nLOCKFILE_PAYLOAD_END\n'
-
       - name: Install locked dependencies
         run: npm ci
 
@@ -59,12 +49,3 @@ jobs:
 
       - name: Build production bundle
         run: npm run build
-
-      - name: Export generated lockfile for one-time repository update
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: phase2-generated-lockfile
-          path: package-lock.json
-          if-no-files-found: error
-          retention-days: 1
