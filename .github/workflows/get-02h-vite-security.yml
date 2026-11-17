@@ -9,11 +9,11 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: get-02h-vite-security-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   verify:
@@ -78,3 +78,17 @@ jobs:
             /tmp/npm-audit.json
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Commit verified lockfile to isolated migration branch
+        if: github.event_name == 'push' && success()
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "Lockfile is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore(deps): lock patched Vite 6.4.6 toolchain"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
