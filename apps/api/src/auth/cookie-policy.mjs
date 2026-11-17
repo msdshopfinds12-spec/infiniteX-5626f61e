@@ -1,7 +1,6 @@
 import { hashOpaqueToken } from "./opaque-token.mjs";
 
 const COOKIE_NAME_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
-const COOKIE_VALUE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 function assertCookieName(name) {
   if (typeof name !== "string" || !COOKIE_NAME_PATTERN.test(name)) {
