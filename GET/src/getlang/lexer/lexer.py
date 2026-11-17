@@ -13,7 +13,7 @@ class LexError(ValueError):
         self.message, self.line, self.column, self.code = message, line, column, code
 
 
-_NUMBER = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
+_NUMBER = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
 _IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*", re.ASCII)
 _KEYWORDS = {
     "let": TokenKind.LET,
@@ -41,7 +41,7 @@ class Lexer:
     def _advance(self) -> str:
         ch = self.source[self.i]
         self.i += 1
-        if ch == "\\n":
+        if ch == "\n":
             self.line, self.column = self.line + 1, 1
         else:
             self.column += 1
@@ -55,14 +55,14 @@ class Lexer:
     def scan(self) -> tuple[Token, ...]:
         while self.i < len(self.source):
             ch = self.source[self.i]
-            if ch in " \\t\\r":
+            if ch in " \t\r":
                 self._advance()
                 continue
-            if ch == "\\n":
+            if ch == "\n":
                 self._advance()
                 continue
             if ch == "#":
-                while self.i < len(self.source) and self.source[self.i] != "\\n":
+                while self.i < len(self.source) and self.source[self.i] != "\n":
                     self._advance()
                 continue
 
@@ -74,11 +74,11 @@ class Lexer:
                     cur = self._advance()
                     if cur == '"' and not escaped:
                         break
-                    if cur == "\\\\" and not escaped:
+                    if cur == "\\" and not escaped:
                         escaped = True
                     else:
                         escaped = False
-                    if cur in "\\r\\n" and not escaped:
+                    if cur in "\r\n" and not escaped:
                         raise LexError("Newlines are not allowed inside strings", line, col)
                 else:
                     raise LexError("Unterminated string literal", line, col)
