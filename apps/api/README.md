@@ -44,7 +44,7 @@ Do not expose this service as a public application API until authentication, aut
 
 ## Authentication and authorization primitives
 
-The package includes isolated, unit-testable primitives for opaque session tokens, CSRF token hashing and verification, secure `__Host-` session cookie serialization, repository-injected session lifecycle, and deny-by-default workspace role policy. These modules are **not wired into HTTP routes**. No production login, identity provider, persistent database repository, session rotation endpoint, or end-to-end authorization middleware exists yet. The session service requires a persistent repository adapter supplied by a later reviewed integration.
+The package includes isolated, unit-testable primitives for opaque session tokens, CSRF token hashing and verification, secure `__Host-` session cookie serialization, repository-injected session lifecycle, fail-closed request principal resolution, CSRF/Origin mutation guards, and deny-by-default workspace role policy. These modules are **not yet wired into application routes or a production identity provider**. Middleware helpers are available for explicit route integration. No production login, identity provider, persistent database repository, session rotation endpoint, or end-to-end authorization middleware exists yet. The session service requires a persistent repository adapter supplied by a later reviewed integration.
 
 ## CI
 
