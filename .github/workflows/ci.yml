@@ -1,4 +1,4 @@
-name: InfiniteX CI
+name: InfiniteX CI — Lockfile Bootstrap
 
 on:
   push:
