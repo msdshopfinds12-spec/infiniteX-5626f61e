@@ -4,6 +4,9 @@ const INTEGER_PATTERN = /^-?(?:0|[1-9][0-9]*)$/;
 const MAX_INTEGER_CHARS = 10_000;
 
 export function parseIntegerLiteral(input: string): bigint {
+  if (typeof input !== "string") {
+    throw new NumericEngineError("INVALID_INTEGER", "Integer literal must be supplied as a string.");
+  }
   if (input.length === 0 || input.length > MAX_INTEGER_CHARS) {
     throw new NumericEngineError("INPUT_TOO_LONG", "Integer literal is empty or exceeds the configured length limit.");
   }
@@ -31,5 +34,8 @@ export function isSafeIntegerLiteral(input: string): boolean {
 }
 
 export function serializeBigInt(value: bigint): string {
+  if (typeof value !== "bigint") {
+    throw new TypeError("serializeBigInt expects a bigint value.");
+  }
   return value.toString(10);
 }
