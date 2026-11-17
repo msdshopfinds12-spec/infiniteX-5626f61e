@@ -54,7 +54,6 @@ export async function createTask(issuer: string, subject: string, value: TaskInp
     const createdTask = inserted.rows[0];
     if (createdTask) return {task: createdTask, created: true};
 
-    // PostgreSQL JSONB equality compares JSON values, not serialized key order.
     const existing = await client.query(
       `SELECT id, agent_id, idempotency_key, status, input, result, created_at, updated_at,
               (input = $3::jsonb AND agent_id IS NOT DISTINCT FROM $4) AS request_matches
@@ -80,29 +79,30 @@ export async function createTask(issuer: string, subject: string, value: TaskInp
 }
 
 export async function listTasks(issuer: string, subject: string) {
-  return inTenantTransaction(issuer, subject, async client => {
+  return inTenantTransaction(issuer, subject, async (client, identity) => {
     const result = await client.query(
-      "SELECT id, agent_id, idempotency_key, status, input, result, created_at, updated_at FROM tasks ORDER BY created_at DESC LIMIT 100",
+      "SELECT id, agent_id, idempotency_key, status, input, result, created_at, updated_at FROM tasks WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 100",
+      [identity.tenantId],
     );
     return result.rows;
   });
 }
 
 export async function getTask(issuer: string, subject: string, id: string) {
-  return inTenantTransaction(issuer, subject, async client => {
+  return inTenantTransaction(issuer, subject, async (client, identity) => {
     const result = await client.query(
-      "SELECT id, agent_id, idempotency_key, status, input, result, created_at, updated_at FROM tasks WHERE id = $1",
-      [id],
+      "SELECT id, agent_id, idempotency_key, status, input, result, created_at, updated_at FROM tasks WHERE tenant_id = $1 AND id = $2 LIMIT 1",
+      [identity.tenantId, id],
     );
     return result.rows[0] ?? null;
   });
 }
 
 export async function cancelQueuedTask(issuer: string, subject: string, id: string) {
-  return inTenantTransaction(issuer, subject, async client => {
+  return inTenantTransaction(issuer, subject, async (client, identity) => {
     const result = await client.query(
-      "UPDATE tasks SET status = 'cancelled', updated_at = now() WHERE id = $1 AND status = 'queued' RETURNING id, status, updated_at",
-      [id],
+      "UPDATE tasks SET status = 'cancelled', updated_at = now() WHERE tenant_id = $1 AND id = $2 AND status = 'queued' RETURNING id, status, updated_at",
+      [identity.tenantId, id],
     );
     return result.rows[0] ?? null;
   });
