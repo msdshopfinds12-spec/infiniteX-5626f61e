@@ -45,7 +45,7 @@ jobs:
 
       - name: Commit lockfile when changed
         run: |
-          if git diff --quiet -- apps/api/package-lock.json; then
+          if [ -z "$(git status --porcelain -- apps/api/package-lock.json)" ]; then
             echo "API lockfile is already committed."
             exit 0
           fi
