@@ -9,6 +9,17 @@ class Span:
     line: int
     column: int
 
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.line, int)
+            or isinstance(self.line, bool)
+            or self.line < 1
+            or not isinstance(self.column, int)
+            or isinstance(self.column, bool)
+            or self.column < 1
+        ):
+            raise ValueError("Source span line and column must be positive integers")
+
 
 @dataclass(frozen=True, slots=True)
 class Literal:
