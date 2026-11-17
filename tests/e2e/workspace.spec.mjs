@@ -9,7 +9,7 @@ test("renders the demo workspace without console or page errors", async ({ page 
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   await expect(page.getByText("Demo workspace")).toBeVisible();
-  await expect(page.getByText("LOCAL DEMO")).toBeVisible();
+  await expect(page.getByText("LOCAL DEMO", { exact: true })).toBeVisible();
   await expect(page.getByText("No connected data source").first()).toBeVisible();
   expect(pageErrors).toEqual([]);
 });
@@ -27,7 +27,11 @@ test("navigates across all six workspace sections", async ({ page }) => {
 
   for (const [navigation, heading] of sections) {
     await page.getByRole("button", { name: navigation }).click();
-    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    if (navigation === "Overview") {
+      await expect(page.getByText(heading, { exact: true })).toBeVisible();
+    } else {
+      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    }
     await expect(page.getByRole("button", { name: navigation })).toHaveAttribute("aria-current", "page");
   }
 });
