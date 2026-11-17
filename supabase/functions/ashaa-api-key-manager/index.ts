@@ -15,6 +15,7 @@ async function sha256(value: string) {
 
 Deno.serve(async (req: Request) => {
   const cors = corsHeadersForRequest(req);
+  if (!cors.allowed) return new Response("origin_not_allowed", { status: 403, headers: cors.headers });
   if (req.method === "OPTIONS") {
     if (!cors.allowed) return new Response("origin_not_allowed", { status: 403, headers: cors.headers });
     return new Response("ok", { headers: cors.headers });
