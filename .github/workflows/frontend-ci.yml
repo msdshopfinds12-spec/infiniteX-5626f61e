@@ -14,6 +14,7 @@ on:
       - fix/phase-4m1b-browser-boundary
       - fix/phase-4m2b-edge-worker-hardening
       - fix/phase-4m2c-deno-tenant-isolation
+      - fix/phase-4m4-picomatch-security-recovery
   pull_request:
     branches:
       - main

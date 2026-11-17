@@ -7,11 +7,13 @@ on:
       - fix/phase-4m1a-ci-coverage
       - fix/phase-4m1b-browser-boundary
       - test/phase-4m3-tenant-isolation-contracts
+      - fix/phase-4m4-picomatch-security-recovery
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
       - "package.json"
       - "package-lock.json"
+      - "docs/security/phase-4m4-picomatch-advisory.md"
   pull_request:
     branches:
       - main
@@ -24,6 +26,7 @@ on:
       - ".github/scripts/**"
       - "package.json"
       - "package-lock.json"
+      - "docs/security/phase-4m4-picomatch-advisory.md"
   workflow_dispatch:
 
 permissions:

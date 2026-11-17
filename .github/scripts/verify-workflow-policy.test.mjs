@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { analyzeWorkflow } from "./verify-workflow-policy.mjs";
+import { parseDocument } from "yaml";
 
 const scanner = new URL("./verify-workflow-policy.mjs", import.meta.url);
 
@@ -101,4 +102,29 @@ test("policy implementation uses a YAML parser rather than line-oriented regex p
   assert.match(source, /parseDocument/);
   assert.match(source, /document\.toJS/);
   assert.match(source, /checkPermissions/);
+});
+
+
+const workflowDirectory = new URL("../workflows/", import.meta.url);
+async function readWorkflow(name) {
+  const source = await readFile(new URL(name, workflowDirectory), "utf8");
+  const document = parseDocument(source, { version: "1.2", strict: true, uniqueKeys: true });
+  assert.deepEqual(document.errors, [], name + " must remain valid YAML");
+  return document.toJS();
+}
+
+test("recovery branch receives frontend, security, and Vite verification on push", async () => {
+  const expectedBranch = "fix/phase-4m4-picomatch-security-recovery";
+  for (const name of ["frontend-ci.yml", "security-regression.yml", "vite-security-remediation.yml"]) {
+    const workflow = await readWorkflow(name);
+    assert.ok(workflow.on?.push?.branches?.includes(expectedBranch), name + " must include the recovery branch push trigger");
+  }
+});
+
+test("Vite security verification runs for pull requests targeting the tenant-isolation base", async () => {
+  const workflow = await readWorkflow("vite-security-remediation.yml");
+  assert.ok(
+    workflow.on?.pull_request?.branches?.includes("fix/phase-4m2c-deno-tenant-isolation"),
+    "pull_request.branches filters the PR base branch, not its head branch"
+  );
 });

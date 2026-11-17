@@ -6,6 +6,7 @@ on:
       - feat/gh16-infiniteX-integration
       - chore/phase-3d4-p0-hardening
       - feat/phase-3d4-trusted-backend
+      - fix/phase-4m4-picomatch-security-recovery
     paths:
       - ".github/workflows/vite-security-remediation.yml"
       - "package.json"
@@ -16,6 +17,7 @@ on:
     branches:
       - feat/gh16-infiniteX-integration
       - feat/phase-3d4-trusted-backend
+      - fix/phase-4m2c-deno-tenant-isolation
     paths:
       - ".github/workflows/vite-security-remediation.yml"
       - "package.json"
