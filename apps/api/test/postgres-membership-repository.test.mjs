@@ -108,6 +108,25 @@ test("role change rejects invalid IDs and self-change before opening a transacti
 });
 
 
+
+test("admin cannot change an owner role and transaction is rolled back", async () => {
+  const adminId = "5d931510-d99f-494a-8c67-87feb05e1596";
+  const fake = fakePool({
+    membershipRows: [
+      { userId: adminId, workspaceId: WORKSPACE, role: "admin", status: "active" },
+      { userId: OWNER, workspaceId: WORKSPACE, role: "owner", status: "active" }
+    ]
+  });
+  const result = await createPostgresMembershipRepository({ pool: fake.pool }).changeRole({
+    actorUserId: adminId, targetUserId: OWNER, workspaceId: WORKSPACE, newRole: "member"
+  });
+  assert.equal(result.allowed, false);
+  assert.equal(result.reason, "ADMIN_SCOPE_LIMIT");
+  assert.equal(fake.calls.some((call) => call.sql.includes("UPDATE workspace_memberships")), false);
+  assert.equal(fake.calls.at(-1).sql, "ROLLBACK");
+  assert.equal(fake.released, true);
+});
+
 test("role changes normalize uppercase UUID inputs before row matching", async () => {
   const fake = fakePool();
   const result = await createPostgresMembershipRepository({ pool: fake.pool }).changeRole({
