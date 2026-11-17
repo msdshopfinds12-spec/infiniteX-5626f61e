@@ -32,7 +32,7 @@ test("lexer emits source-positioned numeric and operator tokens", () => {
 test("lexer ignores whitespace and emits EOF", () => {
   const tokens = compiler.tokenize("  2\n + 3 ");
   assert.equal(tokens.at(-1).kind, "eof");
-  assert.equal(tokens.at(-1).start, 8);
+  assert.equal(tokens.at(-1).start, 9);
 });
 
 test("lexer rejects unknown characters", () => {
