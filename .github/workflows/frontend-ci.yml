@@ -64,6 +64,8 @@ jobs:
         run: npm run test:browser-boundary
       - name: Edge Function security source checks
         run: npm run check:edge-function-security
+      - name: Test exact-origin CORS policy
+        run: npm run test:edge-function-cors
       - name: Dependency security audit
         run: npm audit --audit-level=moderate
       - name: Typecheck
