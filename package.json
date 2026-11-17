@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "audit": "npm audit --audit-level=high",
-    "typecheck:server": "tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --lib ES2023,DOM --strict --skipLibCheck api/ai.ts server/ai-gateway/*.ts"
+    "typecheck:server": "tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --lib ES2023,DOM --strict --skipLibCheck api/ai.ts server/ai-gateway/*.ts server/agent-adapters/*.ts"
   },
   "dependencies": {
     "lucide-react": "^0.456.0",
