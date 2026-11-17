@@ -42,7 +42,7 @@ jobs:
         run: npm run build
 
   browser-e2e:
-    name: Playwright browser smoke tests
+    name: Playwright and accessibility browser tests
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -55,13 +55,13 @@ jobs:
           cache: npm
       - name: Install locked application dependencies
         run: npm ci
-      - name: Install temporary Playwright test runner
-        run: npm install --no-save --package-lock=false @playwright/test@1.56.1
+      - name: Install temporary browser and accessibility test tools
+        run: npm install --no-save --package-lock=false @playwright/test@1.56.1 @axe-core/playwright@4.10.2
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Build production assets
         run: npm run build
-      - name: Run browser smoke tests
+      - name: Run browser and WCAG accessibility tests
         run: npx playwright test
       - name: Upload failure diagnostics
         if: failure()
