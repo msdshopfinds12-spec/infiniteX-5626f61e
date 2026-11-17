@@ -10,8 +10,8 @@ function assertUuid(value, name) {
 }
 
 export function createPostgresMembershipRepository({ pool }) {
-  if (!pool || typeof pool.connect !== "function") {
-    throw new TypeError("A PostgreSQL pool with connect() is required");
+  if (!pool || typeof pool.connect !== "function" || typeof pool.query !== "function") {
+    throw new TypeError("A PostgreSQL pool with query() and connect() is required");
   }
 
   return Object.freeze({
@@ -63,8 +63,8 @@ export function createPostgresMembershipRepository({ pool }) {
           [workspaceId.toLowerCase()]
         );
         const memberships = locked.rows ?? [];
-        const actor = memberships.find((row) => row.userId === actorUserId);
-        const target = memberships.find((row) => row.userId === targetUserId);
+        const actor = memberships.find((row) => row.userId === actorUserId.toLowerCase());
+        const target = memberships.find((row) => row.userId === targetUserId.toLowerCase());
         if (!actor || !target) {
           await client.query("ROLLBACK");
           transactionOpen = false;
