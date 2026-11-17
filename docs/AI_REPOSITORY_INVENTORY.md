@@ -43,8 +43,10 @@ No repository was modified during discovery. This foundation branch adds this in
 - `npm ci`: **PASSED**; 71 packages added.
 - `npm run lint`: **FAILED** with TypeScript `TS6310`: referenced project `tsconfig.node.json` may not disable emit.
 - `tsconfig.json` sets `noEmit: true` and references `tsconfig.node.json`; the package lint script invokes `tsc -b --noEmit`. The failure is a project-reference/build-mode configuration conflict. It does not establish whether all application source files are otherwise type-correct.
-- Production build: **SKIPPED** because the previous step failed; build status remains unverified.
-- `npm ci` reported **2 dependency advisories (1 moderate, 1 high)**. The first log only provided counts; exact package/advisory details require an audit report and triage. No automatic dependency upgrade was performed.
+- Production build in run #190: **SKIPPED** because the previous step failed.
+- Follow-up workflow run: [#191](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44079663456), commit `2a636f516be3594e4e3f47e30ff9c3715b49e762`: **PASSED** for `npm ci`, direct application TypeScript check, non-blocking advisory report, and `npm run build`.
+- The direct TypeScript check is a CI workaround; the package's `npm run lint` script remains broken with TS6310 and was not run in run #191.
+- The advisory report identified `vite` as a direct high-severity package and `esbuild` as a transitive moderate-severity package. npm reported that a fix is available through Vite `8.3.8`, which is a major-version upgrade from the app's current Vite `5.4.21`. No dependency upgrade was performed; compatibility and migration review are required.
 
 Additional UI observations:
 - Sidebar branding currently contains “Bolt OS”; InfiniteX rebranding is a future UI task, not part of this documentation/CI change.

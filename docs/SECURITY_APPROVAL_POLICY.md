@@ -107,7 +107,7 @@ Before enabling code execution:
 - Set job timeouts and concurrency limits.
 - Prefer lockfiles and `npm ci` for deterministic dependency installation.
 - Review dependency updates and workflow changes as code.
-- The first InfiniteX CI run reported two npm advisories (one moderate, one high). Treat this as an open dependency-review item until package names, affected ranges, and available safe fixes are inspected. Do not use `npm audit fix --force` as an automatic CI action.
+- The first InfiniteX CI run reported two npm advisories. The follow-up report identified direct high-severity `vite` and transitive moderate-severity `esbuild`; npm suggested Vite `8.3.8` as a fix, which is a major upgrade from the app's current Vite `5.4.21`. Keep this as an open dependency-review item until compatibility, changelog, plugin support, and lockfile changes are reviewed. Do not use `npm audit fix --force` as an automatic CI action.
 - Do not auto-merge or deploy from the initial CI workflow.
 
 ## 10. Security status vocabulary

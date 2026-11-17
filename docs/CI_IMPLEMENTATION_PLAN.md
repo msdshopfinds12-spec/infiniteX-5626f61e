@@ -1,6 +1,6 @@
 # InfiniteX CI Implementation Plan
 
-**Status:** Initial Node.js CI workflow is included in this branch. Execution results are pending until GitHub Actions completes.  
+**Status:** Initial Node.js CI workflow is included and run #191 completed successfully on commit `2a636f516be3594e4e3f47e30ff9c3715b49e762`. The earlier run #190 exposed the package lint-script issue documented below.  
 **Primary repository:** `msdshopfinds12-spec/infiniteX-5626f61e`
 
 ## 1. Objectives
@@ -61,11 +61,11 @@ A push to the approved feature branch should trigger this workflow after the bra
 | Gate | Current state | Next requirement |
 |---|---|---|
 | Dependency installation | Included in workflow | Confirm `npm ci` passes |
-| TypeScript check | Included as `npm run lint` | Confirm CI result |
-| Vite production build | Included as `npm run build` | Confirm CI result |
+| TypeScript check | Direct `npx tsc --noEmit -p tsconfig.json` passed in run #191 | Keep this check and fix the package lint script separately |
+| Vite production build | `npm run build` passed in run #191 | Keep the production build gate |
 | Unit/component tests | Not configured | Add Vitest/Testing Library only in a separately approved implementation |
 | Accessibility tests | Not configured | Add automated checks plus manual keyboard/screen-reader review |
-| Dependency vulnerability review | Not included in initial CI | Establish a triage policy; avoid unstable fail-on-any-advisory behavior |
+| Dependency vulnerability review | Non-blocking audit step reported direct high `vite` and transitive moderate `esbuild` advisories | Review Vite major upgrade path and patch only after compatibility testing |
 | Secret scanning | Not verified | Review repository-level GitHub security settings and permissions |
 | SAST | Not configured | Select a tool and tune rules before making it a blocking gate |
 | E2E tests | Not configured | Add only after stable user journeys and test environment exist |

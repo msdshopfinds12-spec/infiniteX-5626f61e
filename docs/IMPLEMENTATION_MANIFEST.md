@@ -66,7 +66,8 @@ The final implementation report must record:
 - Whether the commit was pushed successfully.
 - Workflow run ID/URL and job conclusions, if available.
 - First run #190: `npm ci` passed; `npm run lint` failed with TS6310; production build was skipped.
-- npm reported two dependency advisories (one moderate, one high); detailed triage is pending.
+- Follow-up run #191 passed dependency install, direct TypeScript check, advisory reporting, and production build.
+- Dependency audit identified direct high-severity `vite` and transitive moderate-severity `esbuild`; suggested fix requires a Vite major upgrade and remains unapproved/unapplied.
 - Any blocked or unverified checks.
 
 A successful GitHub write does not prove the application builds. A successful CI run does not authorize merge or deployment.
