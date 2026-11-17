@@ -18,3 +18,10 @@ export function compileExpression(source: string): Expression {
 export function evaluateExpression(source: string, options: EvaluationOptions = {}): DecimalValue {
   return evaluateAst(compileExpression(source), options);
 }
+
+export * from "./semantic.ts";
+export * from "./ir.ts";
+export * from "./lower.ts";
+export * from "./optimizer.ts";
+export * from "./runtime.ts";
+export * from "./pipeline.ts";
