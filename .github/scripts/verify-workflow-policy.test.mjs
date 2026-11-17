@@ -6,30 +6,31 @@ import { analyzeWorkflow } from "./verify-workflow-policy.mjs";
 
 const scanner = new URL("./verify-workflow-policy.mjs", import.meta.url);
 
-const safeWorkflow = String.raw\`name: Safe CI
-on:
-  pull_request:
-permissions:
-  contents: read
-jobs:
-  verify:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        with:
-          persist-credentials: false
-      - run: npm test
-\`;
+const safeWorkflow = [
+  "name: Safe CI",
+  "on:",
+  "  pull_request:",
+  "permissions:",
+  "  contents: read",
+  "jobs:",
+  "  verify:",
+  "    runs-on: ubuntu-latest",
+  "    timeout-minutes: 10",
+  "    permissions:",
+  "      contents: read",
+  "    steps:",
+  "      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+  "        with:",
+  "          persist-credentials: false",
+  "      - run: npm test"
+].join("\n");
 
 test("accepts a structurally valid least-privilege workflow", () => {
   assert.deepEqual(analyzeWorkflow(safeWorkflow), []);
 });
 
 test("rejects malformed YAML and duplicate keys", () => {
-  const malformed = analyzeWorkflow("name: broken\\nname: duplicate\\njobs: [");
+  const malformed = analyzeWorkflow("name: broken\nname: duplicate\njobs: [");
   assert.ok(malformed.some((issue) => /Invalid YAML/.test(issue.message)));
 });
 
@@ -48,7 +49,7 @@ test("rejects write permissions at workflow and job scope", () => {
 
 test("requires explicit permissions and finite job timeout", () => {
   const source = safeWorkflow
-    .replace("    permissions:\\n      contents: read\\n", "")
+    .replace("    permissions:\n      contents: read\n", "")
     .replace("    timeout-minutes: 10", "    timeout-minutes: 0");
   const issues = analyzeWorkflow(source);
   assert.ok(issues.some((issue) => /explicit mapping/.test(issue.message)));
