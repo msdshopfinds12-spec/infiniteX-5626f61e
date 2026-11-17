@@ -26,7 +26,10 @@ function foldBinary(op: "add" | "subtract" | "multiply" | "divide", left: string
   }
 }
 
-export function optimizeIR(ir: IntermediateRepresentation): IntermediateRepresentation {
+export function optimizeIR(ir: IntermediateRepresentation, divisionPrecision = 18): IntermediateRepresentation {
+  if (!Number.isInteger(divisionPrecision) || divisionPrecision < 0 || divisionPrecision > 1_000) {
+    throw new CompilerError("INVALID_DIVISION_PRECISION", "Division precision must be an integer from 0 to 1000.", 0);
+  }
   verifyIR(ir);
   const stack: Fragment[] = [];
 
