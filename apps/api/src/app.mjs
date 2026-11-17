@@ -52,7 +52,7 @@ export function createApp({ config, logger = { info() {}, error() {} } }) {
         res.writeHead(204, {
           ...SECURITY_HEADERS,
           "Access-Control-Allow-Origin": origin && isAllowedOrigin(origin, config.allowedOrigins) ? origin : "",
-          "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type, X-Request-Id",
           "Access-Control-Max-Age": "600",
           Vary: "Origin",
@@ -62,7 +62,7 @@ export function createApp({ config, logger = { info() {}, error() {} } }) {
         return;
       }
 
-      if (!["GET", "HEAD"].includes(req.method ?? "")) {
+      if (req.method !== "GET") {
         sendJson(res, 405, { error: { code: "METHOD_NOT_ALLOWED", requestId } }, requestId);
         return;
       }
