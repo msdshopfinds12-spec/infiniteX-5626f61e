@@ -74,6 +74,9 @@ jobs:
           deno check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
           deno check --node-modules-dir=auto --no-lock supabase/functions/ashaa-api-key-manager/index.ts
 
+      - name: Test release artifact integrity
+        run: node --test scripts/release-integrity.test.mjs
+
       - name: Create release candidate manifest
         shell: bash
         run: |
@@ -86,6 +89,11 @@ jobs:
             printf 'production_deployment=not-performed\n'
             printf 'created_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > dist/release-manifest.txt
+
+      - name: Generate and verify artifact SHA-256 manifest
+        run: |
+          node scripts/release-integrity.mjs create dist
+          node scripts/release-integrity.mjs verify dist
 
       - name: Upload immutable release candidate artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
