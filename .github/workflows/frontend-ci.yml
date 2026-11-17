@@ -22,6 +22,7 @@ on:
       - feat/phase-3d4-trusted-backend
       - phase-4m-ai-orchestration-readiness
       - fix/phase-4m1a-ci-coverage
+      - fix/phase-4m1b-browser-boundary
 
 permissions:
   contents: read
