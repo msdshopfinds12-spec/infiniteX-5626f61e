@@ -63,6 +63,8 @@ The previous policy accepted `newRole: null` in a subset of role-change requests
 - Last-owner policy denial.
 - Null/invalid role denial.
 - Self-role-change denial before opening a transaction.
+- Uppercase UUID normalization before locked-row matching.
+- Admin scope denial when attempting to change an owner role, with transaction rollback.
 - Rollback and client release when update row count is unexpected.
 - Missing pool capability rejection.
 
