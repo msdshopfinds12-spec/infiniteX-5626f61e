@@ -15,7 +15,7 @@ interface Fragment {
   readonly constant?: string;
 }
 
-function foldBinary(op: "add" | "subtract" | "multiply" | "divide", left: string, right: string): string {
+function foldBinary(op: "add" | "subtract" | "multiply" | "divide", left: string, right: string, divisionPrecision: number): string {
   const a = parseDecimal(left);
   const b = parseDecimal(right);
   switch (op) {
