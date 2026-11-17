@@ -37,7 +37,7 @@ for (const file of files) {
       report(lineNumber, 'Permission "' + permission[1] + '" is write-enabled; require explicit security review.');
     }
 
-    const action = line.match(/^\s*uses:\s*([^\s#]+)\s*$/);
+    const action = line.match(/^\s*uses:\s*([^\s#]+)(?:\s+#.*)?\s*$/);
     if (action) {
       const reference = action[1];
       if (!reference.startsWith("./") && !/@[a-f0-9]{40}$/i.test(reference)) {
@@ -45,7 +45,10 @@ for (const file of files) {
       }
 
       if (/^actions\/checkout@/i.test(reference)) {
-        const stepWindow = lines.slice(index, Math.min(lines.length, index + 9)).join("\n");
+        const nextStep = lines.findIndex((candidate, candidateIndex) =>
+          candidateIndex > index && /^\s+-\s+(?:name:|uses:)/.test(candidate)
+        );
+        const stepWindow = lines.slice(index, nextStep === -1 ? lines.length : nextStep).join("\n");
         if (!/persist-credentials:\s*false/.test(stepWindow)) {
           report(lineNumber, "actions/checkout must set persist-credentials: false.");
         }
