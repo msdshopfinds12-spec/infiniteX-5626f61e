@@ -22,6 +22,7 @@ The recovery branch at `88322ce6f1ac925e34ae5011a6d7c4a74b53b5ff` has a successf
 | GH19-05 | High | No production API server, authenticated identity boundary, workspace authorization, or database/RLS integration is present in the inspected frontend candidate. | Explicitly retain as NOT VERIFIED / NOT IMPLEMENTED in this candidate; do not connect UI directly to privileged services. |
 | GH19-06 | Medium | Error boundary handles React render/lifecycle errors, not arbitrary event-handler or asynchronous failures. | Keep local async error handling and user-visible retry states as future implementation requirements. |
 | GH19-07 | Medium | Supply-chain pinning differed between workflows. | `frontend-ci.yml` pins checkout, setup-node, and upload-artifact to immutable SHAs. The corresponding upstream action commits were checked and report valid GitHub signatures. The separate Vite remediation workflow previously used floating tags; this P0 change aligns it with the pinned toolchain. |
+| GH19-08 | Medium | The Vite remediation workflow generated a Vite 6 candidate lockfile despite the recovery branch using Vite 8. | Replaced runner-side candidate generation with verification of the committed lockfile and current Vite 8 toolchain; no candidate manifest artifact is produced. |
 
 ## 3. Current architecture
 

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/gh16-infiniteX-integration
+      - chore/phase-3d4-p0-hardening
     paths:
       - ".github/workflows/vite-security-remediation.yml"
       - "package.json"
