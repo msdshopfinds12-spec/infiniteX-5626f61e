@@ -1,36 +1,13 @@
 /**
  * Minimal browser API boundary for InfiniteX.
- *
- * Security defaults:
- * - HTTPS outside localhost.
- * - Same-origin request paths only.
- * - Credentials are omitted unless a future, reviewed adapter opts in.
- * - Redirects are rejected to avoid silently crossing trust boundaries.
- * - No automatic retries: mutations must never be replayed implicitly.
- * - Response bodies are not copied into thrown errors or logs.
+ * Enforces origin, transport, method, timeout, cancellation and payload-size policy.
+ * Mutation requests are never retried implicitly.
  */
 
-/**
- * @typedef {Object} ApiClientOptions
- * @property {string} baseUrl
- * @property {typeof fetch} [fetchImpl]
- * @property {number} [timeoutMs]
- */
-
-/**
- * @typedef {Object} ApiRequestOptions
- * @property {string} [method]
- * @property {HeadersInit} [headers]
- * @property {unknown} [body]
- * @property {AbortSignal} [signal]
- * @property {(value: unknown) => boolean} [validate]
- */
+/** @typedef {{ baseUrl: string, fetchImpl?: typeof fetch, timeoutMs?: number, maxRequestBytes?: number, maxResponseBytes?: number }} ApiClientOptions */
+/** @typedef {{ method?: string, headers?: HeadersInit, body?: unknown, signal?: AbortSignal, validate?: (value: unknown) => boolean }} ApiRequestOptions */
 
 export class ApiClientError extends Error {
-  /**
-   * @param {string} message
-   * @param {{ code: string, status?: number, cause?: unknown }} details
-   */
   constructor(message, details) {
     super(message, details.cause === undefined ? undefined : { cause: details.cause });
     this.name = "ApiClientError";
@@ -43,7 +20,6 @@ function resolveBaseUrl(value) {
   if (typeof value !== "string" || value.trim() === "") {
     throw new TypeError("A valid API baseUrl is required.");
   }
-
   const url = new URL(value);
   const localHost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
   if (url.protocol !== "https:" && !(url.protocol === "http:" && localHost)) {
@@ -52,63 +28,123 @@ function resolveBaseUrl(value) {
   if (url.username || url.password || url.search || url.hash) {
     throw new TypeError("API baseUrl must not contain credentials, query parameters, or fragments.");
   }
-
   return url;
 }
 
-/**
- * @param {ApiClientOptions} options
- */
-export function createApiClient({ baseUrl, fetchImpl = globalThis.fetch, timeoutMs = 10_000 } = {}) {
-  const base = resolveBaseUrl(baseUrl);
+function assertPositiveLimit(value, name, maximum) {
+  if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
+    throw new TypeError(name + " must be an integer between 1 and " + maximum + ".");
+  }
+}
 
+function isJsonMediaType(value) {
+  const mediaType = value.split(";", 1)[0].trim().toLowerCase();
+  return mediaType === "application/json" ||
+    (mediaType.startsWith("application/") && mediaType.endsWith("+json"));
+}
+
+async function readBoundedJson(response, maxBytes) {
+  const declaredLength = response.headers.get("content-length");
+  if (declaredLength && /^\d+$/.test(declaredLength) && Number(declaredLength) > maxBytes) {
+    throw new ApiClientError("The API response exceeded the configured size limit.", {
+      code: "RESPONSE_TOO_LARGE", status: response.status,
+    });
+  }
+  if (!response.body) {
+    throw new ApiClientError("The API returned an empty response body.", {
+      code: "INVALID_JSON", status: response.status,
+    });
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) break;
+      totalBytes += result.value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel("Response size limit exceeded.").catch(() => {});
+        throw new ApiClientError("The API response exceeded the configured size limit.", {
+          code: "RESPONSE_TOO_LARGE", status: response.status,
+        });
+      }
+      chunks.push(result.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return JSON.parse(text);
+  } catch (cause) {
+    throw new ApiClientError("The API returned invalid JSON.", {
+      code: "INVALID_JSON", status: response.status, cause,
+    });
+  }
+}
+
+/** @param {ApiClientOptions} options */
+export function createApiClient({
+  baseUrl,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = 10_000,
+  maxRequestBytes = 1_000_000,
+  maxResponseBytes = 2_000_000,
+} = {}) {
+  const base = resolveBaseUrl(baseUrl);
   if (typeof fetchImpl !== "function") {
     throw new TypeError("A Fetch-compatible implementation is required.");
   }
-  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120_000) {
-    throw new TypeError("timeoutMs must be an integer between 1 and 120000.");
-  }
+  assertPositiveLimit(timeoutMs, "timeoutMs", 120_000);
+  assertPositiveLimit(maxRequestBytes, "maxRequestBytes", 10_000_000);
+  assertPositiveLimit(maxResponseBytes, "maxResponseBytes", 10_000_000);
 
-  /**
-   * @param {string} path
-   * @param {ApiRequestOptions} [options]
-   */
+  /** @param {string} path @param {ApiRequestOptions} [options] */
   async function request(path, options = {}) {
     if (typeof path !== "string" || path.trim() === "") {
       throw new TypeError("A non-empty API path is required.");
     }
-
     const url = new URL(path, base);
     if (url.origin !== base.origin || url.username || url.password || url.hash) {
-      throw new ApiClientError("The API path is outside the configured origin.", {
-        code: "UNTRUSTED_URL",
-      });
+      throw new ApiClientError("The API path is outside the configured origin.", { code: "UNTRUSTED_URL" });
     }
 
     const method = String(options.method || "GET").toUpperCase();
     if (!/^(GET|POST|PUT|PATCH|DELETE)$/.test(method)) {
       throw new TypeError("Unsupported HTTP method.");
     }
-
     const headers = new Headers(options.headers || {});
     headers.set("Accept", "application/json");
 
     let body;
     if (options.body !== undefined) {
       if (method === "GET" || method === "DELETE") {
-        throw new TypeError(`${method} requests must not include a JSON body.`);
+        throw new TypeError(method + " requests must not include a JSON body.");
       }
       try {
         body = JSON.stringify(options.body);
       } catch (cause) {
         throw new ApiClientError("The request body could not be serialized.", {
-          code: "INVALID_REQUEST_BODY",
-          cause,
+          code: "INVALID_REQUEST_BODY", cause,
         });
       }
       if (body === undefined) {
         throw new ApiClientError("The request body must be JSON serializable.", {
           code: "INVALID_REQUEST_BODY",
+        });
+      }
+      if (new TextEncoder().encode(body).byteLength > maxRequestBytes) {
+        throw new ApiClientError("The request body exceeded the configured size limit.", {
+          code: "REQUEST_TOO_LARGE",
         });
       }
       headers.set("Content-Type", "application/json");
@@ -123,53 +159,30 @@ export function createApiClient({ baseUrl, fetchImpl = globalThis.fetch, timeout
       () => controller.abort(new DOMException("Request timed out.", "TimeoutError")),
       timeoutMs,
     );
-
     try {
       const response = await fetchImpl(url, {
-        method,
-        headers,
-        body,
-        signal: controller.signal,
-        credentials: "omit",
-        redirect: "error",
-        cache: "no-store",
+        method, headers, body, signal: controller.signal,
+        credentials: "omit", redirect: "error", cache: "no-store",
       });
-
       if (!response.ok) {
         throw new ApiClientError("The API request failed.", {
-          code: "HTTP_ERROR",
-          status: response.status,
+          code: "HTTP_ERROR", status: response.status,
         });
       }
-
       if (response.status === 204) return null;
 
       const contentType = response.headers.get("content-type") || "";
-      if (!contentType.toLowerCase().includes("application/json")) {
+      if (!isJsonMediaType(contentType)) {
         throw new ApiClientError("The API returned an unsupported content type.", {
-          code: "UNEXPECTED_CONTENT_TYPE",
-          status: response.status,
+          code: "UNEXPECTED_CONTENT_TYPE", status: response.status,
         });
       }
-
-      let payload;
-      try {
-        payload = await response.json();
-      } catch (cause) {
-        throw new ApiClientError("The API returned invalid JSON.", {
-          code: "INVALID_JSON",
-          status: response.status,
-          cause,
-        });
-      }
-
+      const payload = await readBoundedJson(response, maxResponseBytes);
       if (options.validate && options.validate(payload) !== true) {
         throw new ApiClientError("The API response did not match the expected contract.", {
-          code: "INVALID_RESPONSE",
-          status: response.status,
+          code: "INVALID_RESPONSE", status: response.status,
         });
       }
-
       return payload;
     } catch (error) {
       if (error instanceof ApiClientError) throw error;
@@ -181,14 +194,12 @@ export function createApiClient({ baseUrl, fetchImpl = globalThis.fetch, timeout
         );
       }
       throw new ApiClientError("The API request could not be completed.", {
-        code: "NETWORK_ERROR",
-        cause: error,
+        code: "NETWORK_ERROR", cause: error,
       });
     } finally {
       clearTimeout(timeoutId);
       options.signal?.removeEventListener("abort", abortFromCaller);
     }
   }
-
   return Object.freeze({ request });
 }
