@@ -1,7 +1,10 @@
 import {beforeEach,describe,expect,it,vi} from "vitest";
 import {inTenantTransaction} from "../src/repositories/tenant-context.js";
 import {
+  cancelQueuedTask,
   createTask,
+  getTask,
+  listTasks,
   TaskAgentNotFoundError,
   TaskIdempotencyConflictError,
   TaskIdempotencyLookupError,
@@ -77,10 +80,7 @@ describe("createTask", () => {
   it("rejects reuse of a key with a different input payload", async () => {
     query
       .mockResolvedValueOnce({rows: []})
-      .mockResolvedValueOnce({rows: [{
-        id: "task-1",
-        request_matches: false,
-      }]});
+      .mockResolvedValueOnce({rows: [{id: "task-1", request_matches: false}]});
 
     await expect(createTask("issuer", "subject", {
       input: {kind: "different"},
@@ -92,10 +92,7 @@ describe("createTask", () => {
     query
       .mockResolvedValueOnce({rows: [{id: "agent-1"}]})
       .mockResolvedValueOnce({rows: []})
-      .mockResolvedValueOnce({rows: [{
-        id: "task-1",
-        request_matches: false,
-      }]});
+      .mockResolvedValueOnce({rows: [{id: "task-1", request_matches: false}]});
 
     await expect(createTask("issuer", "subject", {
       agentId: "agent-1",
@@ -125,5 +122,28 @@ describe("createTask", () => {
       input: {kind: "demo"},
       idempotencyKey: "request-123",
     })).rejects.toBeInstanceOf(TaskIdempotencyLookupError);
+  });
+});
+
+describe("tenant-scoped task operations", () => {
+  it("lists tasks with an explicit tenant predicate", async () => {
+    query.mockResolvedValueOnce({rows: []});
+    await listTasks("issuer", "subject");
+    expect(query.mock.calls[0]?.[0]).toContain("WHERE tenant_id = $1");
+    expect(query.mock.calls[0]?.[1]).toEqual([identity.tenantId]);
+  });
+
+  it("reads a task with tenant and task identifiers", async () => {
+    query.mockResolvedValueOnce({rows: [{id: "task-1"}]});
+    await getTask("issuer", "subject", "task-1");
+    expect(query.mock.calls[0]?.[0]).toContain("WHERE tenant_id = $1 AND id = $2");
+    expect(query.mock.calls[0]?.[1]).toEqual([identity.tenantId, "task-1"]);
+  });
+
+  it("cancels only a queued task inside the authenticated tenant", async () => {
+    query.mockResolvedValueOnce({rows: [{id: "task-1", status: "cancelled"}]});
+    await cancelQueuedTask("issuer", "subject", "task-1");
+    expect(query.mock.calls[0]?.[0]).toContain("WHERE tenant_id = $1 AND id = $2 AND status = 'queued'");
+    expect(query.mock.calls[0]?.[1]).toEqual([identity.tenantId, "task-1"]);
   });
 });
