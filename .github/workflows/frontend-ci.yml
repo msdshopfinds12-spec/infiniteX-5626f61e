@@ -34,6 +34,8 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Enforce workflow security policy
+        run: npm run check:ci-policy
       - name: Checkout source (immutable action pin)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
