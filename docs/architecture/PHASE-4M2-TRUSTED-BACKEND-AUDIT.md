@@ -1,0 +1,152 @@
+# Phase 4M.2 — Trusted Backend Architecture Audit
+
+**Status:** Planning / read-only audit  
+**Audit ref:** `fix/phase-4m1b-browser-boundary`  
+**Scope:** Repository source and tests only. No live Supabase project, database, secrets, deployment, or billing settings were accessed or changed.
+
+## Executive decision
+
+InfiniteX has useful security primitives, but the API currently runs in foundation mode. Authentication, database access, and AI providers are explicitly disabled. The current HTTP application exposes health, readiness, and status endpoints and rejects non-GET methods. The presence of session and authorization modules is not evidence that protected API routes are active.
+
+**Do not enable authentication or database flags yet.** First select and verify the identity source, define the schema contract, connect authentication at the HTTP boundary, enforce workspace membership on every protected route, and test tenant isolation.
+
+## Evidence matrix
+
+| Area | Status | Repository evidence | Consequence |
+|---|---|---|---|
+| HTTP API boundary | VERIFIED (foundation only) | `apps/api/src/app.mjs` | Health/status endpoints exist; no protected resource routes observed |
+| Server limits | VERIFIED | `apps/api/src/server.mjs` | Header/request/keep-alive limits and graceful shutdown are configured |
+| Runtime config | VERIFIED | `apps/api/src/config.mjs` | Authentication, database, and AI provider flags are hard-disabled |
+| Session token design | PARTIAL | `apps/api/src/auth/session-service.mjs`, `opaque-token.mjs` | Opaque token hashing, expiry and revocation logic exist |
+| Cookie and CSRF primitives | PARTIAL | `cookie-policy.mjs`, `csrf.mjs`, `middleware.mjs` | Secure cookie and mutation checks exist but are not wired into routes |
+| PostgreSQL session adapter | PARTIAL | `postgres-session-repository.mjs` | Adapter assumes `auth_sessions`; schema/migration not found in audited ref |
+| Workspace authorization policy | PARTIAL | `authorization/policy.mjs` | Role/permission checks exist as library functions |
+| Membership repository | PARTIAL | `postgres-membership-repository.mjs` | Adapter assumes `workspace_memberships`; no route integration verified |
+| Database schema / RLS | BLOCKED | No `supabase/` migration directory found in audited ref | Cannot safely enable database integration |
+| Browser API client | PARTIAL | `src/lib/api-client.mjs` | Client currently uses `credentials: "omit"`; incompatible with cookie-session auth without a deliberate, tested change |
+| Supabase client integration | NOT FOUND | No Supabase project config or client dependency found in audited ref | Supabase is a candidate, not a verified integration |
+| AI provider integration | DISABLED | Runtime status/config and AI orchestration policy | Keep disabled until trusted backend boundary is complete |
+
+## Critical findings
+
+### 1. Session middleware is not mounted
+
+`resolveRequestPrincipal()` is implemented in `apps/api/src/auth/middleware.mjs`, but `createApp()` in `apps/api/src/app.mjs` does not invoke it. No authenticated principal is currently established by the HTTP application.
+
+### 2. Authorization is not applied to route handlers
+
+`authorizeWorkspaceAction()` is a reusable policy function, not a route-level access control system. Each workspace route must resolve the authenticated principal, load the active membership from trusted storage, and enforce a permission before reading or mutating tenant data.
+
+### 3. Browser credentials are deliberately omitted
+
+The browser API client sets `credentials: "omit"`. If the backend adopts an HttpOnly cookie session, this must be deliberately revised to `same-origin` or `include` according to the final origin topology, with exact CORS allowlists, CSRF checks, and browser integration tests. Do not simply enable credentials globally.
+
+### 4. Database schema is not established
+
+The PostgreSQL adapters expect `auth_sessions` and `workspace_memberships`. No corresponding migration/schema directory was found in the audited branch. RLS coverage, constraints, indexes, grants, and tenant-scoped foreign keys therefore remain unverified.
+
+### 5. The current tests validate primitives, not end-to-end trust boundaries
+
+Unit tests cover session helpers, policy decisions, SQL parameterization, and the foundation HTTP API. They do not prove that a real HTTP request is authenticated, that a workspace route rejects cross-tenant access, or that database RLS blocks direct Data API access.
+
+## Recommended target architecture
+
+```text
+React / TypeScript browser
+  |
+  | HTTPS + same-origin session cookie (only after approved design)
+  v
+API edge: origin allowlist, request limits, security headers
+  |
+  v
+Authentication boundary: resolve trusted identity/session
+  |
+  v
+CSRF boundary for mutations + request schema validation
+  |
+  v
+Workspace authorization: active membership + permission
+  |
+  v
+Application service: business rules, idempotency, audit events
+  |
+  v
+Repository: parameterized SQL + tenant-scoped predicates
+  |
+  v
+PostgreSQL: constraints + RLS as defense in depth
+```
+
+The browser must never provide its own trusted `userId`, role, workspace membership, provider credentials, or authorization claims. Derive identity from a verified server-side session or verified identity token. Derive permissions from trusted server-side membership records.
+
+## Provider decision: Supabase candidate, not activated
+
+The existing Supabase project may be the preferred free-first candidate for managed identity and PostgreSQL, but repository evidence alone cannot verify its current configuration, schema, RLS, Auth providers, quotas, or project health.
+
+Before implementation, perform a separate **read-only project configuration audit** and confirm:
+- Auth providers and redirect URL configuration
+- Whether the project is paused/active and current plan/quota constraints
+- Existing tables, constraints, indexes, grants, and RLS policies
+- Whether any existing production data or policies must be preserved
+- Whether the project is actually the intended source of identity for InfiniteX
+
+Never place a Supabase secret/service-role key in browser code or any `VITE_*` variable. A public publishable/anon key is not an authorization boundary; RLS must enforce row access. Do not authorize from user-editable metadata. Avoid `SECURITY DEFINER` unless a documented, reviewed exception is essential.
+
+If Supabase is not suitable, alternatives are:
+1. Existing custom session service + managed PostgreSQL, after establishing a trusted identity issuer.
+2. Supabase Auth + PostgreSQL RLS, if the project audit confirms it is appropriate.
+3. Cloudflare Workers + D1 only after a separate architecture/cost/consistency comparison.
+
+Do not run two competing identity systems in parallel.
+
+## Implementation sequence and acceptance gates
+
+| Phase | Work | Acceptance criteria |
+|---|---|---|
+| 4M.2A | Read-only provider and schema audit | Identity source, database source, current state, and cost constraints documented |
+| 4M.2B | Schema contract and migration design | ERD, ownership model, constraints, RLS matrix, rollback plan reviewed; no migration applied |
+| 4M.2C | Authentication boundary | Every protected request resolves trusted identity; missing/expired/revoked sessions fail closed |
+| 4M.2D | Workspace route authorization | Every route enforces active membership, workspace scope, and permission server-side |
+| 4M.2E | Tenant isolation | RLS and repository predicates prevent cross-workspace reads/writes |
+| 4M.2F | Security regression tests | Unauthenticated, cross-tenant, privilege-escalation, CSRF, replay, expiry, and revocation cases fail safely |
+| 4M.2G | CI enforcement | Static checks, unit tests, integration tests, build, dependency audit, and browser tests run on PRs |
+| 4M.2H | Security audit | Threat model, secrets scan, RLS review, error handling, logging, and readiness reviewed |
+
+### Required negative tests
+
+- No cookie, malformed cookie, expired session, revoked session, and repository outage.
+- Authenticated user with no membership.
+- User requests a different workspace ID.
+- Viewer attempts a write.
+- Member attempts to update another user's resource.
+- Admin attempts owner-level actions.
+- CSRF token missing, malformed, or mismatched.
+- Session revocation takes effect on protected operations according to the chosen session model.
+- Database direct access cannot bypass workspace isolation.
+- AI tools cannot access a workspace unless the requesting principal is authorized for that exact workspace and action.
+
+## CI and AI engineering policy
+
+- CI remains least-privilege and read-only for repository checks wherever possible.
+- Pin third-party Actions to immutable commit SHAs; use `npm ci` and the committed lockfile.
+- Run static policy checks, TypeScript, unit tests, API integration tests, build, dependency audit, Playwright, and axe.
+- Use deterministic mock providers in CI. No paid API calls or real user data in tests.
+- AI agents may inspect, propose patches, generate tests, and explain diffs. They must not execute arbitrary generated shell/code, access production secrets, bypass approval gates, merge PRs, deploy, or apply migrations.
+- Every agent action should be scoped, logged, reviewable, and constrained by repository permissions.
+- Mark each capability VERIFIED, PARTIAL, BLOCKED, or NOT TESTED. Never infer success from code presence alone.
+
+## Change-control boundary
+
+This audit is documentation-only. It does not authorize:
+- Applying migrations or executing SQL against a connected project
+- Enabling authentication/database/provider runtime flags
+- Creating or rotating secrets
+- Changing Supabase Auth or RLS configuration
+- Connecting a paid provider or enabling billing
+- Deploying, publishing, merging, or changing production data
+
+Human review is required before each such operation.
+
+## Audit limitations
+
+This is a source-level review of the named branch and files. It is not a live penetration test, database audit, Supabase dashboard inspection, production traffic review, or proof of deployment behavior. Findings must be revalidated against the final integration branch before release.
