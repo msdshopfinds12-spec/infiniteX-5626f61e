@@ -1,5 +1,9 @@
 # GET-02G — Verification Plan
 
+## Executed regression coverage
+
+The current automated suite contains 19 tests covering exact decimal arithmetic, rounding behavior, negative values, safe integer boundaries, malformed input, serialization, and resource limits. The latest successful GitHub Actions run is linked in the project branch.
+
 ## Required commands
 
 1. `npm ci`
