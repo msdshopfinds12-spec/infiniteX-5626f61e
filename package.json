@@ -15,7 +15,8 @@
     "check:browser-boundary": "node .github/scripts/verify-browser-boundary.mjs",
     "test:browser-boundary": "node --test .github/scripts/verify-browser-boundary.test.mjs",
     "check:edge-function-security": "node .github/scripts/verify-edge-function-security.mjs",
-    "test:edge-function-cors": "node --experimental-strip-types --test supabase/functions/_shared/cors.test.mjs"
+    "test:edge-function-cors": "node --experimental-strip-types --test supabase/functions/_shared/cors.test.mjs",
+    "test:edge-worker-security": "node --test supabase/functions/_shared/worker-security.test.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
