@@ -1,6 +1,15 @@
 name: Vite Security Remediation Preview
 
 on:
+  push:
+    branches:
+      - feat/gh16-infiniteX-integration
+    paths:
+      - ".github/workflows/vite-security-remediation.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "vite.config.ts"
   workflow_dispatch:
 
 permissions:
