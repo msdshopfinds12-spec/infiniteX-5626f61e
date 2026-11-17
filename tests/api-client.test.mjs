@@ -129,7 +129,7 @@ test("converts timeouts into a stable error code", async () => {
   );
 });
 
-test("rejects unsupported HTTP methods and unsafe timeout values", () => {
+test("rejects unsupported HTTP methods and unsafe timeout values", async () => {
   assert.throws(
     () => createApiClient({ baseUrl: "https://api.example.test", timeoutMs: 0 }),
     /timeoutMs/,
@@ -138,5 +138,5 @@ test("rejects unsupported HTTP methods and unsafe timeout values", () => {
     baseUrl: "https://api.example.test",
     fetchImpl: async () => jsonResponse({}),
   });
-  assert.rejects(client.request("/data", { method: "TRACE" }), /Unsupported HTTP method/);
+  await assert.rejects(client.request("/data", { method: "TRACE" }), /Unsupported HTTP method/);
 });
