@@ -25,3 +25,4 @@ export * from "./lower.ts";
 export * from "./optimizer.ts";
 export * from "./runtime.ts";
 export * from "./pipeline.ts";
+export { formatDecimal } from "../numeric/index.ts";
