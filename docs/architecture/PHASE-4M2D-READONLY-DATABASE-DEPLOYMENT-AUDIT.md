@@ -12,7 +12,7 @@ The database metadata shows several good security controls: RLS is enabled on th
 
 Two release blockers remain:
 1. The deployed Edge Function source is older than the hardened repository source. The deployed authenticated worker still has wildcard CORS and lacks the explicit parent-workflow owner check and actual streamed request-size enforcement. The deployed API-key manager still has wildcard CORS and no streamed body-size guard. The deployed cron worker still relies on `Content-Length` for request-size checks.
-2. The live database reports 19 applied migrations, but the inspected GitHub branch has no `supabase/migrations` directory. The schema therefore cannot currently be reproduced from this repository snapshot alone.
+2. The live database reports 19 applied migrations, but the inspected GitHub branch has no `supabase/migrations` directory. The migration ledger (versions and names) has now been recovered read-only; the exact SQL bodies are still not present in the branch, so the schema cannot currently be reproduced from this repository snapshot alone.
 
 ## Verified positive controls
 
@@ -51,8 +51,27 @@ The live Supabase function snapshots were inspected directly:
 **Required action:** Review and merge the hardened PR only after human approval; then deploy functions individually with explicit approval, configured allowed origins, and post-deploy source/version verification. Do not deploy as part of this audit.
 
 ### HIGH — Applied database migrations are not reproducible from the inspected repository branch
-- Supabase reports 19 applied migrations, including workflow queue, worker-secret, API-key, webhook idempotency, and credit-ledger migrations.
-- The inspected GitHub branch has no `supabase/migrations` directory.
+- Supabase's read-only migration listing confirms these 19 applied migration versions and names:
+  - `20261025182821` — `simula_app_factory_core_schema_rls`
+  - `20261025183121` — `simula_fk_indexes_and_integrity_review`
+  - `20261025183834` — `remove_seven_unused_nonconstraint_indexes`
+  - `20261025183942` — `add_foreign_key_supporting_indexes`
+  - `20261025201001` — `simula_workflow_cron_scheduler`
+  - `20261025201032` — `simula_workflow_scheduler_safe_interval_validation`
+  - `20261025201831` — `simula_secure_workflow_run_claiming`
+  - `20261025201906` — `simula_move_claim_definer_to_private_schema`
+  - `20261025201915` — `simula_allow_authenticated_claim_wrapper_access`
+  - `20261025202536` — `simula_worker_foundation_indexes_and_pg_net`
+  - `20261025202606` — `simula_internal_worker_queue_claiming`
+  - `20261025202644` — `simula_pg_net_extension_schema_hardening`
+  - `20261025202741` — `simula_secure_cron_worker_auth_and_vault`
+  - `20261025202809` — `simula_schedule_secure_cron_worker`
+  - `20261025202850` — `simula_worker_stale_run_recovery`
+  - `20261025204429` — `restrict_workflow_table_client_privileges`
+  - `20261025204844` — `harden_workflow_run_inserts_and_profile_updates`
+  - `20261103134251` — `ashaa_backend_api_keys_and_webhook_idempotency`
+  - `20261103134302` — `ashaa_backend_credit_ledger`
+- The inspected GitHub branch has no `supabase/migrations` directory; the listing API provides migration names/versions, not the SQL bodies. Exact SQL recovery is still required.
 
 **Impact:** The repository does not provide a verifiable migration history for reproducing the current database schema in a fresh environment or reviewing the exact SQL that established its privileges and functions.
 
@@ -70,7 +89,7 @@ Supabase Performance Advisor reported six unused indexes. The inspected applicat
 
 ## Verification gaps
 
-- Deno-native `deno check` and `deno test` have not been run in GitHub CI.
+- Deno-native `deno test` and `deno check` passed in GitHub Actions run #144 on commit `e0d275fc98c5b20d28c209f00b540340f97b8bfd`; the follow-up documentation commit is undergoing its own CI run.
 - No live two-user tenant-isolation integration test has been run.
 - Queue concurrency, retry idempotency, stale lease recovery, and worker failure recovery have not been load-tested.
 - API-key use-time authentication, scope enforcement, expiry enforcement, and last-used timestamp behavior were not fully traced in this audit.
@@ -82,7 +101,7 @@ Supabase Performance Advisor reported six unused indexes. The inspected applicat
 Do not merge or deploy based only on the passing PR #20 CI run. Before release:
 1. Resolve the source-vs-production function drift.
 2. Recover and reconcile the migration history.
-3. Add Deno-native verification and synthetic two-user integration tests.
+3. Preserve successful Deno-native CI evidence and add synthetic two-user integration tests.
 4. Verify allowed-origin configuration without exposing secrets.
 5. Obtain explicit human approval for merge and a separate explicit approval for each production deployment.
 
