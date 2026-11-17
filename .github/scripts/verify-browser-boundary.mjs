@@ -43,8 +43,11 @@ function moduleReferences(source, filename) {
 }
 
 function resolveSourceImport(fromFile, specifier, rootDir) {
-  if (!specifier.startsWith(".")) return null;
-  const base = path.resolve(path.dirname(fromFile), specifier);
+  const isSourceAlias = specifier.startsWith("@/");
+  if (!specifier.startsWith(".") && !isSourceAlias) return null;
+  const base = isSourceAlias
+    ? path.resolve(rootDir, "src", specifier.slice(2))
+    : path.resolve(path.dirname(fromFile), specifier);
   const root = path.resolve(rootDir);
   if (base !== root && !base.startsWith(root + path.sep)) {
     return { outsideRoot: true, candidate: base };

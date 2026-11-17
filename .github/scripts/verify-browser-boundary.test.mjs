@@ -67,6 +67,15 @@ test("rejects imports that escape the repository root", async () => {
   assert.ok(result.issues.some((issue) => /escapes the repository root/.test(issue.message)));
 });
 
+test("resolves the configured @/* TypeScript alias and rejects aliased server imports", async () => {
+  const result = await fixture({
+    "src/main.tsx": 'import App from "@/components/App";',
+    "src/components/App.tsx": 'export { createOrchestrator } from "@/lib/ai/orchestrator.mjs";',
+    "src/lib/ai/orchestrator.mjs": 'export function createOrchestrator() {}'
+  }, (root) => scanBrowserImportGraph({ rootDir: root }));
+  assert.ok(result.issues.some((issue) => /server-only/.test(issue.message)));
+});
+
 test("the actual browser entrypoint has no trusted server-only imports", async () => {
   const result = await scanBrowserImportGraph();
   assert.deepEqual(result.issues, []);
