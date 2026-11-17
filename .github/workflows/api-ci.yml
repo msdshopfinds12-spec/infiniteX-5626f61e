@@ -20,41 +20,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lockfile-bootstrap:
-    name: Generate and commit API lockfile
-    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/phase-3c1-api-security-recovery'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout recovery branch
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
-        with:
-          ref: fix/phase-3c1-api-security-recovery
-
-      - name: Setup Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
-        with:
-          node-version: 22
-
-      # Lockfile-only resolution; lifecycle scripts are disabled and no app code is executed.
-      - name: Generate dedicated API lockfile
-        working-directory: apps/api
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-
-      - name: Commit lockfile when changed
-        run: |
-          if [ -z "$(git status --porcelain -- apps/api/package-lock.json)" ]; then
-            echo "API lockfile is already committed."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/api/package-lock.json
-          git commit -m "build(api): add reproducible dependency lockfile"
-          git push origin HEAD:fix/phase-3c1-api-security-recovery
-
   api:
     name: API typecheck, tests, audit and build
     runs-on: ubuntu-latest
@@ -71,22 +36,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          # Temporary until the dedicated API package-lock.json is generated and committed.
-          cache-dependency-path: apps/api/package.json
+          cache-dependency-path: apps/api/package-lock.json
 
-      # BLOCKED: the API package has no committed lockfile yet. This install resolves
-      # semver ranges at run time and is not a reproducible substitute for npm ci.
-      - name: Install dependencies (temporary bootstrap)
-        run: npm install --ignore-scripts --no-audit --no-fund
-
-      - name: Export generated API lockfile for reviewed commit
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: api-package-lock-bootstrap
-          path: apps/api/package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Dependency security audit
         run: npm audit --audit-level=high
