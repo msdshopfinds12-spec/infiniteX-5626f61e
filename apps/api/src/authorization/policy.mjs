@@ -35,7 +35,7 @@ export function authorizeWorkspaceRoleChange({
     return deny("WORKSPACE_SCOPE_MISMATCH");
   }
   if (!VALID_ROLES.has(actorMembership.role)) return deny("INVALID_ACTOR_ROLE");
-  if (newRole !== null && !VALID_ROLES.has(newRole)) return deny("INVALID_TARGET_ROLE");
+  if (!VALID_ROLES.has(newRole)) return deny("INVALID_TARGET_ROLE");
   if (!Number.isInteger(activeOwnerCount) || activeOwnerCount < 0) return deny("INVALID_OWNER_COUNT");
   if (newRole === "owner") return deny("USE_EXPLICIT_OWNERSHIP_TRANSFER");
   if (actorMembership.role !== "owner" && actorMembership.role !== "admin") return deny("PERMISSION_DENIED");
