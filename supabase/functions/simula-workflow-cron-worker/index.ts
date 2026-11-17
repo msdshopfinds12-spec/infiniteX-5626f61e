@@ -1,5 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  clampBatchLimit,
+  isClaimedRunValid,
+  isWorkflowOwnedBy,
+  readJsonBodyLimited,
+} from "../_shared/worker-security.mjs";
 
 type JsonRecord = Record<string, unknown>;
 type Step = {
@@ -84,15 +90,13 @@ Deno.serve(async (req: Request) => {
   );
   if (verifyError || secretValid !== true) return reply(401, { ok: false, error: "unauthorized" });
 
-  if (req.headers.get("content-length") && Number(req.headers.get("content-length")) > 2048) {
-    return reply(413, { ok: false, error: "payload_too_large" });
+  const bodyResult = await readJsonBodyLimited(req, 2048);
+  if (!bodyResult.ok) {
+    const status = bodyResult.reason === "payload_too_large" ? 413 : 400;
+    return reply(status, { ok: false, error: bodyResult.reason });
   }
-  let requestedLimit = 3;
-  try {
-    const body = await req.json();
-    if (body && typeof body.limit === "number" && Number.isInteger(body.limit)) requestedLimit = body.limit;
-  } catch { /* Empty body is valid. */ }
-  const limit = Math.max(1, Math.min(requestedLimit, 5));
+  const body = bodyResult.value;
+  const limit = clampBatchLimit(body && typeof body === "object" ? body.limit : undefined);
 
   const { data: claimedRuns, error: claimError } = await admin.rpc(
     "simula_claim_workflow_runs_internal", { p_limit: limit },
@@ -105,8 +109,7 @@ Deno.serve(async (req: Request) => {
   const summary = { ok: true, claimed: (claimedRuns ?? []).length, succeeded: 0, failed: 0, runs: [] as JsonRecord[] };
 
   for (const run of (claimedRuns ?? []) as ClaimedRun[]) {
-    if (!run || typeof run.owner_id !== "string" || !run.owner_id ||
-        typeof run.id !== "string" || typeof run.workflow_id !== "string") {
+    if (!isClaimedRunValid(run)) {
       summary.failed++;
       summary.runs.push({ status: "rejected", error: "claimed_run_invalid" });
       continue;
@@ -118,7 +121,7 @@ Deno.serve(async (req: Request) => {
       const { data: workflow, error: workflowError } = await admin
         .from("workflows").select("id,owner_id,status")
         .eq("id", run.workflow_id).eq("owner_id", ownerId).maybeSingle();
-      if (workflowError || !workflow) throw new Error("workflow_owner_validation_failed");
+      if (workflowError || !isWorkflowOwnedBy(workflow, run.workflow_id, ownerId)) throw new Error("workflow_owner_validation_failed");
       if (workflow.status === "archived") throw new Error("workflow_archived");
 
       const { data: steps, error: stepsError } = await admin
