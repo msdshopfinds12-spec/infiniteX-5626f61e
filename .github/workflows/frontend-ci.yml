@@ -96,7 +96,7 @@ jobs:
         with:
           deno-version: v2.9.8
       - name: Run Deno-native worker security tests
-        run: deno test --no-lock supabase/functions/_shared/worker-security.deno.test.ts
+        run: deno test --no-lock supabase/functions/_shared/worker-security.deno.ts
       - name: Type-check Supabase Edge Functions
         run: |
           deno check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-worker/index.ts
