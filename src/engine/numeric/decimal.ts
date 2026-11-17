@@ -109,6 +109,9 @@ export function divideDecimal(
   if (!Number.isInteger(precision) || precision < 0 || precision > MAX_SCALE) {
     throw new NumericEngineError("PRECISION_OUT_OF_RANGE", "Division precision must be an integer from 0 to 1000.");
   }
+  if (!(["half-even", "half-up", "down", "floor", "ceil"] as const).includes(rounding)) {
+    throw new NumericEngineError("INVALID_ROUNDING_MODE", "Unsupported rounding mode.");
+  }
   if (b.coefficient === 0n) throw new NumericEngineError("DIVISION_BY_ZERO", "Cannot divide by zero.");
   const numerator = a.coefficient * pow10(b.scale + precision);
   const denominator = b.coefficient * pow10(a.scale);
