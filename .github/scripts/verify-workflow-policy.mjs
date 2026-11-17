@@ -1,83 +1,160 @@
 import { readdir, readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
+import { parseDocument } from "yaml";
 
 const workflowDir = new URL("../../.github/workflows/", import.meta.url);
-const entries = await readdir(workflowDir, { withFileTypes: true });
-const files = entries
-  .filter((entry) => entry.isFile() && /\.ya?ml$/i.test(entry.name))
-  .map((entry) => entry.name)
-  .sort();
+const SHA_PIN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[a-f0-9]{40}$/i;
+const UNTRUSTED_CONTEXT = /\$\{\{\s*github\.(?:event(?:\.|}|$)|head_ref\b|ref\b|ref_name\b|actor\b|triggering_actor\b)/i;
+const SECRET_CONTEXT = /\$\{\{\s*secrets\./i;
 
-const violations = [];
-
-if (files.length === 0) {
-  violations.push("No GitHub Actions workflow files were found.");
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-for (const file of files) {
-  const source = await readFile(new URL(file, workflowDir), "utf8");
-  const lines = source.split(/\r?\n/);
-  const report = (line, message) => {
-    violations.push(file + ":" + line + ": " + message);
-  };
+function add(issues, location, message) {
+  issues.push({ location, message });
+}
 
-  if (!/^permissions:\s*\n/m.test(source)) {
-    report(1, "Declare workflow-level least-privilege permissions.");
+function checkPermissions(permissions, location, issues) {
+  if (!isRecord(permissions)) {
+    add(issues, location, "Permissions must be an explicit mapping; do not use write-all/read-all.");
+    return;
+  }
+  for (const [scope, access] of Object.entries(permissions)) {
+    if (!["read", "none"].includes(String(access).toLowerCase())) {
+      add(issues, location + "." + scope, 'Permission must be "read" or "none"; write access requires a separately reviewed exception.');
+    }
+  }
+}
+
+export function analyzeWorkflow(source, filename = "workflow.yml") {
+  const issues = [];
+  const document = parseDocument(source, {
+    version: "1.2",
+    strict: true,
+    uniqueKeys: true,
+    prettyErrors: true
+  });
+
+  for (const error of document.errors) {
+    add(issues, filename, "Invalid YAML: " + error.message);
+  }
+  if (document.errors.length > 0) return issues;
+
+  let workflow;
+  try {
+    workflow = document.toJS({ maxAliasCount: 20 });
+  } catch (error) {
+    add(issues, filename, "YAML aliases could not be safely resolved: " + error.message);
+    return issues;
   }
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const lineNumber = index + 1;
+  if (!isRecord(workflow)) {
+    add(issues, filename, "Workflow root must be a YAML mapping.");
+    return issues;
+  }
 
-    if (/^\s*permissions:\s*(?:write-all)?\s*$/i.test(line) && /write-all/i.test(line)) {
-      report(lineNumber, "Do not use write-all permissions.");
+  checkPermissions(workflow.permissions, filename + ".permissions", issues);
+
+  const triggers = workflow.on;
+  if (isRecord(triggers) && Object.hasOwn(triggers, "pull_request_target")) {
+    add(issues, filename + ".on.pull_request_target", "pull_request_target is prohibited by this repository policy; use pull_request with read-only permissions.");
+  } else if (Array.isArray(triggers) && triggers.includes("pull_request_target")) {
+    add(issues, filename + ".on", "pull_request_target is prohibited by this repository policy.");
+  } else if (typeof triggers === "string" && triggers === "pull_request_target") {
+    add(issues, filename + ".on", "pull_request_target is prohibited by this repository policy.");
+  }
+
+  if (!isRecord(workflow.jobs) || Object.keys(workflow.jobs).length === 0) {
+    add(issues, filename + ".jobs", "Declare at least one job.");
+    return issues;
+  }
+
+  for (const [jobId, job] of Object.entries(workflow.jobs)) {
+    const jobLocation = filename + ".jobs." + jobId;
+    if (!isRecord(job)) {
+      add(issues, jobLocation, "Each job must be a YAML mapping.");
+      continue;
     }
 
-    const permission = line.match(/^\s+([a-z_]+):\s*(read|write|none)\s*$/i);
-    if (permission?.[2].toLowerCase() === "write") {
-      report(lineNumber, 'Permission "' + permission[1] + '" is write-enabled; require explicit security review.');
+    checkPermissions(job.permissions, jobLocation + ".permissions", issues);
+
+    if (!Number.isInteger(job["timeout-minutes"]) || job["timeout-minutes"] < 1 || job["timeout-minutes"] > 60) {
+      add(issues, jobLocation + ".timeout-minutes", "Each job must set a finite timeout from 1 to 60 minutes.");
     }
 
-    const action = line.match(/^\s*uses:\s*([^\s#]+)(?:\s+#.*)?\s*$/);
-    if (action) {
-      const reference = action[1];
-      if (!reference.startsWith("./") && !/@[a-f0-9]{40}$/i.test(reference)) {
-        report(lineNumber, 'Action "' + reference + '" is not pinned to a full 40-character commit SHA.');
+    if (!Array.isArray(job.steps) || job.steps.length === 0) {
+      add(issues, jobLocation + ".steps", "Each job must define at least one step.");
+      continue;
+    }
+
+    for (let index = 0; index < job.steps.length; index += 1) {
+      const step = job.steps[index];
+      const stepLocation = jobLocation + ".steps[" + index + "]";
+      if (!isRecord(step)) {
+        add(issues, stepLocation, "Each step must be a YAML mapping.");
+        continue;
       }
 
-      if (/^actions\/checkout@/i.test(reference)) {
-        const nextStep = lines.findIndex((candidate, candidateIndex) =>
-          candidateIndex > index && /^\s+-\s+(?:name:|uses:)/.test(candidate)
-        );
-        const stepWindow = lines.slice(index, nextStep === -1 ? lines.length : nextStep).join("\n");
-        if (!/persist-credentials:\s*false/.test(stepWindow)) {
-          report(lineNumber, "actions/checkout must set persist-credentials: false.");
+      if (typeof step.uses === "string") {
+        const action = step.uses.trim();
+        const isLocalAction = action.startsWith("./") && !action.includes("..");
+        if (!isLocalAction && !SHA_PIN.test(action)) {
+          add(issues, stepLocation + ".uses", 'Action "' + action + '" must be pinned to a full 40-character commit SHA.');
+        }
+        if (/^actions\/checkout@/i.test(action)) {
+          if (!isRecord(step.with) || step.with["persist-credentials"] !== false) {
+            add(issues, stepLocation + ".with.persist-credentials", "actions/checkout must explicitly set persist-credentials: false.");
+          }
+        }
+      }
+
+      if (Object.hasOwn(step, "run")) {
+        if (typeof step.run !== "string") {
+          add(issues, stepLocation + ".run", "Shell commands must be a string.");
+          continue;
+        }
+        if (UNTRUSTED_CONTEXT.test(step.run)) {
+          add(issues, stepLocation + ".run", "Do not interpolate untrusted GitHub event, ref, actor, or head_ref data directly into shell commands; pass validated data through environment variables instead.");
+        }
+        if (SECRET_CONTEXT.test(step.run)) {
+          add(issues, stepLocation + ".run", "Do not interpolate secrets directly into shell commands; map secrets to narrowly scoped environment variables and avoid logging them.");
         }
       }
     }
   }
 
-  const jobsIndex = lines.findIndex((line) => /^jobs:\s*$/.test(line));
-  if (jobsIndex === -1) {
-    report(1, "Declare a jobs block.");
-  } else {
-    const jobLines = lines
-      .map((line, index) => ({ line, index }))
-      .filter(({ line, index }) => index > jobsIndex && /^  [a-zA-Z0-9_-]+:\s*(?:#.*)?$/.test(line));
-    for (const job of jobLines) {
-      const nextJob = jobLines.find((candidate) => candidate.index > job.index);
-      const block = lines.slice(job.index, nextJob?.index ?? lines.length).join("\n");
-      if (!/^    timeout-minutes:\s*[1-9][0-9]*\s*$/m.test(block)) {
-        report(job.index + 1, "Each job must define a finite timeout-minutes value.");
-      }
-    }
-    if (jobLines.length === 0) report(jobsIndex + 1, "The jobs block must contain at least one job.");
-  }
+  return issues;
 }
 
-if (violations.length > 0) {
-  console.error("CI workflow policy failed:");
-  for (const violation of violations) console.error("- " + violation);
-  process.exitCode = 1;
-} else {
+export async function runPolicyScan() {
+  const entries = await readdir(workflowDir, { withFileTypes: true });
+  const files = entries
+    .filter((entry) => entry.isFile() && /\.ya?ml$/i.test(entry.name))
+    .map((entry) => entry.name)
+    .sort();
+
+  const violations = [];
+  if (files.length === 0) {
+    violations.push({ location: ".github/workflows", message: "No workflow files were found." });
+  }
+
+  for (const file of files) {
+    const source = await readFile(new URL(file, workflowDir), "utf8");
+    violations.push(...analyzeWorkflow(source, file));
+  }
+
+  if (violations.length > 0) {
+    console.error("CI workflow policy failed:");
+    for (const issue of violations) console.error("- " + issue.location + ": " + issue.message);
+    process.exitCode = 1;
+    return false;
+  }
+
   console.log("CI workflow policy passed for " + files.length + " workflow(s).");
+  return true;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await runPolicyScan();
 }

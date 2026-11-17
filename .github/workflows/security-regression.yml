@@ -1,0 +1,56 @@
+name: CI Security Regression
+
+on:
+  push:
+    branches:
+      - security/phase-3d-4l-regression
+    paths:
+      - ".github/workflows/**"
+      - ".github/scripts/**"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    branches:
+      - main
+      - feat/phase-3d4-trusted-backend
+    paths:
+      - ".github/workflows/**"
+      - ".github/scripts/**"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-security-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workflow-policy:
+    name: Structural workflow security policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source (immutable action pin)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up Node.js (immutable action pin)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install exact locked dependencies
+        run: npm ci
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
+      - name: Scan all GitHub Actions workflows
+        run: npm run check:ci-policy
+      - name: Run positive and negative policy regression tests
+        run: npm run test:ci-policy
