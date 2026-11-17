@@ -53,15 +53,21 @@ for (const file of files) {
     }
   }
 
-  const jobLines = lines
-    .map((line, index) => ({ line, index }))
-    .filter(({ line }) => /^  [a-zA-Z0-9_-]+:\s*(?:#.*)?$/.test(line));
-  for (const job of jobLines) {
-    const nextJob = jobLines.find((candidate) => candidate.index > job.index);
-    const block = lines.slice(job.index, nextJob?.index ?? lines.length).join("\n");
-    if (!/^    timeout-minutes:\s*[1-9][0-9]*\s*$/m.test(block)) {
-      report(job.index + 1, "Each job must define a finite timeout-minutes value.");
+  const jobsIndex = lines.findIndex((line) => /^jobs:\s*$/.test(line));
+  if (jobsIndex === -1) {
+    report(1, "Declare a jobs block.");
+  } else {
+    const jobLines = lines
+      .map((line, index) => ({ line, index }))
+      .filter(({ line, index }) => index > jobsIndex && /^  [a-zA-Z0-9_-]+:\s*(?:#.*)?$/.test(line));
+    for (const job of jobLines) {
+      const nextJob = jobLines.find((candidate) => candidate.index > job.index);
+      const block = lines.slice(job.index, nextJob?.index ?? lines.length).join("\n");
+      if (!/^    timeout-minutes:\s*[1-9][0-9]*\s*$/m.test(block)) {
+        report(job.index + 1, "Each job must define a finite timeout-minutes value.");
+      }
     }
+    if (jobLines.length === 0) report(jobsIndex + 1, "The jobs block must contain at least one job.");
   }
 }
 
