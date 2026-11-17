@@ -3,12 +3,14 @@ import type { Theme } from "../hooks/useTheme";
 
 export default function TopBar({
   title,
+  description,
   theme,
   onToggleTheme,
   searchValue,
   onSearchChange,
 }: {
   title: string;
+  description: string;
   theme: Theme;
   onToggleTheme: () => void;
   searchValue: string;
@@ -17,8 +19,12 @@ export default function TopBar({
   const isDark = theme === "dark";
   return (
     <header className="topbar">
-      <h1 className="topbar-title">{title}</h1>
+      <div className="topbar-heading">
+        <h1 className="topbar-title">{title}</h1>
+        <p className="topbar-description">{description}</p>
+      </div>
       <div className="topbar-actions">
+        <span className="workspace-state"><span aria-hidden="true" /> LOCAL DEMO</span>
         <label className="search">
           <Search size={14} aria-hidden="true" />
           <input

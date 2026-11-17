@@ -6,6 +6,7 @@ on:
       - chore/phase-3d4-ci-recovery
       - chore/phase-3d4-p0-hardening
       - chore/phase-3b-frontend-foundation
+      - feat/phase-3c-infiniteX-modern-ui
   pull_request:
     branches:
       - main
