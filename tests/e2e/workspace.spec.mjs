@@ -5,6 +5,8 @@ test("renders the demo workspace without console or page errors", async ({ page 
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   await page.goto("/");
+  await expect(page.locator("#root")).toContainText("InfiniteX");
+  await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   await expect(page.getByText("Demo workspace")).toBeVisible();
   await expect(page.getByText("No connected data source").first()).toBeVisible();
