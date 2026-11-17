@@ -1,9 +1,7 @@
 export type CorsResult = { headers: Headers; allowed: boolean };
 
-/** Exact-origin allowlist. Empty configuration denies browser-origin requests. */
-export function corsHeadersForRequest(req: Request): CorsResult {
-  const origin = req.headers.get("origin");
-  const configured = Deno.env.get("INFINITEX_ALLOWED_ORIGINS") ?? "";
+/** Pure exact-origin policy; intentionally does not normalize or wildcard origins. */
+export function createCorsHeaders(origin: string | null, configured: string): CorsResult {
   const allowedOrigins = new Set(configured.split(",").map((v) => v.trim()).filter(Boolean));
   const allowed = !origin || allowedOrigins.has(origin);
   const headers = new Headers({
@@ -15,4 +13,12 @@ export function corsHeadersForRequest(req: Request): CorsResult {
   });
   if (origin && allowedOrigins.has(origin)) headers.set("Access-Control-Allow-Origin", origin);
   return { headers, allowed };
+}
+
+/** Edge-runtime adapter. Browser origins are denied when the allowlist is empty. */
+export function corsHeadersForRequest(req: Request): CorsResult {
+  return createCorsHeaders(
+    req.headers.get("origin"),
+    Deno.env.get("INFINITEX_ALLOWED_ORIGINS") ?? "",
+  );
 }
