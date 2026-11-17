@@ -10,6 +10,7 @@ on:
       - fix/phase-3d2-frontend-security
       - feat/phase-3d3-ai-orchestration-foundation
       - feat/phase-3d4-trusted-backend
+      - fix/phase-4m1a-ci-coverage
   pull_request:
     branches:
       - main
@@ -18,6 +19,7 @@ on:
       - fix/phase-3d1-ci-security-hardening
       - fix/phase-3d2-frontend-security
       - feat/phase-3d4-trusted-backend
+      - phase-4m-ai-orchestration-readiness
 
 permissions:
   contents: read

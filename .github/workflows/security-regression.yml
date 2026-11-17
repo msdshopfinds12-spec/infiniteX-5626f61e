@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - security/phase-3d-4l-regression
+      - fix/phase-4m1a-ci-coverage
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -13,6 +14,7 @@ on:
     branches:
       - main
       - feat/phase-3d4-trusted-backend
+      - phase-4m-ai-orchestration-readiness
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
