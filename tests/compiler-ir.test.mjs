@@ -8,7 +8,7 @@ before(async () => {
     configFile: false,
     logLevel: "silent",
     build: {
-      lib: { entry: "src/engine/compiler/pipeline.ts", formats: ["es"], fileName: "compiler-ir" },
+      lib: { entry: "src/engine/compiler/index.ts", formats: ["es"], fileName: "compiler-ir" },
       write: false,
       minify: false,
     },
