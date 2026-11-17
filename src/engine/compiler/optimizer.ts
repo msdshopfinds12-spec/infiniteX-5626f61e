@@ -22,7 +22,7 @@ function foldBinary(op: "add" | "subtract" | "multiply" | "divide", left: string
     case "add": return formatDecimal(addDecimal(a, b));
     case "subtract": return formatDecimal(subtractDecimal(a, b));
     case "multiply": return formatDecimal(multiplyDecimal(a, b));
-    case "divide": return formatDecimal(divideDecimal(a, b, 18, "half-even"));
+    case "divide": return formatDecimal(divideDecimal(a, b, divisionPrecision, "half-even"));
   }
 }
 
