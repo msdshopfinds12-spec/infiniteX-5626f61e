@@ -107,6 +107,20 @@ test("role change rejects invalid IDs and self-change before opening a transacti
   assert.equal(fake.calls.length, 0);
 });
 
+
+test("role changes normalize uppercase UUID inputs before row matching", async () => {
+  const fake = fakePool();
+  const result = await createPostgresMembershipRepository({ pool: fake.pool }).changeRole({
+    actorUserId: OWNER.toUpperCase(),
+    targetUserId: MEMBER.toUpperCase(),
+    workspaceId: WORKSPACE.toUpperCase(),
+    newRole: "viewer"
+  });
+  assert.equal(result.allowed, true);
+  assert.deepEqual(fake.calls[1].values, [WORKSPACE]);
+  assert.deepEqual(fake.calls[2].values, [WORKSPACE, MEMBER, "viewer"]);
+});
+
 test("role update rolls back and releases client when update affects unexpected row count", async () => {
   const fake = fakePool({ rowCount: 0, updateRows: [] });
   const repository = createPostgresMembershipRepository({ pool: fake.pool });
