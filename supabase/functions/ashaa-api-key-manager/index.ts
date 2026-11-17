@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeadersForRequest } from "../_shared/cors.ts";
+import { readJsonBodyLimited } from "../_shared/worker-security.mjs";
 
 function response(req: Request, status: number, payload: Record<string, unknown>) {
   return new Response(JSON.stringify(payload), { status, headers: corsHeadersForRequest(req).headers });
@@ -38,14 +39,16 @@ Deno.serve(async (req: Request) => {
   if (authError || !authData.user) return response(req, 401, { ok: false, error: "invalid_session" });
 
   const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
-  let body: Record<string, unknown>;
-  try {
-    const parsed = await req.json();
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
-    body = parsed as Record<string, unknown>;
-  } catch {
+  const bodyResult = await readJsonBodyLimited(req, 2048);
+  if (!bodyResult.ok) {
+    const status = bodyResult.reason === "payload_too_large" ? 413 : 400;
+    return response(req, status, { ok: false, error: bodyResult.reason });
+  }
+  const parsed = bodyResult.value;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     return response(req, 400, { ok: false, error: "invalid_json" });
   }
+  const body = parsed as Record<string, unknown>;
 
   const ownerId = authData.user.id;
   const action = body.action;
