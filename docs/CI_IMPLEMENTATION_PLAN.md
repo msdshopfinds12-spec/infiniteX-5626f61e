@@ -1,49 +1,57 @@
 # InfiniteX CI Implementation Plan
 
 **Status:** Initial Node.js CI workflow is included in this branch. Execution results are pending until GitHub Actions completes.  
-**Primary repository:** \`msdshopfinds12-spec/infiniteX-5626f61e\`
+**Primary repository:** `msdshopfinds12-spec/infiniteX-5626f61e`
 
 ## 1. Objectives
 
 - Detect TypeScript errors and production-build failures on pushes and pull requests.
-- Use the lockfile and \`npm ci\` for repeatable installation.
+- Use the lockfile and `npm ci` for repeatable installation.
 - Keep workflow permissions minimal.
 - Avoid secrets, deployments, automatic merges, and paid services.
 - Separate the primary React app from Python and agent-template CI.
 
 ## 2. Primary app: observed project contract
 
-From the inspected \`package.json\`:
+From the inspected `package.json`:
 - Runtime: React 18 + Vite + TypeScript.
-- \`npm run lint\`: \`tsc -b --noEmit\`.
-- \`npm run build\`: \`tsc -b && vite build\`.
+- `npm run lint`: `tsc -b --noEmit` (observed to fail in the first CI run with TS6310).
+- `npm run build`: `tsc -b && vite build`.
 - A test script is not currently defined.
-- A \`package-lock.json\` exists.
+- A `package-lock.json` exists.
 
-The first workflow therefore runs:
-1. \`npm ci\`
-2. \`npm run lint\`
-3. \`npm run build\`
+### TypeScript check strategy
 
-It does **not** run \`npm test\` because no test script was observed. Add a real test framework and test script in a separately planned change; do not invent a passing test stage.
+The first CI run confirmed that `npm run lint` fails with TS6310 because the build-mode command is invoked with `--noEmit` while the root TypeScript project references `tsconfig.node.json`. The workflow now uses a direct application-project check, `npx tsc --noEmit -p tsconfig.json`, then runs the repository's full `npm run build` command. The latter invokes `tsc -b` without the `--noEmit` override and then Vite.
+
+This is a **CI-level workaround**, not a correction to the existing `package.json` lint script. The script/configuration should be fixed in a separately approved source-code change after confirming the desired project-reference layout.
+
+The workflow therefore runs:
+1. `npm ci`
+2. `npx tsc --noEmit -p tsconfig.json`
+3. `npm run build`
+4. `npm audit --json` as a non-blocking report step (advisories are surfaced, not silently auto-fixed).
+
+It does **not** run `npm test` because no test script was observed. Add a real test framework and test script in a separately planned change; do not invent a passing test stage.
 
 ## 3. Initial workflow design
 
-File: \`.github/workflows/ci.yml\`
+File: `.github/workflows/ci.yml`
 
 Triggers:
-- Push to \`main\` and \`feat/**\`.
-- Pull requests targeting \`main\`.
-- Manual \`workflow_dispatch\`.
+- Push to `main` and `feat/**`.
+- Pull requests targeting `main`.
+- Manual `workflow_dispatch`.
 
 Controls:
 - Ubuntu hosted runner.
 - Node.js 22.
-- Full-SHA-pinned checkout and setup-node actions.
-- \`contents: read\` only.
-- \`persist-credentials: false\`.
+- Full-SHA-pinned `actions/checkout` v7.0.1 and `actions/setup-node` v7.1.0 (Node 24-compatible action runtimes).
+- `contents: read` only.
+- `persist-credentials: false`.
 - npm cache via setup-node.
 - Job timeout and concurrency cancellation.
+- A non-blocking npm advisory report; it does not change dependencies or suppress the reported findings.
 - No secrets, deployment steps, artifact publication, or write permissions.
 
 A push to the approved feature branch should trigger this workflow after the branch commit is pushed. Actual completion must be checked in GitHub Actions.
@@ -52,9 +60,9 @@ A push to the approved feature branch should trigger this workflow after the bra
 
 | Gate | Current state | Next requirement |
 |---|---|---|
-| Dependency installation | Included in workflow | Confirm \`npm ci\` passes |
-| TypeScript check | Included as \`npm run lint\` | Confirm CI result |
-| Vite production build | Included as \`npm run build\` | Confirm CI result |
+| Dependency installation | Included in workflow | Confirm `npm ci` passes |
+| TypeScript check | Included as `npm run lint` | Confirm CI result |
+| Vite production build | Included as `npm run build` | Confirm CI result |
 | Unit/component tests | Not configured | Add Vitest/Testing Library only in a separately approved implementation |
 | Accessibility tests | Not configured | Add automated checks plus manual keyboard/screen-reader review |
 | Dependency vulnerability review | Not included in initial CI | Establish a triage policy; avoid unstable fail-on-any-advisory behavior |
@@ -64,9 +72,9 @@ A push to the approved feature branch should trigger this workflow after the bra
 
 ## 5. GET language CI investigation (separate repository)
 
-Previously observed repository: \`msdshopfinds12-spec/infiniteX-get-language\`.
+Previously observed repository: `msdshopfinds12-spec/infiniteX-get-language`.
 
-Run #14 reported four failed jobs with runner ID 0, no runner name, and no recorded steps. Log retrieval returned \`BlobNotFound\`. This is consistent with a failure before normal step execution, but does not prove a specific GitHub-hosted runner outage or workflow defect.
+Run #14 reported four failed jobs with runner ID 0, no runner name, and no recorded steps. Log retrieval returned `BlobNotFound`. This is consistent with a failure before normal step execution, but does not prove a specific GitHub-hosted runner outage or workflow defect.
 
 Safe investigation sequence:
 1. Inspect the newest run's event, conclusion, timestamps, workflow file, and job metadata.
@@ -99,14 +107,14 @@ For every failed run, capture:
 - Reproduction command and environment, when known.
 
 Classify as:
-- \`RUNNER_OR_SERVICE\`
-- \`DEPENDENCY_INSTALL\`
-- \`STATIC_ANALYSIS\`
-- \`TEST_FAILURE\`
-- \`BUILD_FAILURE\`
-- \`CONFIGURATION\`
-- \`PERMISSION_OR_SECRET\`
-- \`UNKNOWN\`
+- `RUNNER_OR_SERVICE`
+- `DEPENDENCY_INSTALL`
+- `STATIC_ANALYSIS`
+- `TEST_FAILURE`
+- `BUILD_FAILURE`
+- `CONFIGURATION`
+- `PERMISSION_OR_SECRET`
+- `UNKNOWN`
 
 A retry is diagnostic, not a fix. Preserve the original run and compare evidence.
 

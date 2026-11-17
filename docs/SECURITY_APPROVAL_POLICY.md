@@ -101,12 +101,13 @@ Before enabling code execution:
 ## 9. CI and software supply-chain controls
 
 - Pin third-party GitHub Actions to full commit SHAs and document the corresponding release tag.
-- Set workflow permissions to the minimum required; the initial workflow uses \`contents: read\`.
+- Set workflow permissions to the minimum required; the initial workflow uses `contents: read`.
 - Disable persisted checkout credentials where they are not needed.
 - Do not expose secrets to untrusted pull-request code.
 - Set job timeouts and concurrency limits.
-- Prefer lockfiles and \`npm ci\` for deterministic dependency installation.
+- Prefer lockfiles and `npm ci` for deterministic dependency installation.
 - Review dependency updates and workflow changes as code.
+- The first InfiniteX CI run reported two npm advisories (one moderate, one high). Treat this as an open dependency-review item until package names, affected ranges, and available safe fixes are inspected. Do not use `npm audit fix --force` as an automatic CI action.
 - Do not auto-merge or deploy from the initial CI workflow.
 
 ## 10. Security status vocabulary

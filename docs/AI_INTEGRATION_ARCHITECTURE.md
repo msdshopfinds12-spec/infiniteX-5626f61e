@@ -16,7 +16,7 @@
 
 ## 2. Logical system
 
-\`\`\`mermaid
+```mermaid
 flowchart TD
   UI[InfiniteX Control Center] --> API[Control Plane API]
   API --> AUTH[Authentication and Authorization]
@@ -33,7 +33,7 @@ flowchart TD
   ORCH --> AUDIT[Append-Only Audit Events]
   API --> UI
   AUDIT --> UI
-\`\`\`
+```
 
 This is a target diagram. It does not claim these services currently exist.
 
@@ -44,7 +44,7 @@ This is a target diagram. It does not claim these services currently exist.
 Responsibilities:
 - Mobile-first command center and responsive navigation.
 - Show agent registry, repository inventory, workflow runs, audit events, cost budgets, and approval queue.
-- Display explicit states: \`DEMO\`, \`OFFLINE\`, \`CONNECTED\`, \`DEGRADED\`, \`BLOCKED\`, \`NOT TESTED\`.
+- Display explicit states: `DEMO`, `OFFLINE`, `CONNECTED`, `DEGRADED`, `BLOCKED`, `NOT TESTED`.
 - Never fabricate metrics. Static values must carry a visible DEMO label.
 - Send user intent to the API; never call model providers or privileged GitHub APIs directly.
 
@@ -72,7 +72,7 @@ The API is a proposed server boundary. A deployment target must be selected only
 
 ### C. IQ Core policy and event kernel
 
-Candidate reuse: \`msdshopfinds12-spec-infiniteGX.7-IQ-Core\`.
+Candidate reuse: `msdshopfinds12-spec-infiniteGX.7-IQ-Core`.
 
 Responsibilities:
 - Capability registry and policy decisions.
@@ -125,7 +125,7 @@ The GitHub App/token must use least privilege. Never pass credentials to a model
 ### G. Audit and approval service
 
 Every operation should have:
-- \`operation_id\`, \`correlation_id\`, actor, requested capability, target, and timestamp.
+- `operation_id`, `correlation_id`, actor, requested capability, target, and timestamp.
 - Policy decision and reason.
 - Input/output hashes or safe summaries (not raw secrets).
 - Agent/model identity and version when applicable.
@@ -136,7 +136,7 @@ Every operation should have:
 
 A minimal TypeScript interface for future implementation:
 
-\`\`\`ts
+```ts
 export type Capability =
   | "repo.read"
   | "repo.propose_patch"
@@ -172,13 +172,13 @@ export interface AgentResult {
   evidence: Array<{ kind: string; reference: string }>;
   proposedChanges?: Array<{ path: string; patch: string }>;
 }
-\`\`\`
+```
 
-The API must independently validate every field. An agent-supplied \`approvedCapabilities\` value is not authorization; authorization comes from the server-side policy engine.
+The API must independently validate every field. An agent-supplied `approvedCapabilities` value is not authorization; authorization comes from the server-side policy engine.
 
 ## 5. Supervised self-repair lifecycle
 
-\`\`\`mermaid
+```mermaid
 stateDiagram-v2
   [*] --> Detect
   Detect --> Classify
@@ -196,7 +196,7 @@ stateDiagram-v2
   ReleaseGate --> Deployed: separate release approval
   Blocked --> [*]
   Deployed --> [*]
-\`\`\`
+```
 
 A model may propose a patch, but it cannot approve its own patch. Tests and security review must run in an isolated environment. Failure returns the task to diagnosis; it must not trigger an unlimited repair loop.
 
@@ -204,26 +204,26 @@ A model may propose a patch, but it cannot approve its own patch. Tests and secu
 
 | Method | Route | Purpose | Default access |
 |---|---|---|---|
-| GET | \`/api/v1/health\` | Service health and build metadata | Authenticated/read-only |
-| GET | \`/api/v1/agents\` | Agent manifests and capability status | Authenticated/read-only |
-| POST | \`/api/v1/operations\` | Create a bounded task | Authenticated; policy checked |
-| GET | \`/api/v1/operations/{id}\` | Read operation status | Owner/operator |
-| GET | \`/api/v1/repositories\` | Read approved repo inventory | Authenticated/read-only |
-| GET | \`/api/v1/ci/runs\` | Read CI evidence | Authenticated/read-only |
-| GET | \`/api/v1/approvals\` | Read pending approvals | Authorized approver |
-| POST | \`/api/v1/approvals/{id}/decision\` | Approve/deny exact scope | Authorized human only |
+| GET | `/api/v1/health` | Service health and build metadata | Authenticated/read-only |
+| GET | `/api/v1/agents` | Agent manifests and capability status | Authenticated/read-only |
+| POST | `/api/v1/operations` | Create a bounded task | Authenticated; policy checked |
+| GET | `/api/v1/operations/{id}` | Read operation status | Owner/operator |
+| GET | `/api/v1/repositories` | Read approved repo inventory | Authenticated/read-only |
+| GET | `/api/v1/ci/runs` | Read CI evidence | Authenticated/read-only |
+| GET | `/api/v1/approvals` | Read pending approvals | Authorized approver |
+| POST | `/api/v1/approvals/{id}/decision` | Approve/deny exact scope | Authorized human only |
 
 No write endpoint should exist without authentication, authorization, schema validation, audit logging, rate limits, and tests.
 
 ## 7. Data and event model
 
 Suggested core records:
-- \`AgentManifest\`: agent identity, version, capabilities, execution limits.
-- \`Operation\`: task, target, state, requester, timestamps.
-- \`Approval\`: exact action, target, branch, file allowlist, expiry, approver, decision.
-- \`AuditEvent\`: actor, operation, decision, evidence, correlation ID.
-- \`ProviderUsage\`: provider, model, usage, cost estimate, budget outcome.
-- \`WorkflowEvidence\`: repository, commit SHA, run/job IDs, conclusion, log references.
+- `AgentManifest`: agent identity, version, capabilities, execution limits.
+- `Operation`: task, target, state, requester, timestamps.
+- `Approval`: exact action, target, branch, file allowlist, expiry, approver, decision.
+- `AuditEvent`: actor, operation, decision, evidence, correlation ID.
+- `ProviderUsage`: provider, model, usage, cost estimate, budget outcome.
+- `WorkflowEvidence`: repository, commit SHA, run/job IDs, conclusion, log references.
 
 Use append-only audit semantics. Corrections should create new events rather than rewriting historical decisions.
 

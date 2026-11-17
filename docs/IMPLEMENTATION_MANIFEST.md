@@ -1,33 +1,36 @@
 # InfiniteX Foundation Implementation Manifest
 
 **Change:** Control Plane Foundation — documentation and initial CI  
-**Repository:** \`msdshopfinds12-spec/infiniteX-5626f61e\`  
-**Base branch:** \`main\`  
-**Base commit:** \`76b821789f52aa6f403bacb0508c6c989fdfa3a5\`  
-**Feature branch:** \`feat/infiniteX-control-plane-foundation\`  
+**Repository:** `msdshopfinds12-spec/infiniteX-5626f61e`  
+**Base branch:** `main`  
+**Base commit:** `76b821789f52aa6f403bacb0508c6c989fdfa3a5`  
+**Feature branch:** `feat/infiniteX-control-plane-foundation`  
 **Scope approval:** User-approved in conversation on 2026-11-17.
 
 ## 1. Approved file manifest
 
 | Path | Purpose | Change type |
 |---|---|---|
-| \`.github/workflows/ci.yml\` | Minimal Node.js validation workflow | New |
-| \`docs/AI_REPOSITORY_INVENTORY.md\` | Evidence-qualified inventory of selected AI and application repositories | New |
-| \`docs/AI_INTEGRATION_ARCHITECTURE.md\` | Proposed modular control-plane and agent-adapter architecture | New |
-| \`docs/SECURITY_APPROVAL_POLICY.md\` | Least-privilege and human-approval policy | New |
-| \`docs/CI_IMPLEMENTATION_PLAN.md\` | CI baseline, diagnostics, and staged repository CI plan | New |
-| \`docs/IMPLEMENTATION_MANIFEST.md\` | Scope, constraints, and acceptance criteria for this change | New |
+| `.github/workflows/ci.yml` | Minimal Node.js validation workflow | New |
+| `docs/AI_REPOSITORY_INVENTORY.md` | Evidence-qualified inventory of selected AI and application repositories | New |
+| `docs/AI_INTEGRATION_ARCHITECTURE.md` | Proposed modular control-plane and agent-adapter architecture | New |
+| `docs/SECURITY_APPROVAL_POLICY.md` | Least-privilege and human-approval policy | New |
+| `docs/CI_IMPLEMENTATION_PLAN.md` | CI baseline, diagnostics, and staged repository CI plan | New |
+| `docs/IMPLEMENTATION_MANIFEST.md` | Scope, constraints, and acceptance criteria for this change | New |
 
 No existing source file, package manifest, lockfile, production configuration, or deployment setting is in scope.
 
 ## 2. CI contract
 
-The workflow is intended to run:
-- \`npm ci\`
-- \`npm run lint\`
-- \`npm run build\`
+The workflow runs:
+- `npm ci`
+- `npx tsc --noEmit -p tsconfig.json` for the application source project
+- `npm run build` for TypeScript project build plus Vite production build
+- `npm audit --json` as a non-blocking dependency-advisory report
 
-It runs on pushes to \`main\` and \`feat/**\`, pull requests targeting \`main\`, and manual dispatch. It uses read-only repository permissions and no secrets.
+The existing `npm run lint` script remains a known issue: its `tsc -b --noEmit` command failed with TS6310 in the first CI run. This branch uses a CI-level workaround only; changing `package.json` or TypeScript project configuration is outside this approved foundation scope.
+
+It runs on pushes to `main` and `feat/**`, pull requests targeting `main`, and manual dispatch. It uses read-only repository permissions and no secrets.
 
 ## 3. Explicit exclusions
 
@@ -62,6 +65,8 @@ The final implementation report must record:
 - Exact changed paths.
 - Whether the commit was pushed successfully.
 - Workflow run ID/URL and job conclusions, if available.
+- First run #190: `npm ci` passed; `npm run lint` failed with TS6310; production build was skipped.
+- npm reported two dependency advisories (one moderate, one high); detailed triage is pending.
 - Any blocked or unverified checks.
 
 A successful GitHub write does not prove the application builds. A successful CI run does not authorize merge or deployment.
