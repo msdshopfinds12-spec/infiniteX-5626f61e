@@ -37,6 +37,7 @@ export default function App() {
   }
 
   return (
+    <a className="skip-link" href="#main-content">Skip to main content</a>
     <div className="app-shell">
       <Sidebar view={view} onChange={setView} />
       <div className="main">
@@ -47,7 +48,7 @@ export default function App() {
           searchValue={searchQuery}
           onSearchChange={handleSearchChange}
         />
-        <main className="content">
+        <main id="main-content" className="content" tabIndex={-1}>
           {notice && (
             <div className="notice" role="status">
               <span>{notice}</span>
