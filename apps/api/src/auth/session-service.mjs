@@ -1,5 +1,5 @@
 import { createCsrfToken } from "./csrf.mjs";
-import { createOpaqueToken, hashOpaqueToken } from "./opaque-token.mjs";
+import { createOpaqueToken, equalTokenDigests, hashOpaqueToken } from "./opaque-token.mjs";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DEFAULT_TTL_SECONDS = 60 * 60 * 8;
@@ -48,7 +48,7 @@ export function createSessionService({
 
       if (!csrf || typeof csrf.token !== "string" || typeof csrf.tokenHash !== "string" ||
           !/^[a-f0-9]{64}$/.test(csrf.tokenHash) ||
-          !equalHash(hashOpaqueToken(csrf.token), csrf.tokenHash)) {
+          !equalTokenDigests(hashOpaqueToken(csrf.token), csrf.tokenHash)) {
         throw new TypeError("csrfFactory returned an invalid token pair");
       }
 
@@ -89,7 +89,4 @@ export function createSessionService({
   });
 }
 
-function equalHash(left, right) {
-  // The expected value is generated and compared inside this trusted process.
-  return left === right;
-}
+
