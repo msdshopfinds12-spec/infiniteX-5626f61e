@@ -12,7 +12,11 @@ class ParseError(ValueError):
 
 class Parser:
     def __init__(self, tokens: tuple[Token, ...], *, max_statements: int = 10_000) -> None:
-        if not isinstance(max_statements, int) or isinstance(max_statements, bool) or max_statements < 1:
+        if (
+            not isinstance(max_statements, int)
+            or isinstance(max_statements, bool)
+            or max_statements < 1
+        ):
             raise ValueError("max_statements must be a positive integer")
         self.tokens, self.i, self.max_statements = tokens, 0, max_statements
 
@@ -44,11 +48,20 @@ class Parser:
                 declared_type = None
                 if self._peek().kind is TokenKind.COLON:
                     self._take()
-                    declared_type = str(self._expect(TokenKind.IDENT, "Expected type name after ':'").value)
+                    type_token = self._peek()
+                    if type_token.kind not in (TokenKind.IDENT, TokenKind.NULL):
+                        raise ParseError(
+                            "Expected type name after ':'", type_token.line, type_token.column
+                        )
+                    declared_type = str(self._take().lexeme)
                 self._expect(TokenKind.EQUAL, "Expected '=' after binding name or type")
                 value = self._value()
                 self._expect(TokenKind.SEMICOLON, "Expected ';' after let statement")
-                statements.append(LetStatement(str(name.value), value, Span(start.line, start.column), declared_type))
+                statements.append(
+                    LetStatement(
+                        str(name.value), value, Span(start.line, start.column), declared_type
+                    )
+                )
             elif token.kind is TokenKind.EMIT:
                 start = self._take()
                 value = self._value()
@@ -71,4 +84,6 @@ class Parser:
             return Literal(None, "null", span)
         if token.kind is TokenKind.IDENT:
             return Reference(str(token.value), span)
-        raise ParseError("Expected literal or previously declared identifier", token.line, token.column)
+        raise ParseError(
+            "Expected literal or previously declared identifier", token.line, token.column
+        )
