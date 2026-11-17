@@ -60,3 +60,27 @@ test("mobile viewport keeps the document within the viewport width", async ({ pa
   expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
   await expect(page.getByRole("button", { name: "AI Agents" })).toBeVisible();
 });
+
+test("keyboard users can skip navigation and operate the workspace", async ({ page }) => {
+  await page.goto("/");
+  await page.keyboard.press("Tab");
+  const skipLink = page.getByRole("link", { name: "Skip to main content" });
+  await expect(skipLink).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#main-content")).toBeFocused();
+
+  const agentsButton = page.getByRole("button", { name: "AI Agents" });
+  await agentsButton.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "AI Agents" })).toBeVisible();
+});
+
+test("search input is rendered as text and cannot inject markup", async ({ page }) => {
+  await page.goto("/");
+  const payload = '<img src=x onerror=alert(1)> Sentinel';
+  const search = page.getByRole("searchbox", { name: "Search sample agents" });
+  await search.fill(payload);
+
+  await expect(page.locator("img")).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText("No sample agents match");
+});
