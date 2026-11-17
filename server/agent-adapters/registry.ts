@@ -99,7 +99,7 @@ function createMockAdapter(): AgentAdapter {
       "policy.evaluate", "workflow.route", "chat.respond", "code.review",
       "repo.propose_patch", "data.analyze", "content.draft", "marketing.plan",
       "personal.assist",
-    ],
+    ] as const,
     maxInputChars: 4000,
     requiresHumanApproval: true,
   });
