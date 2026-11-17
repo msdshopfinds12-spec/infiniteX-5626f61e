@@ -1,18 +1,15 @@
 interface LogLine {
-  time: string;
   level: "info" | "warn" | "error";
   source: string;
   message: string;
 }
 
 const logs: LogLine[] = [
-  { time: "06:41:02", level: "info", source: "atlas", message: "Plan generated: 6 steps, 2 agents" },
-  { time: "06:41:05", level: "info", source: "forge", message: "Generated 4 files for auth-service" },
-  { time: "06:41:09", level: "warn", source: "vault", message: "Dependency 'legacy-crypto' flagged for review" },
-  { time: "06:41:12", level: "info", source: "billing-api", message: "Deploy stage started" },
-  { time: "06:41:18", level: "error", source: "pulse", message: "Health probe timed out, retrying (2/3)" },
-  { time: "06:41:22", level: "info", source: "sentinel", message: "Diff queued, awaiting review slot" },
-  { time: "06:41:26", level: "info", source: "forge", message: "Tests: 142 passed, 0 failed" },
+  { level: "info", source: "atlas", message: "Illustrative planning event" },
+  { level: "info", source: "forge", message: "Illustrative code generation event" },
+  { level: "warn", source: "vault", message: "Example dependency review notice" },
+  { level: "info", source: "pipeline", message: "Example pipeline event — not executed" },
+  { level: "error", source: "monitor", message: "Example error record — not a live alert" },
 ];
 
 const levelClass: Record<LogLine["level"], string> = {
@@ -22,15 +19,14 @@ const levelClass: Record<LogLine["level"], string> = {
 };
 
 export default function LogStream({ compact = false }: { compact?: boolean }) {
-  const lines = compact ? logs.slice(0, 5) : logs;
+  const lines = compact ? logs.slice(0, 3) : logs;
   return (
-    <div className="log-stream">
-      {lines.map((l, i) => (
-        <div key={i} className="log-line">
-          <span className="log-time">{l.time}</span>
-          <span className={`log-level ${levelClass[l.level]}`}>{l.level}</span>
-          <span className="log-source">{l.source}</span>
-          <span className="log-message">{l.message}</span>
+    <div className="log-stream" aria-label="Illustrative log entries">
+      {lines.map((line, index) => (
+        <div key={`${line.source}-${index}`} className="log-line">
+          <span className={`log-level ${levelClass[line.level]}`}>{line.level}</span>
+          <span className="log-source">{line.source}</span>
+          <span className="log-message">{line.message}</span>
         </div>
       ))}
     </div>
