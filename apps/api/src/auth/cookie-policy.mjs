@@ -1,3 +1,5 @@
+import { hashOpaqueToken } from "./opaque-token.mjs";
+
 const COOKIE_NAME_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const COOKIE_VALUE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
@@ -17,7 +19,7 @@ export function serializeSessionCookie({
   sameSite = "Lax"
 }) {
   assertCookieName(name);
-  if (typeof value !== "string" || !COOKIE_VALUE_PATTERN.test(value)) {
+  try { hashOpaqueToken(value); } catch {
     throw new TypeError("Session cookie value is invalid");
   }
   if (!Number.isInteger(maxAgeSeconds) || maxAgeSeconds < 0 || maxAgeSeconds > 31_536_000) {
@@ -56,5 +58,10 @@ export function readSessionCookie(cookieHeader, name = "__Host-infinite_x_sessio
     .filter((part) => part.startsWith(name + "="));
   if (matches.length !== 1) return null;
   const value = matches[0].slice(name.length + 1);
-  return COOKIE_VALUE_PATTERN.test(value) ? value : null;
+  try {
+    hashOpaqueToken(value);
+    return value;
+  } catch {
+    return null;
+  }
 }
