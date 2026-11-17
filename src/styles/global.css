@@ -11,6 +11,7 @@
   --text-3: #56657f;
 
   --primary: #3b82f6;
+  --primary-strong: #60a5fa;
   --primary-soft: rgba(59, 130, 246, 0.14);
   --success: #10b981;
   --success-soft: rgba(16, 185, 129, 0.14);
@@ -45,6 +46,7 @@
   --text-3: #94a3b8;
 
   --primary: #2563eb;
+  --primary-strong: #1d4ed8;
   --primary-soft: rgba(37, 99, 235, 0.12);
   --success: #059669;
   --success-soft: rgba(5, 150, 105, 0.12);
@@ -209,7 +211,7 @@ body {
 
 .nav-item.active {
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-strong);
 }
 
 .sidebar-foot {
