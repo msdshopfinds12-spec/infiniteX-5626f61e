@@ -150,3 +150,77 @@ Human review is required before each such operation.
 ## Audit limitations
 
 This is a source-level review of the named branch and files. It is not a live penetration test, database audit, Supabase dashboard inspection, production traffic review, or proof of deployment behavior. Findings must be revalidated against the final integration branch before release.
+
+
+---
+
+## Live Supabase audit addendum — 2026-11-18
+
+**Audit status:** READ-ONLY inspection completed. Project settings, schema, migrations, policies, advisor findings, and Edge Function source were inspected. No database writes, migrations, function deployments, secret reads, or configuration changes were performed.
+
+### Project and schema evidence
+
+| Check | Observed result | Status |
+|---|---|---|
+| Project | `Ashaa-INX` / `vepacoemkhudamfaccah` | VERIFIED |
+| Project health | `ACTIVE_HEALTHY` | VERIFIED |
+| Database | PostgreSQL 17 | VERIFIED |
+| Recorded migrations | 18 | VERIFIED |
+| Public application tables | 14 | VERIFIED |
+| RLS | Enabled on all 14 listed public tables | VERIFIED |
+| RLS policy coverage | 13 tables have one or more policies; one has none | VERIFIED |
+| Active Edge Functions | 3 listed | VERIFIED |
+| Frontend/API integration | Not tested by this project inspection | NOT TESTED |
+
+The table inventory reported zero rows for the listed application tables at audit time. This is an observed inventory value, not proof that all project data or other schemas are empty.
+
+### Live security finding — webhook event table
+
+Supabase Security Advisor reported:
+
+- `RLS Enabled No Policy`
+- `public.billing_webhook_events`
+- RLS is enabled, but no policy exists.
+
+This table stores billing webhook event processing metadata. The safe default is to keep browser roles unable to read or mutate it and let a narrowly scoped trusted server-side webhook handler perform validated, idempotent writes. Do not add a broad authenticated policy merely to silence the advisor. Review table grants and the webhook handler before deciding whether the advisor notice is an intentional server-only design or a configuration defect.
+
+Remediation reference: https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy
+
+### Other live RLS observations
+
+The read-only policy inventory found owner-scoped policies on profiles, user projects, usage logs, subscriptions, payments, API keys, credits, workflows, workflow runs, workflow steps, step runs, and workflow logs. These policy definitions are evidence of row filters, not proof of complete privilege safety. Table grants, function grants, write paths, and negative tests must also be reviewed.
+
+### Worker and API-key function review
+
+Three active Edge Functions were listed:
+
+- `simula-workflow-cron-worker` — `verify_jwt=false`; source requires a dedicated worker-secret header and validates it through `simula_verify_worker_secret`. The secret value itself was not read.
+- `simula-workflow-worker` — `verify_jwt=true`; source validates the bearer token with `auth.getUser()` before claiming user-owned runs.
+- `ashaa-api-key-manager` — `verify_jwt=true`; source validates the user, scopes API key creation, stores a SHA-256 digest, and returns the raw key once.
+
+The cron worker's secret verification and internal queue claim functions are SECURITY DEFINER with an empty search_path. Read-only ACL inspection showed the internal claim wrapper and secret verifier are executable by `service_role`, not `authenticated`. The user-facing claim function is executable by `authenticated` and scopes queue claims using `auth.uid()`.
+
+**Follow-up hardening:** The regular workflow worker uses the service-role client for step reads. Add explicit `owner_id` scoping to those reads and verify the returned claimed run's owner matches the authenticated principal, even though the current claim RPC is owner-scoped. This is defense in depth around service-role access.
+
+Both user-facing Edge Functions currently emit wildcard CORS origins. Authentication is still enforced in their source, but production browser use should use an explicit trusted-origin allowlist and test preflight behavior. Do not assume CORS is an authorization control.
+
+### Performance Advisor
+
+Six indexes were reported as unused at audit time. These are informational candidates only. Do not drop them without query workload evidence, foreign-key coverage review, and a measured before/after plan. An index may be useful for infrequent, future, or integrity-related operations despite a low usage counter.
+
+Remediation reference: https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index
+
+### Updated backend decision
+
+Supabase is now **VERIFIED as an existing live project and schema**, not merely a candidate. Its suitability as InfiniteX's production identity/database source remains **PARTIAL / NOT APPROVED** until the repository integration, authentication model, CORS topology, webhook trust boundary, service-role access, and tenant-isolation tests are reconciled.
+
+### Required next actions
+
+1. Inspect table grants for `billing_webhook_events` and confirm browser roles cannot access it.
+2. Review webhook verification/idempotency implementation without exposing signing secrets.
+3. Add owner predicates to service-role workflow step reads and test cross-owner denial.
+4. Restrict authenticated Edge Function CORS to approved frontend origins.
+5. Add integration tests for RLS, RPC execute grants, webhook event isolation, API-key ownership, and worker tenant boundaries.
+6. Reconcile repository schema/migrations with the 18 live migrations before proposing any new migration.
+
+**Change-control:** This addendum is documentation-only. It does not authorize schema changes, policy changes, Edge Function redeployments, secret rotation, runtime flag changes, or production data changes.
