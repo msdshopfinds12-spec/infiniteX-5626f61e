@@ -1,0 +1,42 @@
+name: GET-04 Semantic Analysis and IR
+
+on:
+  push:
+    branches:
+      - feat/get-04-semantic-ir
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: get-04-semantic-ir-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install reproducibly
+        run: npm ci
+
+      - name: TypeScript checks
+        run: npm run lint
+
+      - name: Numeric, compiler, and IR regression tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
