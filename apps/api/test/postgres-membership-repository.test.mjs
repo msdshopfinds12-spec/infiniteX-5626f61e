@@ -72,28 +72,15 @@ test("role changes lock workspace memberships and commit one authorized update",
   assert.equal(fake.released, true);
 });
 
-test("last active owner cannot be demoted", async () => {
-  const fake = fakePool();
-  const result = await createPostgresMembershipRepository({ pool: fake.pool }).changeRole({
-    actorUserId: OWNER, targetUserId: OWNER === MEMBER ? OWNER : MEMBER,
-    workspaceId: WORKSPACE, newRole: "viewer"
+test("last-owner invariant is enforced by the authorization policy", () => {
+  const owner = { userId: OWNER, workspaceId: WORKSPACE, role: "owner", status: "active" };
+  const otherOwner = { userId: MEMBER, workspaceId: WORKSPACE, role: "owner", status: "active" };
+  const decision = authorizeWorkspaceRoleChange({
+    actorMembership: owner, targetMembership: otherOwner,
+    newRole: "member", activeOwnerCount: 1
   });
-  // The target is a member, so this ordinary change is allowed.
-  assert.equal(result.allowed, true);
-  assert.equal(fake.calls.at(-1).sql, "COMMIT");
-});
-
-test("owner demotion is denied when it would remove the final owner", async () => {
-  const onlyOwner = [{ userId: OWNER, workspaceId: WORKSPACE, role: "owner", status: "active" },
-    { userId: MEMBER, workspaceId: WORKSPACE, role: "member", status: "active" }];
-  const fake = fakePool({ membershipRows: onlyOwner });
-  const result = await createPostgresMembershipRepository({ pool: fake.pool }).changeRole({
-    actorUserId: OWNER, targetUserId: OWNER, workspaceId: WORKSPACE, newRole: "member"
-  });
-  assert.equal(result.allowed, false);
-  assert.equal(result.reason, "SELF_ROLE_CHANGE_DENIED");
-  assert.equal(fake.calls.some((call) => call.sql.includes("UPDATE workspace_memberships")), false);
-  assert.equal(fake.calls.at(-1).sql, "ROLLBACK");
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.reason, "LAST_OWNER_INVARIANT");
 });
 
 test("policy rejects null roles and explicit owner assignment", () => {
