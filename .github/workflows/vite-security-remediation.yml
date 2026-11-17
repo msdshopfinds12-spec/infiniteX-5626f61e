@@ -1,7 +1,16 @@
-name: Vite Security Remediation Preview
+name: Vite 8 Security Verification
 
 on:
   push:
+    branches:
+      - feat/gh16-infiniteX-integration
+    paths:
+      - ".github/workflows/vite-security-remediation.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "vite.config.ts"
+  pull_request:
     branches:
       - feat/gh16-infiniteX-integration
     paths:
@@ -16,54 +25,37 @@ permissions:
   contents: read
 
 concurrency:
-  group: vite-security-remediation-${{ github.ref }}
-  cancel-in-progress: false
+  group: vite-security-verification-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  preview-remediation:
-    name: Generate and verify patched dependency lockfile
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  verify-toolchain:
+    name: Verify locked Vite 8 toolchain
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - name: Checkout selected branch
-        uses: actions/checkout@v7
+      - name: Checkout source (immutable action pin)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
-
-      - name: Set up Node.js 24
-        uses: actions/setup-node@v7
+          fetch-depth: 1
+      - name: Set up Node.js (immutable action pin)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24
           cache: npm
-
-      - name: Generate candidate Vite 6 lockfile (runner only)
-        run: npm install --package-lock-only --ignore-scripts --save-dev vite@^6.4.6
-
-      - name: Install exactly from candidate lockfile
+          cache-dependency-path: package-lock.json
+      - name: Install exact locked dependencies
         run: npm ci
-
-      - name: Verify resolved toolchain
+      - name: Verify Vite toolchain versions
         run: npm ls vite esbuild @vitejs/plugin-react
-
       - name: Enforce dependency security audit
         run: npm audit --audit-level=moderate
-
       - name: Typecheck
         run: npm run lint
-
       - name: Run unit tests
         run: npm test
-
       - name: Build production assets
         run: npm run build
-
-      - name: Upload candidate manifests for review
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: vite-security-remediation-candidate
-          path: |
-            package.json
-            package-lock.json
-          if-no-files-found: error
-          retention-days: 7

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - chore/phase-3d4-ci-recovery
+      - chore/phase-3d4-p0-hardening
   pull_request:
     branches:
       - main

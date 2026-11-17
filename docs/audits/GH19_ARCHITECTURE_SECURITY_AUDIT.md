@@ -1,15 +1,15 @@
 # GH-19 — InfiniteX Architecture and Repository Audit
 
-**Status:** Source-level review completed for the candidate branch; implementation verification is limited to the exact CI evidence linked below.
-**Branch:** chore/infiniteX-vite8-candidate
-**Audit baseline:** 45810af0d2eb669626c20986b385ffb167f63c8a
+**Status:** Source-level review updated for the isolated P0 hardening branch. CI evidence is tied to exact commit SHAs and run URLs; this document is not a production security certification.
+**Branch:** chore/phase-3d4-p0-hardening
+**Audit baseline:** 88322ce6f1ac925e34ae5011a6d7c4a74b53b5ff (parent of the P0 hardening commit)
 **Scope:** Frontend source, package scripts, TypeScript configuration, GitHub Actions workflows, repository tree, and architecture/security plans.
 
 ## 1. Executive result
 
 InfiniteX remains a frontend demonstration workspace. It is not yet a production AI-agent orchestration platform, and no live backend, provider execution, production identity, or workspace authorization was verified in this review.
 
-The existing Vite 8 candidate has passing CI evidence at its recorded baseline. This audit adds repository hygiene and deterministic sample-search hardening. Changes must be tied to a fresh CI run before they are considered verified.
+The recovery branch at `88322ce6f1ac925e34ae5011a6d7c4a74b53b5ff` has a successful GitHub Actions run #58 (`44096600026`): both jobs passed, including 8 unit tests, 12 Playwright tests, dependency audit, TypeScript validation, and production build. This evidence applies to that exact recovery commit only. The P0 hardening commit requires its own fresh CI run before its changes are considered verified.
 
 ## 2. Findings
 
@@ -21,7 +21,7 @@ The existing Vite 8 candidate has passing CI evidence at its recorded baseline. 
 | GH19-04 | Medium | @vercel/analytics is declared in the package manifest but no usage was found in the inspected candidate application source. | Keep dependency review open; do not remove it until its intended deployment use is confirmed. |
 | GH19-05 | High | No production API server, authenticated identity boundary, workspace authorization, or database/RLS integration is present in the inspected frontend candidate. | Explicitly retain as NOT VERIFIED / NOT IMPLEMENTED in this candidate; do not connect UI directly to privileged services. |
 | GH19-06 | Medium | Error boundary handles React render/lifecycle errors, not arbitrary event-handler or asynchronous failures. | Keep local async error handling and user-visible retry states as future implementation requirements. |
-| GH19-07 | Medium | Browser CI uses floating GitHub Action major tags. | Pinning actions to immutable commit SHAs remains a supply-chain hardening task requiring reviewed upstream SHA updates. |
+| GH19-07 | Medium | Supply-chain pinning differed between workflows. | `frontend-ci.yml` pins checkout, setup-node, and upload-artifact to immutable SHAs. The corresponding upstream action commits were checked and report valid GitHub signatures. The separate Vite remediation workflow previously used floating tags; this P0 change aligns it with the pinned toolchain. |
 
 ## 3. Current architecture
 
@@ -115,3 +115,28 @@ Production-readiness requires additional API integration, authentication, cross-
 ## 9. Acceptance gate
 
 GH-19 is not a production approval. The candidate can progress only after fresh CI passes and the remaining architecture/security gaps have concrete implementation plans, negative tests, and human review.
+
+## 10. P0 recovery update — 2026-11-17
+
+### Exact baseline and scope
+- Recovery base commit: `88322ce6f1ac925e34ae5011a6d7c4a74b53b5ff`.
+- Existing PR #9 remains open, draft, and unchanged; its head remains `b91de221a8f7a84b95f783878e286a9cc47e2e17`.
+- P0 branch: `chore/phase-3d4-p0-hardening`.
+- Scope is limited to the two GitHub Actions workflows and this audit document. No application source, dependency manifest, lockfile, secrets, settings, billing, deployment, or PR metadata is changed.
+
+### GH19-08 — Conflicting Vite remediation workflow
+The previous `.github/workflows/vite-security-remediation.yml` generated a Vite 6 candidate lockfile on the runner while the recovery branch uses Vite 8.3.7. It did not commit that generated lockfile, but its result was inconsistent with the active toolchain and could mislead reviewers. The workflow is changed to verify the checked-in Vite 8 toolchain using `npm ci`, `npm ls`, `npm audit`, TypeScript checks, unit tests, and the production build. It no longer generates or uploads candidate manifests.
+
+### CI trigger coverage
+The main frontend workflow is configured to run on pushes to both the original recovery branch and this isolated P0 branch. Its pull-request base filters remain explicit. This ensures the P0 branch can receive a fresh CI result without changing PR #9.
+
+### Action provenance
+The pinned upstream commits for `actions/checkout`, `actions/setup-node`, and `actions/upload-artifact` were queried in their respective upstream repositories. GitHub reports valid commit signatures for the inspected SHAs. This validates those exact commit objects; it is not a guarantee against every future supply-chain risk.
+
+### Verification state
+- Prior evidence: run #58 / `44096600026` passed on the recovery base commit only.
+- P0 hardening commit: fresh CI is required; no passing result is claimed here.
+- The branch remains isolated. No PR was created, no merge occurred, and no deployment or repository settings were changed.
+
+### Remaining controls
+Branch protection and required status checks are repository governance settings and are intentionally outside this P0 write authorization. Manual Android QA, backend authentication, workspace authorization, database/RLS tests, and production AI-provider execution remain not verified.
