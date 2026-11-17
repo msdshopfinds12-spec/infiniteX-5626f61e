@@ -34,6 +34,9 @@ function normalize(coefficient: bigint, scale: number): DecimalValue {
 }
 
 export function parseDecimal(input: string): DecimalValue {
+  if (typeof input !== "string") {
+    throw new NumericEngineError("INVALID_DECIMAL", "Decimal literal must be supplied as a string.");
+  }
   if (input.length === 0 || input.length > MAX_LITERAL_CHARS) {
     throw new NumericEngineError("INPUT_TOO_LONG", "Decimal literal is empty or exceeds the configured length limit.");
   }
