@@ -10,9 +10,10 @@ export interface DecimalValue {
 const DECIMAL_PATTERN = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/;
 const MAX_LITERAL_CHARS = 10_000;
 const MAX_SCALE = 1_000;
+const MAX_INTERMEDIATE_POWER = 2_000;
 
 function pow10(power: number): bigint {
-  if (!Number.isInteger(power) || power < 0 || power > MAX_SCALE) {
+  if (!Number.isInteger(power) || power < 0 || power > MAX_INTERMEDIATE_POWER) {
     throw new NumericEngineError("PRECISION_OUT_OF_RANGE", "Decimal scale exceeds the configured limit.");
   }
   return 10n ** BigInt(power);
