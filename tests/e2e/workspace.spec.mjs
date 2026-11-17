@@ -84,3 +84,42 @@ test("search input is rendered as text and cannot inject markup", async ({ page 
   await expect(page.locator("img")).toHaveCount(0);
   await expect(page.getByRole("status")).toContainText("No sample agents match");
 });
+
+test("theme preference survives a page reload", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Switch to light mode" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByRole("button", { name: "Switch to dark mode" })).toBeVisible();
+});
+
+test("responsive layout has no horizontal document overflow at common viewport widths", async ({ page }) => {
+  for (const width of [320, 360, 375, 390, 430, 768, 1024, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const dimensions = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      document: document.documentElement.scrollWidth,
+    }));
+    expect(
+      dimensions.document,
+      `Unexpected horizontal overflow at viewport width ${width}px`,
+    ).toBeLessThanOrEqual(dimensions.viewport);
+  }
+});
+
+test("reduced-motion preference is respected by the application stylesheet", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const transitionDuration = await page.locator(".nav-item").first().evaluate(
+    (element) => getComputedStyle(element).transitionDuration,
+  );
+  expect(transitionDuration.split(",").every((duration) => {
+    const seconds = duration.trim().endsWith("ms")
+      ? Number.parseFloat(duration) / 1000
+      : Number.parseFloat(duration);
+    return seconds <= 0.001;
+  })).toBe(true);
+});
