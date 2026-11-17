@@ -74,6 +74,13 @@ export function createOrchestrator({
     if (signal?.aborted) abortFromCaller();
     else signal?.addEventListener("abort", abortFromCaller, { once: true });
 
+    let rejectOnAbort;
+    const abortPromise = new Promise((_resolve, reject) => {
+      rejectOnAbort = () => reject(controller.signal.reason ||
+        new DOMException("Execution aborted.", "AbortError"));
+      if (controller.signal.aborted) rejectOnAbort();
+      else controller.signal.addEventListener("abort", rejectOnAbort, { once: true });
+    });
     const timeoutId = setTimeout(
       () => controller.abort(new DOMException("Execution timed out.", "TimeoutError")),
       timeoutMs,
@@ -82,12 +89,15 @@ export function createOrchestrator({
     record({ runId, agentId, providerId: agent.providerId, event: "run_started", at: startedAt });
 
     try {
-      const result = await provider.generate({
-        input,
-        systemPrompt: agent.systemPrompt,
-        signal: controller.signal,
-        maxOutputChars: policy.limits.maxOutputChars,
-      });
+      const result = await Promise.race([
+        Promise.resolve().then(() => provider.generate({
+          input,
+          systemPrompt: agent.systemPrompt,
+          signal: controller.signal,
+          maxOutputChars: policy.limits.maxOutputChars,
+        })),
+        abortPromise,
+      ]);
       if (typeof result !== "string") {
         throw new OrchestrationError("INVALID_PROVIDER_OUTPUT", "The provider returned an invalid response.");
       }
@@ -121,6 +131,7 @@ export function createOrchestrator({
       throw new OrchestrationError("PROVIDER_FAILED", "The configured provider request failed.");
     } finally {
       clearTimeout(timeoutId);
+      controller.signal.removeEventListener("abort", rejectOnAbort);
       signal?.removeEventListener("abort", abortFromCaller);
     }
   }
