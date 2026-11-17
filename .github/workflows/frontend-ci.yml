@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Typecheck, test, audit and build
+    name: Typecheck, unit test, audit and build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -40,3 +40,36 @@ jobs:
         run: npm test
       - name: Build production assets
         run: npm run build
+
+  browser-e2e:
+    name: Playwright browser smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked application dependencies
+        run: npm ci
+      - name: Install temporary Playwright test runner
+        run: npm install --no-save --package-lock=false @playwright/test@1.56.1
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build production assets
+        run: npm run build
+      - name: Run browser smoke tests
+        run: npx playwright test
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-diagnostics
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
