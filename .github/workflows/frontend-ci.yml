@@ -45,12 +45,12 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
       - name: Enforce workflow security policy
         run: npm run check:ci-policy
       - name: Test workflow policy scanner
         run: npm run test:ci-policy
-      - name: Install locked dependencies
-        run: npm ci
       - name: Dependency security audit
         run: npm audit --audit-level=moderate
       - name: Typecheck
