@@ -6,7 +6,7 @@ export default defineConfig({
   server: { host: true, port: 5173 },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "server/**/*.test.ts"],
     clearMocks: true,
     restoreMocks: true,
   },

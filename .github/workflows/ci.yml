@@ -43,6 +43,9 @@ jobs:
       - name: Type-check application sources
         run: npm run lint
 
+      - name: Type-check server gateway
+        run: npm run typecheck:server
+
       - name: Run automated tests
         run: npm test
 
