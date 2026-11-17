@@ -7,12 +7,14 @@ on:
       - chore/phase-3d4-p0-hardening
       - feat/phase-3d4-trusted-backend
       - fix/phase-4m4-picomatch-security-recovery
+      - fix/phase-4m4-picomatch-regression-tests
     paths:
       - ".github/workflows/vite-security-remediation.yml"
       - "package.json"
       - "package-lock.json"
       - "vite.config.js"
       - "vite.config.ts"
+      - "tests/security/**"
   pull_request:
     branches:
       - feat/gh16-infiniteX-integration
@@ -24,6 +26,7 @@ on:
       - "package-lock.json"
       - "vite.config.js"
       - "vite.config.ts"
+      - "tests/security/**"
   workflow_dispatch:
 
 permissions:
