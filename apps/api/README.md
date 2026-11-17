@@ -42,11 +42,15 @@ The check command runs Node syntax checks and the built-in Node test runner. No 
 
 Do not expose this service as a public application API until authentication, authorization, persistent session storage, CSRF protection for cookie-authenticated mutations, durable audit, rate/quota controls, and database isolation are implemented and independently tested.
 
+## Authentication and authorization primitives
+
+The package includes isolated, unit-testable primitives for opaque session tokens, CSRF token hashing and verification, secure `__Host-` session cookie serialization, repository-injected session lifecycle, and deny-by-default workspace role policy. These modules are **not wired into HTTP routes**. No production login, identity provider, persistent database repository, session rotation endpoint, or end-to-end authorization middleware exists yet. The session service requires a persistent repository adapter supplied by a later reviewed integration.
+
 ## CI
 
 The Phase 3D-4 workflow runs Node syntax checks and tests on pull requests and pushes to the trusted backend branch. CI uses no repository secrets and requests only `contents: read`.
 
-The workflow's GitHub Actions references currently use major-version tags rather than verified full commit SHAs; pinning is a follow-up supply-chain hardening item.
+GitHub Actions are pinned to immutable commit SHAs. Pin updates must be reviewed and refreshed deliberately.
 
 ## Explicitly not done
 
