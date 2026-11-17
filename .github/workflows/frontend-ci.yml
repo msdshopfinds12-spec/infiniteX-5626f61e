@@ -70,6 +70,9 @@ jobs:
         run: npm run test:edge-function-cors
       - name: Test Edge worker ownership and request-boundary policies
         run: npm run test:edge-worker-security
+      - name: Test release artifact integrity
+        run: node --test scripts/release-integrity.test.mjs
+
       - name: Dependency security audit
         run: npm audit --audit-level=moderate
       - name: Typecheck
