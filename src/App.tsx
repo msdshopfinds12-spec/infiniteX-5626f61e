@@ -115,8 +115,8 @@ export default function App() {
                   <h2><GitBranch size={18} /> Pipeline examples</h2>
                   <p className="panel-description">These stages are illustrative and are not executing.</p>
                 </div>
-                <button className="btn btn-primary" type="button" onClick={() => setNotice("Pipeline creation is not connected yet. No pipeline was created.")}>
-                  <Play size={14} /> Create draft
+                <button className="btn btn-primary" type="button" onClick={() => setNotice("Preview only: pipeline creation is not connected. No pipeline was created.")}>
+                  <Play size={14} /> Preview draft flow
                 </button>
               </div>
               <PipelineBoard expanded />
