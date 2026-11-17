@@ -13,7 +13,8 @@
     "check:ci-policy": "node .github/scripts/verify-workflow-policy.mjs",
     "test:ci-policy": "node --test .github/scripts/verify-workflow-policy.test.mjs",
     "check:browser-boundary": "node .github/scripts/verify-browser-boundary.mjs",
-    "test:browser-boundary": "node --test .github/scripts/verify-browser-boundary.test.mjs"
+    "test:browser-boundary": "node --test .github/scripts/verify-browser-boundary.test.mjs",
+    "check:edge-function-security": "node .github/scripts/verify-edge-function-security.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
