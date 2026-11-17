@@ -58,7 +58,7 @@ export function optimizeIR(ir: IntermediateRepresentation, divisionPrecision = 1
     if (!left || !right) throw new CompilerError("IR_INVALID", "Optimizer encountered binary stack underflow.", 0);
 
     if (left.constant !== undefined && right.constant !== undefined) {
-      const value = foldBinary(instruction.op, left.constant, right.constant);
+      const value = foldBinary(instruction.op, left.constant, right.constant, divisionPrecision);
       stack.push({ instructions: [{ op: "constant", value }], constant: value });
     } else {
       stack.push({
