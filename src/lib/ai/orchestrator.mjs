@@ -89,6 +89,9 @@ export function createOrchestrator({
     record({ runId, agentId, providerId: agent.providerId, event: "run_started", at: startedAt });
 
     try {
+      if (controller.signal.aborted) {
+        throw new OrchestrationError("ABORTED", "The agent execution was cancelled.");
+      }
       const result = await Promise.race([
         Promise.resolve().then(() => provider.generate({
           input,
@@ -117,7 +120,10 @@ export function createOrchestrator({
         durationMs: Math.max(0, finishedAt - startedAt),
       });
     } catch (error) {
-      if (error instanceof OrchestrationError) throw error;
+      if (error instanceof OrchestrationError) {
+        record({ runId, agentId, providerId: agent.providerId, event: "run_failed", code: error.code, at: now() });
+        throw error;
+      }
       if (controller.signal.aborted) {
         const timedOut = controller.signal.reason?.name === "TimeoutError";
         const code = timedOut ? "TIMEOUT" : "ABORTED";
