@@ -1,4 +1,5 @@
-import { compileExpression } from "./index.ts";
+import { tokenize } from "./lexer.ts";
+import { parseTokens } from "./parser.ts";
 import { evaluateAst, type EvaluationOptions } from "./evaluator.ts";
 import { lowerToIR } from "./lower.ts";
 import { optimizeIR } from "./optimizer.ts";
