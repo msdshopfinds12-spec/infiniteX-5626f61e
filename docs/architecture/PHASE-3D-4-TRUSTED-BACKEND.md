@@ -1,9 +1,9 @@
 # Phase 3D-4 — Trusted Backend Execution Boundary
 
-Status: **PLAN / ARCHITECTURE GATE**  
+Status: **ARCHITECTURE + PARTIAL RUNTIME/AUTH PRIMITIVES; INTEGRATION GATES OPEN**  
 Branch: `feat/phase-3d4-trusted-backend`  
 Base: `ec4263d5a36a44d0afe9dfebd2b0141675d788ef`  
-Scope: documentation and security contracts only. No runtime backend, migration, secret, paid service, deployment, PR merge, or provider call is introduced by this commit.
+Initial commit scope was documentation and security contracts. Follow-up commits add a dependency-free read-only Node runtime and isolated authentication/authorization primitives. No production authentication integration, migration, secret, paid service, deployment, PR merge, or provider call has been introduced.
 
 ## 1. Objective
 
@@ -150,8 +150,8 @@ Any such operation requires separate explicit approval.
 - Branch existence: verified by GitHub branch search and creation response.
 - Base commit: verified as `ec4263d5a36a44d0afe9dfebd2b0141675d788ef`.
 - Candidate package metadata: inspected on the three named branches.
-- Runtime implementation: **NOT IMPLEMENTED**.
-- Tests/build: **NOT RUN**.
-- Database/RLS: **NOT VERIFIED**.
+- Runtime implementation: **PARTIAL** — health/status-only HTTP service plus isolated auth/session/CSRF/cookie/workspace-policy primitives; not wired as production middleware.
+- Tests/build: **TEST SOURCE COMMITTED; ACTUAL EXECUTION NOT VERIFIED**.
+- Database/RLS: **NOT IMPLEMENTED / NOT VERIFIED**.
 - Live AI providers: **NOT CONNECTED**.
 - Deployment/migration/merge: **NOT PERFORMED**.
