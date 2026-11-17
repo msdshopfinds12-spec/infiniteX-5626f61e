@@ -99,9 +99,9 @@ jobs:
         run: deno test --no-lock supabase/functions/_shared/worker-security.deno.test.ts
       - name: Type-check Supabase Edge Functions
         run: |
-          deno check --no-lock supabase/functions/simula-workflow-worker/index.ts
-          deno check --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
-          deno check --no-lock supabase/functions/ashaa-api-key-manager/index.ts
+          deno check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-worker/index.ts
+          deno check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
+          deno check --node-modules-dir=auto --no-lock supabase/functions/ashaa-api-key-manager/index.ts
 
   # Browser job intentionally skips npm cache to avoid concurrent same-key cache writes.
   browser-e2e:
