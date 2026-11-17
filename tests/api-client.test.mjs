@@ -23,9 +23,10 @@ test("sends JSON requests with safe fetch defaults", async () => {
       return jsonResponse({ ok: true });
     },
   });
-
-  const result = await client.request("status", { method: "POST", body: { ping: true } });
-  assert.deepEqual(result, { ok: true });
+  assert.deepEqual(
+    await client.request("status", { method: "POST", body: { ping: true } }),
+    { ok: true },
+  );
   assert.equal(observed.url, "https://api.example.test/v1/status");
   assert.equal(observed.init.credentials, "omit");
   assert.equal(observed.init.redirect, "error");
@@ -39,7 +40,6 @@ test("rejects cross-origin paths before calling fetch", async () => {
     baseUrl: "https://api.example.test",
     fetchImpl: async () => { called = true; return jsonResponse({}); },
   });
-
   await assert.rejects(
     client.request("https://attacker.example/collect"),
     (error) => error instanceof ApiClientError && error.code === "UNTRUSTED_URL",
@@ -52,7 +52,6 @@ test("does not expose server response bodies in HTTP errors", async () => {
     baseUrl: "https://api.example.test",
     fetchImpl: async () => new Response("private diagnostic payload", { status: 500 }),
   });
-
   await assert.rejects(client.request("/private"), (error) => {
     assert.equal(error.code, "HTTP_ERROR");
     assert.equal(error.status, 500);
@@ -61,28 +60,43 @@ test("does not expose server response bodies in HTTP errors", async () => {
   });
 });
 
-test("rejects unexpected content types and malformed JSON", async () => {
-  const htmlClient = createApiClient({
+test("accepts JSON and structured +json media types but rejects lookalikes", async () => {
+  const accepted = createApiClient({
     baseUrl: "https://api.example.test",
-    fetchImpl: async () => new Response("<html></html>", {
-      headers: { "content-type": "text/html" },
+    fetchImpl: async () => jsonResponse({ ok: true }, {
+      headers: { "content-type": "application/problem+json; charset=utf-8" },
+    }),
+  });
+  assert.deepEqual(await accepted.request("/data"), { ok: true });
+
+  const rejected = createApiClient({
+    baseUrl: "https://api.example.test",
+    fetchImpl: async () => new Response("{}", {
+      headers: { "content-type": "application/jsonp" },
     }),
   });
   await assert.rejects(
-    htmlClient.request("/data"),
+    rejected.request("/data"),
     (error) => error.code === "UNEXPECTED_CONTENT_TYPE",
   );
+});
 
-  const invalidJsonClient = createApiClient({
+test("rejects malformed JSON and invalid UTF-8", async () => {
+  const malformed = createApiClient({
     baseUrl: "https://api.example.test",
     fetchImpl: async () => new Response("{", {
       headers: { "content-type": "application/json" },
     }),
   });
-  await assert.rejects(
-    invalidJsonClient.request("/data"),
-    (error) => error.code === "INVALID_JSON",
-  );
+  await assert.rejects(malformed.request("/data"), (error) => error.code === "INVALID_JSON");
+
+  const invalidUtf8 = createApiClient({
+    baseUrl: "https://api.example.test",
+    fetchImpl: async () => new Response(new Uint8Array([0xff]), {
+      headers: { "content-type": "application/json" },
+    }),
+  });
+  await assert.rejects(invalidUtf8.request("/data"), (error) => error.code === "INVALID_JSON");
 });
 
 test("validates response contracts and supports 204 responses", async () => {
@@ -94,7 +108,6 @@ test("validates response contracts and supports 204 responses", async () => {
     client.request("/record", { validate: (value) => typeof value.id === "string" }),
     (error) => error.code === "INVALID_RESPONSE",
   );
-
   const emptyClient = createApiClient({
     baseUrl: "https://api.example.test",
     fetchImpl: async () => new Response(null, { status: 204 }),
@@ -114,25 +127,87 @@ test("rejects request bodies on GET and DELETE", async () => {
   );
 });
 
-test("converts timeouts into a stable error code", async () => {
+test("rejects oversized request bodies before calling fetch", async () => {
+  let called = false;
   const client = createApiClient({
+    baseUrl: "https://api.example.test",
+    maxRequestBytes: 8,
+    fetchImpl: async () => { called = true; return jsonResponse({}); },
+  });
+  await assert.rejects(
+    client.request("/write", { method: "POST", body: { value: "payload too long" } }),
+    (error) => error.code === "REQUEST_TOO_LARGE",
+  );
+  assert.equal(called, false);
+});
+
+test("rejects oversized response using content-length before reading", async () => {
+  const client = createApiClient({
+    baseUrl: "https://api.example.test",
+    maxResponseBytes: 4,
+    fetchImpl: async () => new Response('{"long":true}', {
+      headers: { "content-type": "application/json", "content-length": "13" },
+    }),
+  });
+  await assert.rejects(
+    client.request("/large"),
+    (error) => error.code === "RESPONSE_TOO_LARGE",
+  );
+});
+
+test("enforces response byte limit while streaming without content-length", async () => {
+  let cancelled = false;
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"value":"'));
+      controller.enqueue(new TextEncoder().encode("a".repeat(64)));
+    },
+    cancel() { cancelled = true; },
+  });
+  const client = createApiClient({
+    baseUrl: "https://api.example.test",
+    maxResponseBytes: 16,
+    fetchImpl: async () => new Response(body, {
+      headers: { "content-type": "application/json" },
+    }),
+  });
+  await assert.rejects(
+    client.request("/stream"),
+    (error) => error.code === "RESPONSE_TOO_LARGE",
+  );
+  assert.equal(cancelled, true);
+});
+
+test("converts timeouts and caller cancellation into stable error codes", async () => {
+  const timeoutClient = createApiClient({
     baseUrl: "https://api.example.test",
     timeoutMs: 5,
     fetchImpl: (_url, { signal }) => new Promise((_resolve, reject) => {
       signal.addEventListener("abort", () => reject(signal.reason), { once: true });
     }),
   });
+  await assert.rejects(timeoutClient.request("/slow"), (error) => error.code === "TIMEOUT");
 
+  const abortController = new AbortController();
+  abortController.abort();
+  const abortClient = createApiClient({
+    baseUrl: "https://api.example.test",
+    fetchImpl: (_url, { signal }) => Promise.reject(signal.reason),
+  });
   await assert.rejects(
-    client.request("/slow"),
-    (error) => error.code === "TIMEOUT",
+    abortClient.request("/cancelled", { signal: abortController.signal }),
+    (error) => error.code === "ABORTED",
   );
 });
 
-test("rejects unsupported HTTP methods and unsafe timeout values", async () => {
+test("rejects unsupported methods and invalid policy limits", async () => {
   assert.throws(
     () => createApiClient({ baseUrl: "https://api.example.test", timeoutMs: 0 }),
     /timeoutMs/,
+  );
+  assert.throws(
+    () => createApiClient({ baseUrl: "https://api.example.test", maxResponseBytes: 0 }),
+    /maxResponseBytes/,
   );
   const client = createApiClient({
     baseUrl: "https://api.example.test",

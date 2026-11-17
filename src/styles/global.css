@@ -1039,3 +1039,32 @@ input:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
+
+
+/* ---------- Phase 3D-2: consistent touch and keyboard targets ---------- */
+.nav-item {
+  min-height: 44px;
+}
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.btn {
+  min-height: 44px;
+}
+.notice-dismiss {
+  min-height: 44px;
+  padding: 8px 10px;
+}
+.search {
+  min-height: 44px;
+}
+button:focus-visible,
+input:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}

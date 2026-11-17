@@ -7,11 +7,13 @@ on:
       - chore/phase-3d4-p0-hardening
       - chore/phase-3b-frontend-foundation
       - fix/phase-3d1-ci-security-hardening
+      - fix/phase-3d2-frontend-security
   pull_request:
     branches:
       - main
       - feat/gh16-infiniteX-integration
       - chore/phase-3b-frontend-foundation
+      - fix/phase-3d1-ci-security-hardening
 
 permissions:
   contents: read
