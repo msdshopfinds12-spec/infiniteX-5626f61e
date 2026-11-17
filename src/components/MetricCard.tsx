@@ -13,7 +13,6 @@ export default function MetricCard({
   label,
   value,
   delta,
-  trend,
   icon: Icon,
   accent,
 }: {
