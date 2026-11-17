@@ -703,7 +703,7 @@ body {
 
 .log-line {
   display: grid;
-  grid-template-columns: 72px 56px 90px 1fr;
+  grid-template-columns: 56px 90px 1fr;
   gap: 12px;
   align-items: center;
 }
@@ -868,15 +868,12 @@ body {
   .log-line {
     min-width: 230px;
   }
-  .search input {
-    width: 120px;
-  }
   .pipeline-row {
     flex-direction: column;
     align-items: flex-start;
   }
   .log-line {
-    grid-template-columns: 64px 48px 1fr;
+    grid-template-columns: 56px 1fr;
   }
   .log-source {
     display: none;
