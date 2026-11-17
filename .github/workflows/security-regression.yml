@@ -34,6 +34,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dependency-audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source (immutable action pin)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up Node.js (immutable action pin)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install exact locked dependencies
+        run: npm ci
+      - name: Audit all dependency classes
+        run: npm audit --audit-level=moderate
+
   workflow-policy:
     name: Structural workflow security policy
     runs-on: ubuntu-24.04
@@ -54,8 +77,6 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install exact locked dependencies
         run: npm ci
-      - name: Audit dependencies
-        run: npm audit --audit-level=moderate
       - name: Scan all GitHub Actions workflows
         run: npm run check:ci-policy
       - name: Run positive and negative policy regression tests
