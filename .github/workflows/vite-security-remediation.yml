@@ -5,6 +5,7 @@ on:
     branches:
       - feat/gh16-infiniteX-integration
       - chore/phase-3d4-p0-hardening
+      - feat/phase-3d4-trusted-backend
     paths:
       - ".github/workflows/vite-security-remediation.yml"
       - "package.json"
@@ -14,6 +15,7 @@ on:
   pull_request:
     branches:
       - feat/gh16-infiniteX-integration
+      - feat/phase-3d4-trusted-backend
     paths:
       - ".github/workflows/vite-security-remediation.yml"
       - "package.json"
