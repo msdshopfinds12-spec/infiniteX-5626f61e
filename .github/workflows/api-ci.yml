@@ -5,6 +5,7 @@ on:
     branches:
       - feature/infiniteX-platform-integrations
       - feat/infiniteX-phase-3c-security-ci
+      - fix/phase-3c1-api-security-recovery
   pull_request:
     branches:
       - main
@@ -28,22 +29,23 @@ jobs:
         working-directory: apps/api
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
+          # Temporary until the dedicated API package-lock.json is generated and committed.
           cache-dependency-path: apps/api/package.json
 
-      # This API package currently has no committed package-lock.json.
-      # npm install is temporary until a reviewed lockfile is committed.
-      - name: Install dependencies
+      # BLOCKED: the API package has no committed lockfile yet. This install resolves
+      # semver ranges at run time and is not a reproducible substitute for npm ci.
+      - name: Install dependencies (temporary bootstrap)
         run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Dependency security audit
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=high
 
       - name: Typecheck
         run: npm run typecheck
