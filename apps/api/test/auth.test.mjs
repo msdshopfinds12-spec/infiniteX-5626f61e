@@ -58,6 +58,8 @@ test("session cookie is Secure, HttpOnly, host-prefixed, and path-bound", () => 
 test("cookie policy rejects insecure, invalid, or unbounded cookie values", () => {
   assert.throws(() => serializeSessionCookie({ name: "session", value: createOpaqueToken(), maxAgeSeconds: 60 }));
   assert.throws(() => serializeSessionCookie({ value: "bad", maxAgeSeconds: 60 }));
+  assert.throws(() => serializeSessionCookie({ value: "x".repeat(43), maxAgeSeconds: 60 }));
+  assert.equal(readSessionCookie("__Host-infinite_x_session=" + "x".repeat(43)), null);
   assert.throws(() => serializeSessionCookie({ value: createOpaqueToken(), maxAgeSeconds: -1 }));
   assert.throws(() => serializeSessionCookie({ value: createOpaqueToken(), maxAgeSeconds: 60, sameSite: "None" }));
   assert.match(serializeExpiredSessionCookie(), /Max-Age=0/);
@@ -160,4 +162,18 @@ test("role policy protects last active owner and reserves ownership transfer", (
   assert.equal(authorizeWorkspaceRoleChange({
     actorMembership: owner, targetMembership: target, newRole: "owner", activeOwnerCount: 2
   }).reason, "USE_EXPLICIT_OWNERSHIP_TRANSFER");
+});
+
+test("session service rejects timestamps outside the supported Date range", async () => {
+  const repository = {
+    async create() {},
+    async findActiveByTokenHash() { return null; },
+    async revokeByTokenHash() { return false; }
+  };
+  const service = createSessionService({
+    repository,
+    clock: () => 8_640_000_000_000_000,
+    ttlSeconds: 60
+  });
+  await assert.rejects(() => service.create({ userId: USER_ID }), /supported date range/);
 });
