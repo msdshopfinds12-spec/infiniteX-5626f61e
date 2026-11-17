@@ -17,6 +17,7 @@ assert.doesNotMatch(worker, /Access-Control-Allow-Origin["']?\s*:\s*["']\*["']/)
 
 assert.match(keyManager, /corsHeadersForRequest/);
 assert.match(keyManager, /if \(!cors\.allowed\)/);
+assert.match(keyManager, /readJsonBodyLimited\(req, 2048\)/);
 assert.doesNotMatch(keyManager, /Access-Control-Allow-Origin["']?\s*:\s*["']\*["']/);
 
 assert.match(cron, /simula_verify_worker_secret/);
