@@ -161,7 +161,6 @@ test("enforces response byte limit while streaming without content-length", asyn
     start(controller) {
       controller.enqueue(new TextEncoder().encode('{"value":"'));
       controller.enqueue(new TextEncoder().encode("a".repeat(64)));
-      controller.close();
     },
     cancel() { cancelled = true; },
   });
