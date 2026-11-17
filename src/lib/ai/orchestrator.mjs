@@ -6,9 +6,11 @@ export class OrchestrationError extends Error {
   }
 }
 
+let fallbackRunSequence = 0;
 function makeId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  return "run-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+  fallbackRunSequence += 1;
+  return "run-" + Date.now().toString(36) + "-" + fallbackRunSequence.toString(36);
 }
 
 /**
@@ -23,6 +25,7 @@ export function createOrchestrator({
   policy,
   providers = {},
   timeoutMs = 15_000,
+  maxAuditEvents = 500,
   idFactory = makeId,
   now = () => Date.now(),
 } = {}) {
@@ -38,11 +41,15 @@ export function createOrchestrator({
   if (!providers || typeof providers !== "object" || Array.isArray(providers)) {
     throw new TypeError("providers must be a provider adapter map.");
   }
+  if (!Number.isSafeInteger(maxAuditEvents) || maxAuditEvents < 1 || maxAuditEvents > 10_000) {
+    throw new TypeError("maxAuditEvents must be between 1 and 10000.");
+  }
 
   const auditEvents = [];
 
   function record(event) {
     auditEvents.push(Object.freeze({ ...event }));
+    if (auditEvents.length > maxAuditEvents) auditEvents.shift();
   }
 
   async function run({ agentId, input, signal } = {}) {
@@ -54,7 +61,7 @@ export function createOrchestrator({
       throw new OrchestrationError("AGENT_DISABLED", "The requested agent is not enabled.");
     }
 
-    const provider = providers[agent.providerId];
+    const provider = Object.hasOwn(providers, agent.providerId) ? providers[agent.providerId] : null;
     if (!provider || provider.enabled !== true || typeof provider.generate !== "function") {
       throw new OrchestrationError("PROVIDER_UNAVAILABLE", "No enabled provider adapter is configured.");
     }
