@@ -47,7 +47,7 @@ No provider credentials, API calls, repository writes, autonomous code changes, 
 
 ### Remaining verification
 
-- Final CI run against the committed lockfile and final read-only workflow: pending
+- Final locked CI run #198 (`44082357988`) on commit `3d6948b68516e32ceffb2dff4123e125eb929701`: **passed**.
 - Manual mobile browser QA: not performed
 - Production security audit: not performed
 - AI repository end-to-end connection: not performed
