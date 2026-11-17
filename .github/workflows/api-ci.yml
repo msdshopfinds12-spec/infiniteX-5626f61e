@@ -44,6 +44,15 @@ jobs:
       - name: Install dependencies (temporary bootstrap)
         run: npm install --ignore-scripts --no-audit --no-fund
 
+      - name: Export generated API lockfile for reviewed commit
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: api-package-lock-bootstrap
+          path: apps/api/package-lock.json
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Dependency security audit
         run: npm audit --audit-level=high
 
