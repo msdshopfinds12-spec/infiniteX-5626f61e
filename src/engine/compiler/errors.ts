@@ -8,7 +8,11 @@ export type CompilerErrorCode =
   | "EXPECTED_CLOSING_PAREN"
   | "TRAILING_TOKEN"
   | "NESTING_LIMIT_EXCEEDED"
-  | "INVALID_DIVISION_PRECISION";
+  | "INVALID_DIVISION_PRECISION"
+  | "AST_INVALID"
+  | "AST_LIMIT_EXCEEDED"
+  | "IR_INVALID"
+  | "IR_LIMIT_EXCEEDED";
 
 export class CompilerError extends Error {
   readonly code: CompilerErrorCode;
