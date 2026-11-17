@@ -1,38 +1,37 @@
-interface LogLine {
-  time: string;
-  level: "info" | "warn" | "error";
-  source: string;
-  message: string;
-}
+import { Terminal } from "lucide-react";
+import type { LogEntry } from "../types";
 
-const logs: LogLine[] = [
-  { time: "06:41:02", level: "info", source: "atlas", message: "Plan generated: 6 steps, 2 agents" },
-  { time: "06:41:05", level: "info", source: "forge", message: "Generated 4 files for auth-service" },
-  { time: "06:41:09", level: "warn", source: "vault", message: "Dependency 'legacy-crypto' flagged for review" },
-  { time: "06:41:12", level: "info", source: "billing-api", message: "Deploy stage started" },
-  { time: "06:41:18", level: "error", source: "pulse", message: "Health probe timed out, retrying (2/3)" },
-  { time: "06:41:22", level: "info", source: "sentinel", message: "Diff queued, awaiting review slot" },
-  { time: "06:41:26", level: "info", source: "forge", message: "Tests: 142 passed, 0 failed" },
+export const demoLogEntries: LogEntry[] = [
+  { id: "log-1", time: "09:00:01", level: "info", source: "control-plane", message: "Local demo workspace initialized." },
+  { id: "log-2", time: "09:00:03", level: "warn", source: "agent-registry", message: "Candidate adapters are listed as NOT CONNECTED." },
+  { id: "log-3", time: "09:00:05", level: "info", source: "policy-engine", message: "Remote execution remains disabled." },
 ];
 
-const levelClass: Record<LogLine["level"], string> = {
-  info: "log-info",
-  warn: "log-warn",
-  error: "log-error",
-};
+export default function LogStream({
+  entries,
+  compact = false,
+}: {
+  entries: LogEntry[];
+  compact?: boolean;
+}) {
+  const visible = compact ? entries.slice(0, 5) : entries;
+  if (visible.length === 0) {
+    return <div className="empty-state">No activity matches this search.</div>;
+  }
 
-export default function LogStream({ compact = false }: { compact?: boolean }) {
-  const lines = compact ? logs.slice(0, 5) : logs;
   return (
-    <div className="log-stream">
-      {lines.map((l, i) => (
-        <div key={i} className="log-line">
-          <span className="log-time">{l.time}</span>
-          <span className={`log-level ${levelClass[l.level]}`}>{l.level}</span>
-          <span className="log-source">{l.source}</span>
-          <span className="log-message">{l.message}</span>
-        </div>
-      ))}
+    <div className="log-panel">
+      <div className="log-panel-label"><Terminal size={14} /> LOCAL DEMO EVENTS</div>
+      <div className="log-list" role="log" aria-label="Local demo activity">
+        {visible.map((entry) => (
+          <div className="log-entry" key={entry.id}>
+            <time>{entry.time}</time>
+            <span className={"log-level level-" + entry.level}>{entry.level}</span>
+            <span className="log-source">{entry.source}</span>
+            <p>{entry.message}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

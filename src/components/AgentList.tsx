@@ -1,49 +1,42 @@
-import { Dot } from "lucide-react";
+import { ArrowUpRight, Bot, LockKeyhole } from "lucide-react";
+import { agentIntegrations } from "../lib/agentRegistry";
 
-interface Agent {
-  id: string;
-  name: string;
-  role: string;
-  status: "running" | "idle" | "error";
-  task: string;
-}
+export default function AgentList({
+  compact = false,
+  searchTerm = "",
+}: {
+  compact?: boolean;
+  searchTerm?: string;
+}) {
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filtered = agentIntegrations.filter((agent) => {
+    const searchable = [agent.name, agent.repository, agent.role, agent.purpose].join(" ").toLowerCase();
+    return searchable.includes(normalizedSearch);
+  });
+  const visible = compact ? filtered.slice(0, 4) : filtered;
 
-const agents: Agent[] = [
-  { id: "a1", name: "Atlas", role: "Planner", status: "running", task: "Decomposing feature spec" },
-  { id: "a2", name: "Forge", role: "Codegen", status: "running", task: "Writing API endpoints" },
-  { id: "a3", name: "Sentinel", role: "Reviewer", status: "idle", task: "Awaiting next diff" },
-  { id: "a4", name: "Vault", role: "Security", status: "running", task: "Scanning dependencies" },
-  { id: "a5", name: "Pulse", role: "Monitor", status: "error", task: "Retrying after timeout" },
-  { id: "a6", name: "Quill", role: "Docs", status: "idle", task: "Queued for release notes" },
-];
+  if (visible.length === 0) {
+    return <div className="empty-state">No candidate adapters match this search.</div>;
+  }
 
-const statusClass: Record<Agent["status"], string> = {
-  running: "status-running",
-  idle: "status-idle",
-  error: "status-error",
-};
-
-export default function AgentList({ compact = false }: { compact?: boolean }) {
-  const list = compact ? agents.slice(0, 4) : agents;
   return (
-    <ul className="agent-list">
-      {list.map((a) => (
-        <li key={a.id} className="agent-row">
-          <div className="agent-id">
-            <span className={`agent-dot ${statusClass[a.status]}`}>
-              <Dot size={18} />
-            </span>
-            <div>
-              <div className="agent-name">{a.name}</div>
-              <div className="agent-role">{a.role}</div>
-            </div>
+    <div className="agent-grid">
+      {visible.map((agent) => (
+        <article className="agent-card" key={agent.id}>
+          <div className="agent-card-top">
+            <span className="agent-icon"><Bot size={18} /></span>
+            <span className="state-pill state-muted"><span className="state-dot" /> NOT CONNECTED</span>
           </div>
-          <div className="agent-task">
-            <span className={`status-pill ${statusClass[a.status]}`}>{a.status}</span>
-            <span className="agent-task-text">{a.task}</span>
+          <h3>{agent.name}</h3>
+          <p className="agent-role">{agent.role}</p>
+          <p className="agent-description">{agent.purpose}</p>
+          <div className="agent-card-footer">
+            <span><LockKeyhole size={13} /> Server-side credentials</span>
+            <span className="adapter-link" title={agent.repository}><ArrowUpRight size={14} /></span>
           </div>
-        </li>
+          <code className="repo-name">{agent.repository}</code>
+        </article>
       ))}
-    </ul>
+    </div>
   );
 }

@@ -1,13 +1,15 @@
-import { Activity, Bot, GitBranch, Settings, ShieldCheck, Terminal, Zap, type LucideIcon } from "lucide-react";
+import {
+  Activity, Bot, GitBranch, Layers3, ShieldCheck, Workflow, Zap, type LucideIcon,
+} from "lucide-react";
 import type { ViewKey } from "../types";
 
-const nav: { key: ViewKey; label: string; icon: LucideIcon }[] = [
+const navigation: { key: ViewKey; label: string; icon: LucideIcon }[] = [
   { key: "overview", label: "Overview", icon: Activity },
   { key: "agents", label: "AI Agents", icon: Bot },
-  { key: "pipelines", label: "Pipelines", icon: GitBranch },
-  { key: "logs", label: "Log Stream", icon: Terminal },
-  { key: "security", label: "Security", icon: ShieldCheck },
-  { key: "settings", label: "Settings", icon: Settings },
+  { key: "pipelines", label: "Workflows", icon: Workflow },
+  { key: "activity", label: "Activity", icon: GitBranch },
+  { key: "security", label: "Guardrails", icon: ShieldCheck },
+  { key: "integrations", label: "Integrations", icon: Layers3 },
 ];
 
 export default function Sidebar({
@@ -15,43 +17,42 @@ export default function Sidebar({
   onChange,
 }: {
   view: ViewKey;
-  onChange: (v: ViewKey) => void;
+  onChange: (nextView: ViewKey) => void;
 }) {
   return (
-    <aside className="sidebar">
-      <div className="brand">
-        <div className="brand-mark">
-          <Zap size={18} />
-        </div>
-        <div className="brand-text">
-          <span className="brand-title">Bolt OS</span>
-          <span className="brand-sub">AI Engineering</span>
-        </div>
-      </div>
-      <nav className="nav">
-        {nav.map((item) => {
+    <aside className="sidebar" aria-label="Primary navigation">
+      <a className="brand" href="#main-content" aria-label="InfiniteX home">
+        <span className="brand-mark"><Zap size={19} strokeWidth={2.4} /></span>
+        <span className="brand-copy"><strong>InfiniteX</strong><small>ENGINEERING OS</small></span>
+      </a>
+      <div className="nav-caption">WORKSPACE</div>
+      <nav className="nav-list">
+        {navigation.map((item) => {
           const Icon = item.icon;
           const active = view === item.key;
           return (
             <button
               key={item.key}
-              className={`nav-item${active ? " active" : ""}`}
+              type="button"
+              className={active ? "nav-item active" : "nav-item"}
+              aria-current={active ? "page" : undefined}
+              aria-label={item.label}
+              title={item.label}
               onClick={() => onChange(item.key)}
             >
               <Icon size={18} />
               <span>{item.label}</span>
+              {active && <i className="nav-active-mark" aria-hidden="true" />}
             </button>
           );
         })}
       </nav>
-      <div className="sidebar-foot">
-        <div className="user-chip">
-          <div className="avatar">AE</div>
-          <div className="user-meta">
-            <span className="user-name">AI Engineer</span>
-            <span className="user-role">workspace owner</span>
-          </div>
+      <div className="sidebar-bottom">
+        <div className="workspace-chip">
+          <span className="workspace-avatar">IX</span>
+          <span><strong>Local workspace</strong><small>Demo environment</small></span>
         </div>
+        <div className="sidebar-footnote">No remote actions enabled</div>
       </div>
     </aside>
   );

@@ -1,79 +1,64 @@
-import { GitBranch } from "lucide-react";
+import { GitBranch, ShieldCheck } from "lucide-react";
+import type { Pipeline } from "../types";
 
-interface Stage {
-  name: string;
-  status: "passed" | "running" | "queued" | "failed";
-}
-
-interface Pipeline {
-  id: string;
-  name: string;
-  branch: string;
-  stages: Stage[];
-}
-
-const pipelines: Pipeline[] = [
+export const demoPipelines: Pipeline[] = [
   {
-    id: "p1",
-    name: "auth-service",
-    branch: "main",
+    id: "demo-quality",
+    name: "Quality gate preview",
+    branch: "local/demo",
     stages: [
-      { name: "Lint", status: "passed" },
-      { name: "Build", status: "passed" },
-      { name: "Test", status: "running" },
-      { name: "Deploy", status: "queued" },
+      { name: "Inspect", status: "demo" },
+      { name: "Type-check", status: "planned" },
+      { name: "Test", status: "planned" },
+      { name: "Human review", status: "blocked" },
     ],
   },
   {
-    id: "p2",
-    name: "billing-api",
-    branch: "release/2.4",
+    id: "demo-ai",
+    name: "AI adapter proposal",
+    branch: "local/demo",
     stages: [
-      { name: "Lint", status: "passed" },
-      { name: "Build", status: "passed" },
-      { name: "Test", status: "passed" },
-      { name: "Deploy", status: "running" },
-    ],
-  },
-  {
-    id: "p3",
-    name: "web-dashboard",
-    branch: "feat/insights",
-    stages: [
-      { name: "Lint", status: "passed" },
-      { name: "Build", status: "failed" },
-      { name: "Test", status: "queued" },
-      { name: "Deploy", status: "queued" },
+      { name: "Inventory", status: "demo" },
+      { name: "Plan", status: "demo" },
+      { name: "Connect", status: "blocked" },
+      { name: "Approval", status: "blocked" },
     ],
   },
 ];
 
-const stageClass: Record<Stage["status"], string> = {
-  passed: "stage-passed",
-  running: "stage-running",
-  queued: "stage-queued",
-  failed: "stage-failed",
-};
+export default function PipelineBoard({
+  pipelines,
+  expanded = false,
+}: {
+  pipelines: Pipeline[];
+  expanded?: boolean;
+}) {
+  if (pipelines.length === 0) {
+    return <div className="empty-state">No local workflows match this search.</div>;
+  }
 
-export default function PipelineBoard({ expanded = false }: { expanded?: boolean }) {
   return (
-    <div className="pipeline-board">
-      {pipelines.map((p) => (
-        <div key={p.id} className="pipeline-row">
-          <div className="pipeline-meta">
-            <GitBranch size={16} />
-            <span className="pipeline-name">{p.name}</span>
-            <span className="pipeline-branch">{p.branch}</span>
+    <div className="pipeline-list">
+      {pipelines.map((pipeline) => (
+        <article className="pipeline-card" key={pipeline.id}>
+          <div className="pipeline-header">
+            <div className="pipeline-identity">
+              <span className="pipeline-icon"><GitBranch size={16} /></span>
+              <div><strong>{pipeline.name}</strong><small>{pipeline.branch}</small></div>
+            </div>
+            <span className="state-pill state-demo">LOCAL DEMO</span>
           </div>
-          <div className={`pipeline-stages${expanded ? " expanded" : ""}`}>
-            {p.stages.map((s) => (
-              <div key={s.name} className={`stage ${stageClass[s.status]}`}>
-                <span className="stage-name">{s.name}</span>
-                <span className="stage-status">{s.status}</span>
+          <div className={expanded ? "pipeline-stages expanded" : "pipeline-stages"}>
+            {pipeline.stages.map((stage) => (
+              <div className={"pipeline-stage stage-" + stage.status} key={stage.name}>
+                <span className="stage-marker" />
+                <span>{stage.name}</span>
+                <small>{stage.status === "blocked" ? "approval needed" : stage.status}</small>
               </div>
             ))}
           </div>
-        </div>
+          <div className="pipeline-note"><ShieldCheck size={14} /> No repository, deployment, or provider action is performed.</div>
+        </article>
       ))}
     </div>
   );

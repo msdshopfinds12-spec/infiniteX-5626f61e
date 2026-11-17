@@ -1,27 +1,31 @@
 import { useEffect, useState } from "react";
+import type { Theme } from "../types";
 
-export type Theme = "dark" | "light";
+const STORAGE_KEY = "infinitex-theme";
 
-const STORAGE_KEY = "bolt-os-theme";
-
-function getInitialTheme(): Theme {
+function readStoredTheme(): Theme {
   if (typeof window === "undefined") return "dark";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "dark" || stored === "light") return stored;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === "light" || stored === "dark") return stored;
+  } catch {
+    // Storage may be unavailable in restricted browser contexts.
+  }
   return "dark";
 }
 
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [theme, setTheme] = useState<Theme>(readStoredTheme);
 
   useEffect(() => {
-    const root = document.documentElement;
-    root.setAttribute("data-theme", theme);
-    window.localStorage.setItem(STORAGE_KEY, theme);
+    document.documentElement.setAttribute("data-theme", theme);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      // Theme remains functional for the current session.
+    }
   }, [theme]);
 
-  const toggleTheme = () =>
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-
+  const toggleTheme = () => setTheme((current) => current === "dark" ? "light" : "dark");
   return { theme, toggleTheme };
 }

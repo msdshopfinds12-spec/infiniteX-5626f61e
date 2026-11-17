@@ -19,9 +19,9 @@ concurrency:
 
 jobs:
   validate:
-    name: Install, type-check, audit, and build
+    name: Install, type-check, test, audit, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout source
@@ -35,29 +35,30 @@ jobs:
           node-version: "22"
           cache: npm
 
+      # One-time bootstrap: this step is removed after its generated lockfile is committed.
+      - name: Bootstrap refreshed lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
       - name: Install locked dependencies
         run: npm ci
 
       - name: Type-check application sources
-        run: npx tsc --noEmit -p tsconfig.json
+        run: npm run lint
 
-      - name: Report dependency advisories (non-blocking)
-        shell: bash
-        run: |
-          npm audit --json > "$RUNNER_TEMP/npm-audit.json" || true
-          node - "$RUNNER_TEMP/npm-audit.json" <<'NODE'
-          const fs = require("node:fs");
-          const report = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-          if (report.error) {
-            console.log(`npm audit report unavailable: ${report.error.summary || report.error.code}`);
-            process.exit(0);
-          }
-          const entries = Object.entries(report.vulnerabilities || {});
-          console.log(`Affected package count: ${entries.length}`);
-          for (const [name, item] of entries) {
-            console.log(`${name}: severity=${item.severity}; direct=${item.isDirect}; fixAvailable=${JSON.stringify(item.fixAvailable)}`);
-          }
-          NODE
+      - name: Run automated tests
+        run: npm test
+
+      - name: Enforce high and critical dependency audit gate
+        run: npm audit --audit-level=high
 
       - name: Build production bundle
         run: npm run build
+
+      - name: Export generated lockfile for one-time repository update
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: phase2-generated-lockfile
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 1
