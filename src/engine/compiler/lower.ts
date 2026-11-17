@@ -30,7 +30,7 @@ export function lowerToIR(root: Expression): IntermediateRepresentation {
         instructions.push({ op: OPERATION_MAP[node.operator] });
         return;
       default:
-        throw new CompilerError("AST_INVALID", "Cannot lower an unknown AST node.", node.start);
+        throw new CompilerError("AST_INVALID", "Cannot lower an unknown AST node.", 0);
     }
   };
 
