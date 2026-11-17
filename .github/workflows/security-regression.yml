@@ -6,6 +6,7 @@ on:
       - security/phase-3d-4l-regression
       - fix/phase-4m1a-ci-coverage
       - fix/phase-4m1b-browser-boundary
+      - test/phase-4m3-tenant-isolation-contracts
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -17,6 +18,7 @@ on:
       - feat/phase-3d4-trusted-backend
       - phase-4m-ai-orchestration-readiness
       - fix/phase-4m1a-ci-coverage
+      - fix/phase-4m2c-deno-tenant-isolation
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
