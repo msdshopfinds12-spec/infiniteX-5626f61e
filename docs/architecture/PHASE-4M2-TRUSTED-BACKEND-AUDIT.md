@@ -224,3 +224,51 @@ Supabase is now **VERIFIED as an existing live project and schema**, not merely 
 6. Reconcile repository schema/migrations with the 18 live migrations before proposing any new migration.
 
 **Change-control:** This addendum is documentation-only. It does not authorize schema changes, policy changes, Edge Function redeployments, secret rotation, runtime flag changes, or production data changes.
+
+
+---
+
+## Live privilege and worker-source verification — 2026-11-18
+
+### Webhook event table: browser access is not granted
+
+A read-only privilege check confirmed:
+
+| Role | SELECT | INSERT |
+|---|---:|---:|
+| `anon` | false | false |
+| `authenticated` | false | false |
+| `service_role` | true | true |
+
+The table's RLS-enabled/no-policy advisor finding is therefore **not evidence of current direct browser access**. The observed grants support a server-only design. Keep it that way unless a reviewed use case proves otherwise. The advisor finding remains visible and should be documented as intentional only after the webhook writer and operational ownership are identified.
+
+No active Edge Function named or visibly implementing a billing webhook receiver was found in the three-function inventory. Do not infer that webhook signature verification or idempotent ingestion is implemented merely because the event table exists.
+
+### Worker source: important ownership asymmetry
+
+The authenticated `simula-workflow-worker` does the following:
+
+1. Validates the bearer token with `auth.getUser(token)`.
+2. Claims runs through the user-scoped `simula_claim_workflow_runs` RPC.
+3. Uses a service-role client for workflow-step reads and run/step writes.
+4. Filters step-run reads and writes by `owner_id`.
+5. Does **not** explicitly verify each returned claimed run's `owner_id` equals the authenticated user's ID before privileged processing.
+6. Reads `workflow_steps` by `workflow_id` without first validating that the workflow row's `owner_id` matches the authenticated user.
+
+The RPC is intended to enforce user scope, but service-role execution makes explicit post-claim ownership checks a valuable defense-in-depth control. Treat this as a high-priority source-level finding pending tests of the RPC and actual RLS/grant behavior.
+
+The secret-authenticated cron worker differs: it verifies the worker secret, calls the internal claim RPC, and verifies the workflow row by both `workflow_id` and `owner_id` before reading steps. This is stronger explicit ownership validation in the inspected source. Its workflow-step query is still keyed by the globally unique `workflow_id`; keep the prior ownership check mandatory.
+
+### API-key manager
+
+The active `ashaa-api-key-manager` function validates the bearer token with `auth.getUser`, derives `owner_id` from the verified user, and scopes list/revoke operations by that owner. It stores a SHA-256 digest and returns the raw generated key once. Its wildcard CORS origin is a browser-origin hardening issue, not a replacement for authentication or ownership authorization.
+
+### Revised priority list
+
+1. **P0 before enabling user workflow execution:** validate every claimed run's owner against the authenticated principal; validate the parent workflow owner before any service-role step read; add cross-owner negative tests.
+2. **P1:** replace wildcard CORS on the two user-facing functions with an exact allowlist based on verified production/staging frontend origins; test OPTIONS, allowed origins, disallowed origins, and non-browser requests.
+3. **P1:** identify and inspect the actual billing webhook ingress outside the current three-function inventory; if none exists, keep billing event ingestion disabled until signature verification, replay protection, idempotency, and provider-event mapping are designed.
+4. **P2:** document the no-browser-grant posture for `billing_webhook_events` and confirm operational service-role write ownership.
+5. **P2:** add integration tests for API-key owner isolation, revoked/expired keys, workflow claim ownership, and worker retry/idempotency.
+
+**No live changes were made.** This section records source and privilege observations only. Any remediation must be proposed as a separate reviewed implementation, with tests, and must not be applied directly to the live Supabase project.
