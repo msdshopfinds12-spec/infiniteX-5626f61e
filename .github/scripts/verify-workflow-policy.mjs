@@ -3,8 +3,8 @@ import { pathToFileURL } from "node:url";
 import { parseDocument } from "yaml";
 
 const workflowDir = new URL("../../.github/workflows/", import.meta.url);
-const SHA_PIN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[a-f0-9]{40}$/i;
-const UNTRUSTED_CONTEXT = /\$\{\{\s*github\.(?:event(?:\.|}|$)|head_ref\b|ref_name\b|actor\b|triggering_actor\b)/i;
+const SHA_PIN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[a-f0-9]{40}$/i;
+const UNTRUSTED_CONTEXT = /\$\{\{\s*github\.(?:event(?:\.|}|$)|head_ref\b|ref\b|ref_name\b|actor\b|triggering_actor\b)/i;
 const SECRET_CONTEXT = /\$\{\{\s*secrets\./i;
 
 function isRecord(value) {
