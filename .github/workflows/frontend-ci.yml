@@ -46,6 +46,7 @@ jobs:
       - name: Build production assets
         run: npm run build
 
+  # Browser job intentionally skips npm cache to avoid concurrent same-key cache writes.
   browser-e2e:
     name: Playwright and axe accessibility browser tests
     runs-on: ubuntu-24.04
