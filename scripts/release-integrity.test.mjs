@@ -49,7 +49,7 @@ test("rejects missing and unmanifested files", async () => {
 
 test("rejects symbolic links instead of following them", async () => {
   await withArtifactDirectory(async (root) => {
-    const outside = path.join(root, "..", "outside-infinite-x.txt");
+    const outside = path.join(os.tmpdir(), `outside-${path.basename(root)}.txt`);
     await writeFile(outside, "outside");
     await symlink(outside, path.join(root, "linked.txt"));
     try {

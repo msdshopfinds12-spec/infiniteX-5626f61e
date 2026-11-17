@@ -10,6 +10,10 @@ import { fileURLToPath } from "node:url";
 
 const MANIFEST_NAME = "SHA256SUMS.txt";
 
+function comparePaths(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function normalizeRelativePath(value) {
   if (
     typeof value !== "string" ||
@@ -40,7 +44,7 @@ async function listArtifactFiles(root) {
 
   async function visit(directory, prefix = "") {
     const entries = await readdir(directory, { withFileTypes: true });
-    entries.sort((a, b) => a.name.localeCompare(b.name, "en"));
+    entries.sort((a, b) => comparePaths(a.name, b.name));
 
     for (const entry of entries) {
       const relative = normalizeRelativePath(
@@ -63,7 +67,7 @@ async function listArtifactFiles(root) {
   }
 
   await visit(root);
-  return result.sort((a, b) => a.relative.localeCompare(b.relative, "en"));
+  return result.sort((a, b) => comparePaths(a.relative, b.relative));
 }
 
 function sha256(data) {
@@ -129,7 +133,7 @@ export async function verifyManifest(rootDirectory = "dist") {
 
   const sortedPaths = records.map((record) => record.relative)
     .slice()
-    .sort((a, b) => a.localeCompare(b, "en"));
+    .sort(comparePaths);
 
   if (records.some((record, index) => record.relative !== sortedPaths[index])) {
     throw new Error("Checksum records are not in canonical sorted order.");
@@ -162,13 +166,13 @@ async function main() {
 
   if (mode === "create") {
     const result = await createManifest(root);
-    process.stdout.write(`Created SHA-256 manifest for ${result.fileCount} files.\\n`);
+    process.stdout.write(`Created SHA-256 manifest for ${result.fileCount} files.\n`);
     return;
   }
 
   if (mode === "verify") {
     const result = await verifyManifest(root);
-    process.stdout.write(`Verified SHA-256 manifest for ${result.fileCount} files.\\n`);
+    process.stdout.write(`Verified SHA-256 manifest for ${result.fileCount} files.\n`);
     return;
   }
 
@@ -177,7 +181,7 @@ async function main() {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
-    process.stderr.write(`Release integrity check failed: ${error.message}\\n`);
+    process.stderr.write(`Release integrity check failed: ${error.message}\n`);
     process.exitCode = 1;
   });
 }
