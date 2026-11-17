@@ -1,0 +1,60 @@
+name: Vite Security Remediation Preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vite-security-remediation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preview-remediation:
+    name: Generate and verify patched dependency lockfile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Generate candidate Vite 6 lockfile (runner only)
+        run: npm install --package-lock-only --ignore-scripts --save-dev vite@^6.4.6
+
+      - name: Install exactly from candidate lockfile
+        run: npm ci
+
+      - name: Verify resolved toolchain
+        run: npm ls vite esbuild @vitejs/plugin-react
+
+      - name: Enforce dependency security audit
+        run: npm audit --audit-level=moderate
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build production assets
+        run: npm run build
+
+      - name: Upload candidate manifests for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vite-security-remediation-candidate
+          path: |
+            package.json
+            package-lock.json
+          if-no-files-found: error
+          retention-days: 7
