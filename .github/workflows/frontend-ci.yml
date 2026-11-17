@@ -71,6 +71,8 @@ jobs:
       - name: Test Edge worker ownership and request-boundary policies
         run: npm run test:edge-worker-security
       - name: Dependency security audit
+        id: dependency_audit
+        continue-on-error: true
         run: npm audit --audit-level=moderate
       - name: Typecheck
         run: npm run lint
@@ -78,6 +80,15 @@ jobs:
         run: npm test
       - name: Build production assets
         run: npm run build
+      - name: Enforce dependency audit result
+        if: always()
+        env:
+          AUDIT_OUTCOME: ${{ steps.dependency_audit.outcome }}
+        run: |
+          if [ "$AUDIT_OUTCOME" != "success" ]; then
+            echo "Dependency audit failed; release remains blocked."
+            exit 1
+          fi
 
   deno-worker-security:
     name: Deno worker runtime tests and type checks
