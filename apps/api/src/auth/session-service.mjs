@@ -52,7 +52,11 @@ export function createSessionService({
         throw new TypeError("csrfFactory returned an invalid token pair");
       }
 
-      const expiresAt = new Date(now + ttlSeconds * 1000).toISOString();
+      const expiresAtMs = now + ttlSeconds * 1000;
+      if (!Number.isSafeInteger(expiresAtMs) || expiresAtMs > 8_640_000_000_000_000) {
+        throw new RangeError("Session expiry is outside the supported date range");
+      }
+      const expiresAt = new Date(expiresAtMs).toISOString();
       await repository.create({
         userId: userId.toLowerCase(),
         tokenHash,
