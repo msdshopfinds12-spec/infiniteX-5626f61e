@@ -1,20 +1,30 @@
 from __future__ import annotations
+
 import json
 import math
 import re
+
 from .tokens import Token, TokenKind
+
 
 class LexError(ValueError):
     def __init__(self, message: str, line: int, column: int, code: str = "GET-L001") -> None:
         super().__init__(message)
         self.message, self.line, self.column, self.code = message, line, column, code
 
+
 _NUMBER = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
 _IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-_KEYWORDS = {"let": TokenKind.LET, "emit": TokenKind.EMIT, "true": TokenKind.TRUE, "false": TokenKind.FALSE, "null": TokenKind.NULL}
+_KEYWORDS = {
+    "let": TokenKind.LET, "emit": TokenKind.EMIT, "true": TokenKind.TRUE,
+    "false": TokenKind.FALSE, "null": TokenKind.NULL,
+}
+
 
 class Lexer:
     def __init__(self, source: str, max_tokens: int = 10_000) -> None:
+        if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or max_tokens < 1:
+            raise ValueError("max_tokens must be a positive integer")
         self.source, self.max_tokens = source, max_tokens
         self.i, self.line, self.column = 0, 1, 1
         self.tokens: list[Token] = []
@@ -88,7 +98,7 @@ class Lexer:
                 value = True if kind is TokenKind.TRUE else False if kind is TokenKind.FALSE else None if kind is TokenKind.NULL else raw
                 self._add(kind, raw, value, line, col)
                 continue
-            single = {"=": TokenKind.EQUAL, ";": TokenKind.SEMICOLON}
+            single = {"=": TokenKind.EQUAL, ":": TokenKind.COLON, ";": TokenKind.SEMICOLON}
             if ch in single:
                 self._advance()
                 self._add(single[ch], ch, ch, line, col)

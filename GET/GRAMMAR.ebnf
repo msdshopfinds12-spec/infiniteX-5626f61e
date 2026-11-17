@@ -1,7 +1,8 @@
 program = { statement } ;
 statement = let_statement | emit_statement ;
-let_statement = "let" , identifier , "=" , value , ";" ;
+let_statement = "let" , identifier , [ ":" , type_name ] , "=" , value , ";" ;
 emit_statement = "emit" , value , ";" ;
+type_name = "string" | "number" | "boolean" | "null" ;
 value = string | number | boolean | "null" | identifier ;
 identifier = ( letter | "_" ) , { letter | digit | "_" } ;
 string = '"' , { string_char | escape } , '"' ;

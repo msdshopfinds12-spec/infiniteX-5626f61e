@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 
+
 class TokenKind(Enum):
     LET = auto()
     EMIT = auto()
@@ -11,8 +12,10 @@ class TokenKind(Enum):
     STRING = auto()
     NUMBER = auto()
     EQUAL = auto()
+    COLON = auto()
     SEMICOLON = auto()
     EOF = auto()
+
 
 @dataclass(frozen=True, slots=True)
 class Token:
