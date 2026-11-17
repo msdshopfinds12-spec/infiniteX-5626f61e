@@ -1,0 +1,14 @@
+program = { statement } ;
+statement = let_statement | emit_statement ;
+let_statement = "let" , identifier , "=" , value , ";" ;
+emit_statement = "emit" , value , ";" ;
+value = string | number | boolean | "null" | identifier ;
+identifier = ( letter | "_" ) , { letter | digit | "_" } ;
+string = '"' , { string_char | escape } , '"' ;
+number = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] , [ ( "e" | "E" ) , [ "+" | "-" ] , digit , { digit } ] ;
+boolean = "true" | "false" ;
+escape = "\\" , ( '"' | "\\" | "/" | "b" | "f" | "n" | "r" | "t" | "u" , hex , hex , hex , hex ) ;
+letter = ? ASCII A-Z or a-z ? ;
+digit = ? ASCII 0-9 ? ;
+hex = digit | ? ASCII A-F or a-f ? ;
+string_char = ? Unicode scalar except quote, backslash, and control characters ? ;
