@@ -4,8 +4,10 @@
 
 1. `npm ci`
 2. `npm run lint`
-3. `npm run build`
-4. Run the numeric test suite once a test runner is approved/installed, or use a temporary external harness without adding production dependencies.
+3. `npm test` — Node's built-in test runner with Vite's existing build API; no additional package is required.
+4. `npm run build`
+
+The test harness bundles the TypeScript numeric entry point in memory with the project's existing Vite dependency, then executes regression tests using `node:test`.
 
 ## Required test vectors
 
