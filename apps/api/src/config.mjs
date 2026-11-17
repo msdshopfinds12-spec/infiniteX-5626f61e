@@ -1,4 +1,3 @@
-const DEFAULT_BODY_LIMIT_BYTES = 16 * 1024;
 const DEFAULT_PORT = 8787;
 
 function parsePort(value) {
@@ -45,19 +44,11 @@ export function loadConfig(env = process.env) {
     throw new Error("ALLOWED_ORIGINS is required in production");
   }
 
-  const bodyLimitBytes = env.BODY_LIMIT_BYTES === undefined
-    ? DEFAULT_BODY_LIMIT_BYTES
-    : Number(env.BODY_LIMIT_BYTES);
-  if (!Number.isSafeInteger(bodyLimitBytes) || bodyLimitBytes < 1024 || bodyLimitBytes > 1024 * 1024) {
-    throw new Error("BODY_LIMIT_BYTES must be an integer from 1024 to 1048576");
-  }
-
   return Object.freeze({
     nodeEnv,
     host,
     port,
     allowedOrigins,
-    bodyLimitBytes,
     trustProxy: false,
     authenticationEnabled: false,
     databaseEnabled: false,
