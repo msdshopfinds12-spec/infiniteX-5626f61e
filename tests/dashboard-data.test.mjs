@@ -29,3 +29,18 @@ test("returns an empty list when there is no match", () => {
 test("handles invalid collection input safely", () => {
   assert.deepEqual(filterAgents(null, "atlas"), []);
 });
+
+test("normalizes search consistently without relying on runtime locale", () => {
+  assert.deepEqual(filterAgents(agents, "  ATLAS  "), [agents[0]]);
+});
+
+test("ignores malformed records without throwing", () => {
+  const mixed = [agents[0], null, undefined, { name: 42, role: null, task: "safe task" }];
+  assert.deepEqual(filterAgents(mixed, "atlas"), [agents[0]]);
+  assert.deepEqual(filterAgents(mixed, "safe task"), [mixed[3]]);
+});
+
+test("does not interpret HTML-like search text as executable content", () => {
+  const payload = '<img src=x onerror=alert(1)>';
+  assert.deepEqual(filterAgents(agents, payload), []);
+});
