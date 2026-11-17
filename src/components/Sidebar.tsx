@@ -12,15 +12,15 @@ const nav: { key: ViewKey; label: string; icon: LucideIcon }[] = [
 
 export default function Sidebar({ view, onChange }: { view: ViewKey; onChange: (view: ViewKey) => void }) {
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label="Workspace navigation">
       <div className="brand">
-        <div className="brand-mark"><Zap size={18} /></div>
+        <div className="brand-mark"><Zap size={18} aria-hidden="true" /></div>
         <div className="brand-text">
           <span className="brand-title">InfiniteX</span>
           <span className="brand-sub">AI Engineering</span>
         </div>
       </div>
-      <nav className="nav" aria-label="Main navigation">
+      <nav className="nav" aria-label="Primary">
         {nav.map((item) => {
           const Icon = item.icon;
           const active = view === item.key;
@@ -28,7 +28,7 @@ export default function Sidebar({ view, onChange }: { view: ViewKey; onChange: (
             <button
               key={item.key}
               type="button"
-              className={`nav-item${active ? " active" : ""}`}
+              className={"nav-item" + (active ? " active" : "")}
               onClick={() => onChange(item.key)}
               aria-current={active ? "page" : undefined}
               aria-label={item.label}

@@ -24,7 +24,7 @@ export default function MetricCard({
   accent: Accent;
 }) {
   return (
-    <article className={`metric ${accentClass[accent]}`} aria-label={`${label}: ${value}`}>
+    <article className={"metric " + accentClass[accent]} aria-label={label + ": " + value}>
       <div className="metric-top">
         <span className="metric-label">{label}</span>
         <span className="metric-icon"><Icon size={18} aria-hidden="true" /></span>

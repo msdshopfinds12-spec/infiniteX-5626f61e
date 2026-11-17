@@ -1039,3 +1039,405 @@ input:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
+
+
+/* ---------- Phase 3C: modern workspace hierarchy ---------- */
+:root {
+  --radius-xl: 20px;
+  --surface-glass: color-mix(in srgb, var(--bg-1) 88%, transparent);
+  --focus-ring: 0 0 0 3px var(--primary-soft);
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--bg-0);
+}
+
+body {
+  min-width: 320px;
+  background: var(--bg-0);
+}
+
+.app-shell {
+  min-height: 100dvh;
+}
+
+.sidebar {
+  position: relative;
+  z-index: 10;
+}
+
+.nav-item {
+  min-height: 44px;
+}
+
+.nav-item:focus-visible,
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.notice-dismiss:focus-visible {
+  outline: 2px solid var(--primary-strong);
+  outline-offset: 3px;
+  box-shadow: var(--focus-ring);
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  min-height: 76px;
+  height: auto;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px);
+}
+
+.topbar-heading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.topbar-title {
+  font-size: clamp(18px, 2vw, 22px);
+  letter-spacing: -0.035em;
+}
+
+.topbar-description {
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.workspace-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.workspace-state > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warning);
+  box-shadow: 0 0 0 3px var(--warning-soft);
+}
+
+.content {
+  gap: 18px;
+  padding-top: 22px;
+}
+
+.environment-banner {
+  min-height: 64px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(110deg, var(--bg-1), var(--bg-2));
+}
+
+.environment-label {
+  margin-left: auto;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.metric,
+.panel {
+  border-radius: var(--radius-lg);
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.metric:hover {
+  border-color: var(--text-3);
+  transform: translateY(-2px);
+}
+
+.panel {
+  gap: 2px;
+}
+
+.panel-head {
+  gap: 12px;
+}
+
+.panel-head h2 {
+  letter-spacing: -0.015em;
+}
+
+.metric-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-row {
+  min-height: 58px;
+}
+
+.pipeline-row {
+  border-radius: var(--radius);
+}
+
+.stage {
+  border-radius: 10px;
+}
+
+.search {
+  min-height: 42px;
+}
+
+.search input {
+  min-width: 0;
+}
+
+.icon-btn {
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    height: auto;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+
+  .main {
+    min-height: 100dvh;
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    min-height: 72px;
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+    border: 0;
+    border-top: 1px solid var(--border);
+    background: var(--surface-glass);
+    box-shadow: 0 -10px 32px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(18px);
+    overflow: visible;
+  }
+
+  .brand,
+  .sidebar-foot {
+    display: none;
+  }
+
+  .nav {
+    display: flex;
+    flex: 1;
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-item {
+    display: flex;
+    flex: 1 0 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-width: 48px;
+    min-height: 54px;
+    padding: 5px 2px;
+    border-radius: 12px;
+    font-size: 10px;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
+  .nav-item span {
+    display: block;
+    font-size: 10px;
+  }
+
+  .nav-item svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .topbar {
+    position: sticky;
+    min-height: 0;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 14px 12px;
+  }
+
+  .topbar-heading {
+    flex: 1 1 100%;
+  }
+
+  .topbar-description {
+    max-width: 58ch;
+  }
+
+  .topbar-actions {
+    flex: 1 1 100%;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .workspace-state {
+    display: none;
+  }
+
+  .search {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .search input {
+    width: 100%;
+  }
+
+  .content {
+    padding: 14px 12px calc(22px + env(safe-area-inset-bottom));
+    gap: 14px;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .metric {
+    min-width: 0;
+    padding: 13px;
+    gap: 10px;
+  }
+
+  .metric-label {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .metric-value {
+    font-size: clamp(18px, 5vw, 23px);
+    overflow-wrap: anywhere;
+  }
+
+  .environment-banner {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .environment-label {
+    display: none;
+  }
+
+  .panel {
+    min-width: 0;
+    padding: 14px;
+  }
+
+  .panel-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .panel-head > button {
+    min-height: 44px;
+  }
+
+  .agent-row {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .agent-task {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .agent-task-text {
+    max-width: 38vw;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  .pipeline-row {
+    align-items: stretch;
+  }
+
+  .pipeline-meta {
+    flex-wrap: wrap;
+  }
+
+  .pipeline-stages {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stage {
+    min-width: 0;
+  }
+
+  .log-stream {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 360px) {
+  .nav-item {
+    min-width: 44px;
+  }
+
+  .nav-item span {
+    font-size: 9px;
+  }
+
+  .metric {
+    padding: 11px;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .metric,
+  .nav-item,
+  .btn,
+  .icon-btn {
+    transition: none;
+  }
+}

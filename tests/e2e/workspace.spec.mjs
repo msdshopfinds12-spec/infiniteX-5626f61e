@@ -9,19 +9,31 @@ test("renders the demo workspace without console or page errors", async ({ page 
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   await expect(page.getByText("Demo workspace")).toBeVisible();
+  await expect(page.getByText("LOCAL DEMO", { exact: true })).toBeVisible();
   await expect(page.getByText("No connected data source").first()).toBeVisible();
   expect(pageErrors).toEqual([]);
 });
 
-test("navigates between workspace sections", async ({ page }) => {
+test("navigates across all six workspace sections", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "AI Agents" }).click();
-  await expect(page.getByRole("heading", { name: "AI Agents" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Registered agent examples" })).toBeVisible();
+  const sections = [
+    ["AI Agents", "Registered agent examples"],
+    ["Pipelines", "Pipeline examples"],
+    ["Sample Logs", "Example log entries"],
+    ["Security", "Security verification"],
+    ["Settings", "Workspace settings"],
+    ["Overview", "Demo workspace"],
+  ];
 
-  await page.getByRole("button", { name: "Pipelines" }).click();
-  await expect(page.getByRole("heading", { name: "Pipelines" })).toBeVisible();
-  await expect(page.getByText("auth-service")).toBeVisible();
+  for (const [navigation, heading] of sections) {
+    await page.getByRole("button", { name: navigation }).click();
+    if (navigation === "Overview") {
+      await expect(page.getByText(heading, { exact: true })).toBeVisible();
+    } else {
+      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    }
+    await expect(page.getByRole("button", { name: navigation })).toHaveAttribute("aria-current", "page");
+  }
 });
 
 test("search filters sample agents and reports empty results", async ({ page }) => {
@@ -61,6 +73,23 @@ test("mobile viewport keeps the document within the viewport width", async ({ pa
   }));
   expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
   await expect(page.getByRole("button", { name: "AI Agents" })).toBeVisible();
+});
+
+test("mobile navigation uses a fixed bottom bar with accessible touch targets", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const sidebar = page.locator(".sidebar");
+  await expect(sidebar).toHaveCSS("position", "fixed");
+  await expect(sidebar).toHaveCSS("bottom", "0px");
+
+  const targets = await page.locator(".nav-item").evaluateAll((items) =>
+    items.map((item) => Math.round(item.getBoundingClientRect().height)),
+  );
+  expect(targets).toHaveLength(6);
+  expect(targets.every((height) => height >= 44)).toBe(true);
+
+  await page.getByRole("button", { name: "Security" }).click();
+  await expect(page.getByRole("heading", { name: "Security verification" })).toBeVisible();
 });
 
 test("keyboard users can skip navigation and operate the workspace", async ({ page }) => {
@@ -107,7 +136,7 @@ test("responsive layout has no horizontal document overflow at common viewport w
     }));
     expect(
       dimensions.document,
-      `Unexpected horizontal overflow at viewport width ${width}px`,
+      "Unexpected horizontal overflow at viewport width " + width + "px",
     ).toBeLessThanOrEqual(dimensions.viewport);
   }
 });
