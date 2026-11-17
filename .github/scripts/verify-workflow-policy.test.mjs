@@ -34,6 +34,17 @@ test("rejects malformed YAML and duplicate keys", () => {
   assert.ok(malformed.some((issue) => /Invalid YAML/.test(issue.message)));
 });
 
+test("rejects duplicate YAML mapping keys", () => {
+  const duplicate = safeWorkflow.replace("name: Safe CI", "name: Safe CI\nname: Shadowed CI");
+  const issues = analyzeWorkflow(duplicate);
+  assert.ok(issues.some((issue) => /Invalid YAML/.test(issue.message)));
+});
+
+test("rejects untrusted ref interpolation in shell", () => {
+  const source = safeWorkflow.replace("run: npm test", 'run: echo "${{ github.ref }}"');
+  assert.ok(analyzeWorkflow(source).some((issue) => /untrusted GitHub event/.test(issue.message)));
+});
+
 test("rejects pull_request_target", () => {
   const source = safeWorkflow.replace("  pull_request:", "  pull_request_target:");
   assert.ok(analyzeWorkflow(source).some((issue) => /pull_request_target/.test(issue.message)));
