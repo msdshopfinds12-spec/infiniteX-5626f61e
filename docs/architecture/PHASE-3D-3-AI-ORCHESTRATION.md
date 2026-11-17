@@ -79,10 +79,11 @@ No model is selected in this phase. Do not hardcode model IDs or provider keys. 
 - A model response is untrusted input, not an instruction to override policy.
 - Use least privilege; read-only tools first.
 - Do not expose raw provider errors, prompts, outputs, secrets, or personal data in audit logs.
-- Use a hard timeout race as well as AbortSignal; a provider adapter may ignore cancellation.
+- Use a hard timeout race as well as AbortSignal; this bounds the app's wait but cannot forcibly terminate an adapter that ignores cancellation. Provider adapters must propagate aborts upstream; otherwise a remote request may continue consuming resources or incur provider charges.
+- Keep in-memory audit retention bounded; durable server-side audit storage is a separate backend requirement.
 - No automatic retry for provider calls or mutations in this foundation.
 - Browser-side checks do not replace server-side controls.
-- This in-memory audit event list is diagnostic only; it is not durable audit storage.
+- This bounded in-memory audit event list is diagnostic only; it is not durable audit storage.
 
 ## 8. Verification
 
