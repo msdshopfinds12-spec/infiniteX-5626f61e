@@ -79,6 +79,30 @@ jobs:
       - name: Build production assets
         run: npm run build
 
+  deno-worker-security:
+    name: Deno worker runtime tests and type checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source (immutable action pin)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up Deno (immutable action pin)
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb
+        with:
+          deno-version: v2.9.8
+      - name: Run Deno-native worker security tests
+        run: deno test --no-lock supabase/functions/_shared/worker-security.deno.test.ts
+      - name: Type-check Supabase Edge Functions
+        run: |
+          deno check --no-lock supabase/functions/simula-workflow-worker/index.ts
+          deno check --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
+          deno check --no-lock supabase/functions/ashaa-api-key-manager/index.ts
+
   # Browser job intentionally skips npm cache to avoid concurrent same-key cache writes.
   browser-e2e:
     name: Playwright and axe accessibility browser tests
