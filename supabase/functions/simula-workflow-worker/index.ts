@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { corsHeadersForRequest } from "../_shared/cors.ts";
 import {
   clampBatchLimit,
@@ -88,7 +88,7 @@ function executeSafeAction(actionType: string, input: unknown, config: JsonRecor
 }
 
 async function logEvent(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient<any, "public", any, any, any>,
   ownerId: string,
   workflowId: string,
   runId: string,
@@ -173,7 +173,7 @@ Deno.serve(async (req: Request) => {
       const { data: workflow, error: workflowError } = await admin
         .from("workflows").select("id,owner_id,status")
         .eq("id", run.workflow_id).eq("owner_id", ownerId).maybeSingle();
-      if (workflowError || !isWorkflowOwnedBy(workflow, run.workflow_id, ownerId)) throw new Error("workflow_owner_validation_failed");
+      if (workflowError || !workflow || !isWorkflowOwnedBy(workflow, run.workflow_id, ownerId)) throw new Error("workflow_owner_validation_failed");
       if (workflow.status === "archived") throw new Error("workflow_archived");
 
       const { data: steps, error: stepsError } = await admin
