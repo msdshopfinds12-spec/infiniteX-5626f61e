@@ -257,3 +257,40 @@ test("provider failures are normalized without leaking provider error messages",
     },
   );
 });
+
+
+test("orchestrator ignores inherited provider properties and bounds audit memory", async () => {
+  const registry = makeRegistry({
+    ...readyAgent,
+    providerId: "toString",
+  });
+  const inheritedProviderMap = {};
+  const orchestrator = createOrchestrator({
+    registry,
+    policy: createExecutionPolicy({ allowedProviders: ["toString"], maxEstimatedCostUsd: 0 }),
+    providers: inheritedProviderMap,
+    maxAuditEvents: 1,
+  });
+  await assert.rejects(
+    orchestrator.run({ agentId: "planner", input: "hello" }),
+    (error) => error.code === "PROVIDER_UNAVAILABLE",
+  );
+  assert.equal(orchestrator.getAuditEvents().length, 0);
+
+  const eventsRegistry = makeRegistry();
+  const eventsOrchestrator = createOrchestrator({
+    registry: eventsRegistry,
+    policy: makePolicy(),
+    providers: {
+      "local-test": {
+        enabled: true,
+        estimatedCostUsd: 0,
+        generate: async () => "done",
+      },
+    },
+    maxAuditEvents: 1,
+  });
+  await eventsOrchestrator.run({ agentId: "planner", input: "hello" });
+  assert.equal(eventsOrchestrator.getAuditEvents().length, 1);
+  assert.equal(eventsOrchestrator.getAuditEvents()[0].event, "run_completed");
+});
