@@ -35,7 +35,7 @@ export function createMemoryAuditSink(maxEvents = 100) {
 
 function getHeader(req: GatewayRequest, name: string): string | undefined {
   const value = req.headers[name.toLowerCase()];
-  return Array.isArray(value) ? value[0] : value;
+  return typeof value === "string" ? value : value?.[0];
 }
 function securityHeaders(res: GatewayResponse) {
   res.setHeader("Cache-Control","no-store");
