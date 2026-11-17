@@ -17,7 +17,7 @@ export interface CompilationResult {
 export function compileAndRun(source: string, options: EvaluationOptions = {}): CompilationResult {
   const ast = parseTokens(tokenize(source));
   const ir = lowerToIR(ast);
-  const optimizedIR = optimizeIR(ir);
+  const optimizedIR = optimizeIR(ir, options.divisionPrecision ?? 18);
   const astValue = evaluateAst(ast, options);
   const irValue = executeIR(optimizedIR, options);
   return { ir, optimizedIR, astValue, irValue };
