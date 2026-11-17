@@ -9,7 +9,7 @@ from .typesystem import ValueType
 
 
 _ALLOWED_OPCODES = frozenset({"CONST", "COPY", "EMIT_CONST", "EMIT_REF"})
-_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\\Z", re.ASCII)
+_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z", re.ASCII)
 _MAX_SAFE_INTEGER = (2**53) - 1
 
 
