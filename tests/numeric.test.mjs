@@ -18,7 +18,8 @@ before(async () => {
       minify: false,
     },
   });
-  const output = result.output.find((item) => item.type === "chunk");
+  const outputs = Array.isArray(result) ? result : [result];
+  const output = outputs.flatMap((item) => item.output ?? []).find((item) => item.type === "chunk");
   assert.ok(output, "Vite should produce a numeric engine bundle");
   numeric = await import(`data:text/javascript;base64,${Buffer.from(output.code).toString("base64")}`);
 });
