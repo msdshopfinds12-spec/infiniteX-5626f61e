@@ -1,0 +1,80 @@
+name: GET-02H Vite Security Patch
+
+on:
+  push:
+    branches:
+      - fix/get-02h-vite-security
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: get-02h-vite-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Patch lockfile, audit, tests, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Regenerate lockfile for patched Vite line
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Install exact lockfile
+        run: npm ci
+
+      - name: Verify resolved toolchain
+        run: npm ls vite @vitejs/plugin-react esbuild
+
+      - name: TypeScript verification
+        run: npm run lint
+
+      - name: Numeric regression tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Dependency audit summary
+        shell: bash
+        run: |
+          npm audit --json > /tmp/npm-audit.json || true
+          node --input-type=commonjs -e '
+            const audit = require("/tmp/npm-audit.json");
+            const counts = audit.metadata?.vulnerabilities ?? {};
+            console.log(JSON.stringify({
+              vulnerabilities: counts,
+              packages: Object.entries(audit.vulnerabilities ?? {}).map(([name, item]) => ({
+                name,
+                severity: item.severity,
+                isDirect: item.isDirect,
+                range: item.range,
+                fixAvailable: item.fixAvailable
+              }))
+            }, null, 2));
+            if ((counts.high ?? 0) > 0 || (counts.critical ?? 0) > 0) process.exitCode = 1;
+          '
+
+      - name: Upload generated lockfile and audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: get-02h-generated-lockfile
+          path: |
+            package-lock.json
+            /tmp/npm-audit.json
+          if-no-files-found: warn
+          retention-days: 7
