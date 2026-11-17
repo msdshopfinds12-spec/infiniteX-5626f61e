@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "lint": "tsc --noEmit -p tsconfig.json",
     "test": "node --test",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "check:ci-policy": "node .github/scripts/verify-workflow-policy.mjs",
+    "test:ci-policy": "node --test .github/scripts/verify-workflow-policy.test.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
