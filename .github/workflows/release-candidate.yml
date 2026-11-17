@@ -1,0 +1,96 @@
+name: InfiniteX Release Candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-release-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-candidate:
+    name: Validate and package release candidate (no deployment)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source (immutable action pin)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Node.js (immutable action pin)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Enforce CI workflow security policy
+        run: npm run check:ci-policy
+
+      - name: Enforce browser/server import boundary
+        run: npm run check:browser-boundary
+
+      - name: Enforce Edge Function security source checks
+        run: npm run check:edge-function-security
+
+      - name: Run security policy tests
+        run: |
+          npm run test:ci-policy
+          npm run test:browser-boundary
+          npm run test:edge-function-cors
+          npm run test:edge-worker-security
+
+      - name: Dependency audit
+        run: npm audit --audit-level=moderate
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build production assets
+        run: npm run build
+
+      - name: Set up Deno (immutable action pin)
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb
+        with:
+          deno-version: v2.9.8
+
+      - name: Verify Deno worker runtime
+        run: |
+          deno test --no-lock supabase/functions/_shared/worker-security.deno.ts
+          deno check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-worker/index.ts
+          deno check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
+          deno check --node-modules-dir=auto --no-lock supabase/functions/ashaa-api-key-manager/index.ts
+
+      - name: Create release candidate manifest
+        shell: bash
+        run: |
+          {
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'commit=%s\n' "$GITHUB_SHA"
+            printf 'ref=%s\n' "$GITHUB_REF"
+            printf 'workflow_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'artifact_kind=release-candidate-only\n'
+            printf 'production_deployment=not-performed\n'
+            printf 'created_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > dist/release-manifest.txt
+
+      - name: Upload immutable release candidate artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: infinitex-release-candidate-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

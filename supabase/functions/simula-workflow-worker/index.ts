@@ -1,6 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { corsHeadersForRequest } from "../_shared/cors.ts";
+import {
+  clampBatchLimit,
+  isClaimedRunOwnedBy,
+  isWorkflowOwnedBy,
+  readJsonBodyLimited,
+} from "../_shared/worker-security.mjs";
 
 type JsonRecord = Record<string, unknown>;
 type Step = {
@@ -82,7 +88,7 @@ function executeSafeAction(actionType: string, input: unknown, config: JsonRecor
 }
 
 async function logEvent(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient<any, "public", any, any, any>,
   ownerId: string,
   workflowId: string,
   runId: string,
@@ -131,14 +137,13 @@ Deno.serve(async (req: Request) => {
   if (userError || !userData.user) return reply(req, 401, { ok: false, error: "invalid_session" });
   const ownerId = userData.user.id;
 
-  let requestedLimit = 3;
-  try {
-    const body = await req.json();
-    if (body && typeof body.limit === "number" && Number.isInteger(body.limit)) requestedLimit = body.limit;
-  } catch {
-    // An empty body is valid; use the safe default batch size.
+  const bodyResult = await readJsonBodyLimited(req, 2048);
+  if (!bodyResult.ok) {
+    const status = bodyResult.reason === "payload_too_large" ? 413 : 400;
+    return reply(req, status, { ok: false, error: bodyResult.reason });
   }
-  const limit = Math.max(1, Math.min(requestedLimit, 5));
+  const body = bodyResult.value;
+  const limit = clampBatchLimit(body && typeof body === "object" ? body.limit : undefined);
 
   const { data: claimedRuns, error: claimError } = await userClient.rpc(
     "simula_claim_workflow_runs",
@@ -156,7 +161,7 @@ Deno.serve(async (req: Request) => {
   const summary = { ok: true, claimed: (claimedRuns ?? []).length, succeeded: 0, failed: 0, runs: [] as JsonRecord[] };
 
   for (const run of (claimedRuns ?? []) as ClaimedRun[]) {
-    if (!run || run.owner_id !== ownerId || typeof run.id !== "string" || typeof run.workflow_id !== "string") {
+    if (!isClaimedRunOwnedBy(run, ownerId)) {
       summary.failed++;
       summary.runs.push({ status: "rejected", error: "claimed_run_owner_mismatch" });
       continue;
@@ -168,7 +173,7 @@ Deno.serve(async (req: Request) => {
       const { data: workflow, error: workflowError } = await admin
         .from("workflows").select("id,owner_id,status")
         .eq("id", run.workflow_id).eq("owner_id", ownerId).maybeSingle();
-      if (workflowError || !workflow) throw new Error("workflow_owner_validation_failed");
+      if (workflowError || !workflow || !isWorkflowOwnedBy(workflow, run.workflow_id, ownerId)) throw new Error("workflow_owner_validation_failed");
       if (workflow.status === "archived") throw new Error("workflow_archived");
 
       const { data: steps, error: stepsError } = await admin
