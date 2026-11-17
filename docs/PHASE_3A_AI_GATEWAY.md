@@ -63,3 +63,15 @@ npm run build
 5. Implement one adapter at a time with isolated integration tests.
 6. Isolate all code execution from the API process.
 7. Require separate approval for every external write, PR, merge, migration, and release.
+
+## 9. GitHub Actions verification
+
+- Run #202 (`44084802465`) on commit `57fd3d6250002e52783ea5b951a1f01647e1497e`: **passed**.
+- `npm ci`: passed; 89 packages installed, 90 audited, 0 vulnerabilities.
+- Frontend TypeScript check: passed.
+- Server gateway TypeScript check: passed.
+- Vitest: 2 test files and 15 tests passed.
+- `npm audit --audit-level=high`: passed; 0 vulnerabilities.
+- Production Vite build: passed.
+
+The first Phase 3A run exposed a TypeScript narrowing error for readonly header arrays. The accessor was corrected, and the successful run above validates the corrected commit. This is CI evidence for the source branch, not evidence of a deployed endpoint or live AI integration.
