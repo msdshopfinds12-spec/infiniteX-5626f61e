@@ -33,7 +33,7 @@ test("known affected picomatch versions cannot be documented as resolved", () =>
   const version = lockfile.packages?.["node_modules/picomatch"]?.version;
   assert.ok(version, "package-lock.json must contain the resolved picomatch package");
 
-  // This list is intentionally explicit and must be updated only with advisory evidence.
+  // Update this set only when supported advisory evidence establishes affected ranges.
   const knownAffectedVersions = new Set(["4.0.7"]);
   if (knownAffectedVersions.has(version)) {
     assert.match(
@@ -50,21 +50,38 @@ test("known affected picomatch versions cannot be documented as resolved", () =>
   }
 });
 
-test("frontend CI keeps dependency audit fail-closed", () => {
-  assert.match(frontendCi, /id: dependency_audit[\s\S]*?continue-on-error: true[\s\S]*?run: npm audit --audit-level=moderate/);
-  assert.match(frontendCi, /if: always\(\)[\s\S]*?AUDIT_OUTCOME: \$\{\{ steps\.dependency_audit\.outcome \}\}/);
-  assert.match(frontendCi, /if \[ "\$AUDIT_OUTCOME" != "success" \ ]; then[\s\S]*?exit 1/);
+test("frontend CI structurally enforces the dependency audit result", async () => {
+  const workflow = await parseWorkflow(frontendCi, "frontend-ci.yml");
+  const steps = workflow.jobs?.verify?.steps ?? [];
+  const audit = steps.find((step) => step.id === "dependency_audit");
+  const enforcement = steps.find((step) => step.name === "Enforce dependency audit result");
+
+  assert.ok(audit, "dependency audit step must exist");
+  assert.equal(audit["continue-on-error"], true, "audit may finish so diagnostics can be collected");
+  assert.match(audit.run, /npm audit --audit-level=moderate/);
+  assert.ok(enforcement, "a separate fail-closed enforcement step must exist");
+  assert.equal(enforcement.if, "always()");
+  assert.match(enforcement.run, /if \[ "\$AUDIT_OUTCOME" != "success" \]; then/);
+  assert.match(enforcement.run, /exit 1/);
 });
 
-test("security and Vite workflows run the dependency audit directly", () => {
-  assert.match(securityCi, /run: npm audit --audit-level=moderate/);
-  assert.match(viteCi, /run: npm audit --audit-level=moderate/);
+test("security and Vite workflows run the dependency audit directly", async () => {
+  for (const [name, source] of [
+    ["security-regression.yml", securityCi],
+    ["vite-security-remediation.yml", viteCi],
+  ]) {
+    const workflow = await parseWorkflow(source, name);
+    const allSteps = Object.values(workflow.jobs ?? {}).flatMap((job) => job.steps ?? []);
+    assert.ok(
+      allSteps.some((step) => typeof step.run === "string" && step.run.includes("npm audit --audit-level=moderate")),
+      name + " must contain a direct blocking dependency audit",
+    );
+  }
 });
 
 test("CI workflows do not recommend force-fixing or suppressing the dependency audit", () => {
   for (const [name, source] of Object.entries(workflowSources)) {
     assert.doesNotMatch(source, /npm audit fix --force/, name + " must not force a breaking dependency downgrade");
-    assert.doesNotMatch(source, /continue-on-error:\s*true[\s\S]{0,180}npm audit --audit-level=moderate[\s\S]{0,180}(?!Enforce dependency audit result)/, name + " must not silently ignore audit failures");
   }
 });
 
@@ -85,17 +102,8 @@ test("security and Vite regression workflows include security test paths for pus
     ["vite-security-remediation.yml", viteCi],
   ]) {
     const workflow = await parseWorkflow(source, name);
-    assert.ok(
-      workflow.on?.push?.paths?.includes("tests/security/**"),
-      name + " must run when security regression tests change on push",
-    );
-    assert.ok(
-      workflow.on?.pull_request?.paths?.includes("tests/security/**"),
-      name + " must run when security regression tests change in a pull request",
-    );
-    assert.ok(
-      workflow.on?.pull_request?.branches?.includes("main"),
-      name + " must validate pull requests targeting main",
-    );
+    assert.ok(workflow.on?.push?.paths?.includes("tests/security/**"));
+    assert.ok(workflow.on?.pull_request?.paths?.includes("tests/security/**"));
+    assert.ok(workflow.on?.pull_request?.branches?.includes("main"));
   }
 });

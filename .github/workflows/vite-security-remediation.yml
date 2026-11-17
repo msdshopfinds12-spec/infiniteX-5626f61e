@@ -17,6 +17,7 @@ on:
       - "tests/security/**"
   pull_request:
     branches:
+      - main
       - feat/gh16-infiniteX-integration
       - feat/phase-3d4-trusted-backend
       - fix/phase-4m2c-deno-tenant-isolation
