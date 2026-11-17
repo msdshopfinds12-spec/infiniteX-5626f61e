@@ -1,5 +1,7 @@
 name: InfiniteX CI
 
+# Reproducible validation uses the committed package-lock.json.
+
 on:
   push:
     branches:
