@@ -37,8 +37,9 @@ export default function App() {
   }
 
   return (
-    <a className="skip-link" href="#main-content">Skip to main content</a>
-    <div className="app-shell">
+    <>
+      <a className="skip-link" href="#main-content">Skip to main content</a>
+      <div className="app-shell">
       <Sidebar view={view} onChange={setView} />
       <div className="main">
         <TopBar
@@ -164,5 +165,6 @@ export default function App() {
         </main>
       </div>
     </div>
+    </>
   );
 }
