@@ -74,12 +74,12 @@ export function createOrchestrator({
     if (signal?.aborted) abortFromCaller();
     else signal?.addEventListener("abort", abortFromCaller, { once: true });
 
-    let rejectOnAbort;
+    let rejectOnAbort = null;
     const abortPromise = new Promise((_resolve, reject) => {
+      if (controller.signal.aborted) return;
       rejectOnAbort = () => reject(controller.signal.reason ||
         new DOMException("Execution aborted.", "AbortError"));
-      if (controller.signal.aborted) rejectOnAbort();
-      else controller.signal.addEventListener("abort", rejectOnAbort, { once: true });
+      controller.signal.addEventListener("abort", rejectOnAbort, { once: true });
     });
     const timeoutId = setTimeout(
       () => controller.abort(new DOMException("Execution timed out.", "TimeoutError")),
@@ -137,7 +137,7 @@ export function createOrchestrator({
       throw new OrchestrationError("PROVIDER_FAILED", "The configured provider request failed.");
     } finally {
       clearTimeout(timeoutId);
-      controller.signal.removeEventListener("abort", rejectOnAbort);
+      if (rejectOnAbort) controller.signal.removeEventListener("abort", rejectOnAbort);
       signal?.removeEventListener("abort", abortFromCaller);
     }
   }
