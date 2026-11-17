@@ -27,7 +27,7 @@ export function createPostgresMembershipRepository({ pool }) {
             AND workspace_id = $2::uuid
             AND status = 'active'
           LIMIT 1`,
-        [userId, workspaceId]
+        [userId.toLowerCase(), workspaceId.toLowerCase()]
       );
       return result.rows?.[0] ?? null;
     },
@@ -39,7 +39,7 @@ export function createPostgresMembershipRepository({ pool }) {
       if (!VALID_ROLES.has(newRole)) {
         return Object.freeze({ allowed: false, reason: "INVALID_TARGET_ROLE" });
       }
-      if (actorUserId === targetUserId) {
+      if (actorUserId.toLowerCase() === targetUserId.toLowerCase()) {
         return Object.freeze({ allowed: false, reason: "SELF_ROLE_CHANGE_DENIED" });
       }
 
@@ -60,7 +60,7 @@ export function createPostgresMembershipRepository({ pool }) {
               AND status = 'active'
             ORDER BY user_id
             FOR UPDATE`,
-          [workspaceId]
+          [workspaceId.toLowerCase()]
         );
         const memberships = locked.rows ?? [];
         const actor = memberships.find((row) => row.userId === actorUserId);
@@ -95,7 +95,7 @@ export function createPostgresMembershipRepository({ pool }) {
           RETURNING user_id::text AS "userId",
                     workspace_id::text AS "workspaceId",
                     role, status`,
-          [workspaceId, targetUserId, newRole]
+          [workspaceId.toLowerCase(), targetUserId.toLowerCase(), newRole]
         );
         if (updated.rowCount !== 1 || !updated.rows?.[0]) {
           throw new Error("Membership role update did not affect exactly one active row");
