@@ -9,6 +9,6 @@
   "scripts": {
     "start": "node src/server.mjs",
     "test": "node --test",
-    "check": "node --check src/config.mjs && node --check src/app.mjs && node --check src/server.mjs && node --check src/auth/opaque-token.mjs && node --check src/auth/csrf.mjs && node --check src/auth/cookie-policy.mjs && node --check src/auth/session-service.mjs && node --check src/auth/middleware.mjs && node --check src/authorization/policy.mjs && node --test"
+    "check": "node --check src/config.mjs && node --check src/app.mjs && node --check src/server.mjs && node --check src/auth/opaque-token.mjs && node --check src/auth/csrf.mjs && node --check src/auth/cookie-policy.mjs && node --check src/auth/session-service.mjs && node --check src/auth/middleware.mjs && node --check src/auth/postgres-session-repository.mjs && node --check src/authorization/policy.mjs && node --test"
   }
 }
