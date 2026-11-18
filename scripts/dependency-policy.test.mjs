@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { summarizeAudit } from "./dependency-policy.mjs";
+import { evaluateAuditExit, summarizeAudit } from "./dependency-policy.mjs";
 
 test("passes when no high or critical findings exist", () => {
   const report = summarizeAudit({
@@ -8,7 +8,7 @@ test("passes when no high or critical findings exist", () => {
     vulnerabilities: {},
   });
   assert.equal(report.policy.blocking, false);
-  assert.equal(report.counts.total, 3);
+  assert.equal(evaluateAuditExit(report, 0), 0);
 });
 
 test("blocks high severity findings", () => {
@@ -21,6 +21,7 @@ test("blocks high severity findings", () => {
   assert.equal(report.policy.blocking, true);
   assert.equal(report.findings[0].name, "example");
   assert.equal(report.findings[0].fixAvailable, false);
+  assert.equal(evaluateAuditExit(report, 1), 1);
 });
 
 test("blocks critical findings even if high is zero", () => {
@@ -29,6 +30,7 @@ test("blocks critical findings even if high is zero", () => {
     vulnerabilities: { criticalPackage: { severity: "critical", via: [] } },
   });
   assert.equal(report.policy.blocking, true);
+  assert.equal(evaluateAuditExit(report, 1), 1);
 });
 
 test("normalizes advisory objects without leaking arbitrary object shapes", () => {
@@ -46,4 +48,9 @@ test("normalizes advisory objects without leaking arbitrary object shapes", () =
     url: "https://example.invalid/advisory",
     range: "<2.0.0",
   }]);
+});
+
+test("treats an unexpected audit command failure as an execution error", () => {
+  const report = summarizeAudit({ metadata: { vulnerabilities: { total: 0 } }, vulnerabilities: {} });
+  assert.equal(evaluateAuditExit(report, 2), 2);
 });

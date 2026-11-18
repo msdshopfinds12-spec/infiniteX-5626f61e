@@ -6,7 +6,6 @@ on:
       - main
       - feat/phase-4m2f-release-integrity
       - fix/phase-4m2c-deno-tenant-isolation
-      - feat/phase-4m2f-release-integrity
   push:
     branches:
       - feat/phase-4m4f-dependency-governance
