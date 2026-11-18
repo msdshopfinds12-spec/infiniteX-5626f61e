@@ -6,9 +6,11 @@ on:
       - main
       - feat/phase-4m2f-release-integrity
       - fix/phase-4m2c-deno-tenant-isolation
+      - docs/phase-4m5b-github-security-posture
   push:
     branches:
       - feat/phase-4m4f-dependency-governance
+      - ci/phase-4m5c-security-regression-coverage
   workflow_dispatch:
 
 permissions:

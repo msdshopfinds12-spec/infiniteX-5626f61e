@@ -6,6 +6,7 @@ on:
       - security/phase-3d-4l-regression
       - fix/phase-4m1a-ci-coverage
       - fix/phase-4m1b-browser-boundary
+      - ci/phase-4m5c-security-regression-coverage
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -17,6 +18,7 @@ on:
       - feat/phase-3d4-trusted-backend
       - phase-4m-ai-orchestration-readiness
       - fix/phase-4m1a-ci-coverage
+      - docs/phase-4m5b-github-security-posture
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -28,7 +30,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-security-regression-${{ github.ref }}
+  group: ci-security-regression-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -52,8 +54,6 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install exact locked dependencies
         run: npm ci
-      - name: Audit dependencies
-        run: npm audit --audit-level=moderate
       - name: Scan all GitHub Actions workflows
         run: npm run check:ci-policy
       - name: Run positive and negative policy regression tests
@@ -62,3 +62,11 @@ jobs:
         run: npm run check:browser-boundary
       - name: Test browser/server import boundary
         run: npm run test:browser-boundary
+      - name: Scan Edge Function security boundaries
+        run: npm run check:edge-function-security
+      - name: Test exact-origin CORS policy
+        run: npm run test:edge-function-cors
+      - name: Test Edge worker ownership and request boundaries
+        run: npm run test:edge-worker-security
+      - name: Dependency security audit (final blocking gate)
+        run: npm audit --audit-level=moderate
