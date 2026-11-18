@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - feat/phase-4m2f-release-integrity
       - fix/phase-4m2c-deno-tenant-isolation
       - feat/phase-4m2f-release-integrity
   push:
