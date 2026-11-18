@@ -2,6 +2,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export function summarizeAudit(audit) {
   const vulnerabilities = audit?.metadata?.vulnerabilities ?? {};
