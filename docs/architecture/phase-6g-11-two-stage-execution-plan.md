@@ -20,13 +20,14 @@ The legacy adapter method `approveTaskWithGrantV1` accepts a digest and combines
 
 Before execution-service implementation, define one coherent grant lifecycle:
 
-1. Generate a high-entropy URL-safe raw token only inside trusted server code.
-2. Hash it with SHA-256; persist only the digest, never the raw token.
-3. Persist the grant binding (owner subject, task ID/version, payload hash, agent/capability IDs and versions, expiry, single-use state) using database time.
-4. Atomically approve the task and create the grant record, or define an equally strong transaction boundary that cannot leave an approved task without its intended grant.
-5. Return the raw token exactly once to the authorized approval caller.
-6. On worker claim, atomically validate and consume the digest, owner/task/version/payload binding, expiry, idempotency key, and worker identity while transitioning approved -> running and creating a lease.
-7. Retries must return the original idempotent result without re-consuming a grant or creating a second execution.
+1. Derive a high-entropy URL-safe token inside trusted server code with a deterministic HMAC-SHA-256 factory. Domain-separate the derivation (currently `InfiniteX/approval-token/v1`) and bind it to the trusted principal subject, task ID, canonical payload hash, and idempotency key.
+2. Require a server-only secret of at least 32 bytes. Never place it in browser code, source control, client-visible configuration, or logs. Use the same trusted principal-subject resolver for token derivation and the protocol adapter.
+3. Hash the derived token with SHA-256; persist only the digest, never the raw token.
+4. Persist the grant binding (owner subject, task ID/version, payload hash, agent/capability IDs and versions, expiry, single-use state) using database time.
+5. Atomically approve the task and create the grant record, or define an equally strong transaction boundary that cannot leave an approved task without its intended grant.
+6. Return the raw token only to the authorized approval caller. For an exact idempotent retry, deterministic derivation must reproduce the same token and the store must replay the original approved-task snapshot and expiry. A reused key with a different canonical request (including a different token digest) must conflict.
+7. On worker claim, atomically validate and consume the digest, owner/task/version/payload binding, expiry, idempotency key, and worker identity while transitioning approved -> running and creating a lease.
+8. Never persist the raw token merely to make retries recoverable. Token-secret rotation requires an explicit versioned migration and a policy for outstanding grants.
 
 The selected interface is the explicitly versioned `issueApprovalGrantV1`, followed by `claimApprovedTaskV1`. Both operations must use the same durable driver/database and grant table. The legacy method remains unchanged for compatibility.
 
