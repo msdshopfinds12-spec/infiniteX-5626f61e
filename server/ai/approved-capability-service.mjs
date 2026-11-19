@@ -132,7 +132,7 @@ export function createApprovedCapabilityService({
     }
 
     try {
-      return capabilityExecutor.run({
+      return await capabilityExecutor.run({
         agentId,
         capabilityId,
         input,
