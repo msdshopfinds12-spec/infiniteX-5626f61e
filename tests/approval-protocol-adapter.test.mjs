@@ -72,6 +72,16 @@ test("rejects caller-supplied identity objects not recognized by trusted resolve
   await assert.rejects(
     adapter.claimApprovedTaskV1({
       ...common,
+      principal: { subject: "verified-user-1" },
+      worker,
+      leaseDurationMs: 60_000,
+      idempotencyKey: "claim-spoofed-principal",
+    }),
+    (error) => error.code === "UNTRUSTED_PRINCIPAL_SUBJECT",
+  );
+  await assert.rejects(
+    adapter.claimApprovedTaskV1({
+      ...common,
       worker: { subject: "verified-worker-1" },
       leaseDurationMs: 60_000,
       idempotencyKey: "claim-spoofed-worker",
