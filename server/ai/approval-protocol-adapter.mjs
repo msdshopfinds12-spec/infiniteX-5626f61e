@@ -91,16 +91,18 @@ function validateOutcome(result, kind) {
 }
 
 /**
- * Driver contract:
- * - approveTaskWithGrantV1 performs owner-scoped CAS, DB-time grant validation,
- *   one-time grant consumption, awaiting_approval -> approved, independent
- *   event sequence, and idempotency persistence in one transaction.
- * - claimApprovedTaskV1 performs owner-scoped CAS, authenticated worker binding,
- *   approved -> running, DB-time lease creation, fencing increment, independent
- *   event sequence, and idempotency persistence in one transaction.
+ * Durable driver contract:
+ * - issueApprovalGrantV1 performs owner-scoped CAS, awaiting_approval -> approved,
+ *   grant-digest insertion, DB-time expiry, event append, and idempotency write
+ *   in one transaction.
+ * - claimApprovedTaskV1 validates and consumes that same one-time digest while
+ *   performing owner-scoped CAS, approved -> running, lease creation, fencing
+ *   increment, event append, and idempotency write in one transaction.
+ * - approveTaskWithGrantV1 remains as a legacy compatibility operation only.
  *
- * The adapter passes only a token digest; raw approval tokens never reach the
- * persistence driver. Worker identity is derived from trusted server auth.
+ * The adapter passes only token digests; raw approval tokens never reach the
+ * persistence driver. Principal and worker identities come from trusted server
+ * authentication resolvers, not client-supplied subject strings.
  */
 export function createApprovalProtocolAdapter({
   store,
