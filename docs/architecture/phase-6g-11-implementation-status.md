@@ -9,6 +9,7 @@ Branch: feat/infiniteX-zero-budget-implementation
 - `tests/approval-protocol-adapter.test.mjs`: claim contract fixture and assertion now verify the digest is forwarded.
 - `server/ai/two-stage-approval-service.mjs`: adds a separate trusted-server composition boundary for approval-grant issuance and worker claiming. It loads canonical task snapshots, delegates trusted principal resolution to the protocol adapter, authorizes approval, hashes the raw token, persists only the digest through the shared durable driver, and returns the raw token only for a newly issued grant.
 - `tests/two-stage-approval-service.test.mjs`: adds service-level contract tests for digest-only persistence, claim binding, authorization denial, identity spoofing, malformed tokens, and task-state validation.
+- `tests/helpers/fake-two-stage-approval-store.mjs` and `tests/fake-two-stage-approval-store.test.mjs`: add a deterministic test-only store model for approval, one-time digest consumption, lease creation, grant expiry, idempotent claim replay, competing claims, and rollback behavior.
 
 ## Required grant-store contract
 
@@ -31,7 +32,7 @@ The legacy `approved-capability-service.mjs` remains unchanged as a compatibilit
 
 ## Remaining work
 
-1. Implement a deterministic fake grant/lease store matching the durable contract.
+1. Extend the deterministic fake with lease renewal, settlement, fencing-token rejection, and cancellation operations.
 2. Add lease renewal, settlement, cancellation, and fencing operations to the versioned adapter.
 3. Add service tests proving executor invocation is impossible before a validated claim and lifecycle readiness.
 4. Implement PostgreSQL 17 integration tests in disposable GitHub Actions infrastructure.
