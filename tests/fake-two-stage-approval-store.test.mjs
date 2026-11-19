@@ -80,6 +80,35 @@ test("grant issuance idempotency does not create a second digest after a lost re
   assert.equal(store.snapshotTask(common.taskId).status, "approved");
 });
 
+test("idempotency keys are independently scoped by task and operation", async () => {
+  const { store, common } = createFixture();
+  const first = await issue(store, common, "same-key");
+  store.seedTask({
+    taskId: "task-fake-2",
+    status: "awaiting_approval",
+    ownerSubject: "principal-1",
+    taskVersion: "v1",
+    payloadHash: "d".repeat(64),
+    agentId: "agent-safe",
+    agentVersion: "1.0.0",
+    capabilityId: "text.summary",
+    capabilityVersion: "1.0.0",
+    version: 1,
+  });
+  const second = await store.issueApprovalGrantV1({
+    ...common,
+    taskId: "task-fake-2",
+    expectedPayloadHash: "d".repeat(64),
+    approvalTokenDigest: "e".repeat(64),
+    ttlMs: 60_000,
+    idempotencyKey: "same-key",
+  });
+  assert.equal(first.outcome, "issued");
+  assert.equal(second.outcome, "issued");
+  assert.equal(store.getGrantCount(), 2);
+  assert.equal(store.snapshotTask("task-fake-2").status, "approved");
+});
+
 test("fake store rejects expired grants and cannot claim them", async () => {
   const { store, common } = createFixture();
   await issue(store, common);
