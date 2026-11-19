@@ -32,21 +32,31 @@ self.addEventListener("fetch", (event) => {
     event.respondWith((async () => {
       try {
         const response = await fetch(request);
-        if (response.ok) {
+        const cacheControl = response.headers.get("cache-control") || "";
+        if (
+          url.pathname === "/" &&
+          response.ok &&
+          response.type === "basic" &&
+          !/private|no-store/i.test(cacheControl)
+        ) {
           const cache = await caches.open(CACHE_NAME);
           await cache.put("/", response.clone());
         }
         return response;
       } catch {
-        return (await caches.match(request))
-          || (await caches.match("/"))
+        return (await caches.match("/"))
           || (await caches.match("/offline.html"));
       }
     })());
     return;
   }
 
-  if (["script", "style", "image", "font"].includes(request.destination)) {
+  const isStaticAsset =
+    url.pathname.startsWith("/assets/") ||
+    url.pathname.startsWith("/icons/") ||
+    url.pathname === "/manifest.webmanifest";
+
+  if (isStaticAsset && ["script", "style", "image", "font"].includes(request.destination)) {
     event.respondWith((async () => {
       const cached = await caches.match(request);
       if (cached) return cached;
