@@ -119,3 +119,29 @@ export async function readJsonBodyLimited(request, maxBytes) {
     return { ok: false, reason: "invalid_json" };
   }
 }
+
+
+/**
+ * Executes a synchronous local action within a cooperative deadline budget.
+ * This checks before/after execution; it cannot preempt a synchronous function
+ * that blocks the JavaScript isolate. Keep inputs bounded and isolate CPU-heavy
+ * or external work behind a separately cancellable worker/job boundary.
+ */
+export function executeWithinStepBudget(
+  action,
+  input,
+  timeoutSeconds,
+  maxBytes = 64 * 1024,
+  now = () => performance.now(),
+) {
+  if (typeof action !== "function") throw new TypeError("action_must_be_function");
+  if (typeof now !== "function") throw new TypeError("clock_must_be_function");
+  const startedAt = now();
+  const deadline = createStepDeadline(timeoutSeconds, startedAt);
+  assertStepDeadline(deadline, now());
+  assertJsonByteLimit(input, maxBytes);
+  const output = action();
+  assertStepDeadline(deadline, now());
+  assertJsonByteLimit(output, maxBytes);
+  return output;
+}
