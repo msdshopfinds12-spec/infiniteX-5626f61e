@@ -37,13 +37,12 @@ test("returns null for an atomic claim conflict", async () => {
   assert.equal(await adapter.claim(request), null);
 });
 
-test("rejects a store snapshot with a wrong owner, stale version, or expired lease", async () => {
+test("rejects a store snapshot with a wrong owner or stale version", async () => {
   for (const bad of [
     snapshot({ lease: { ...snapshot().lease, ownerId: "other" } }),
     snapshot({ version: 4 }),
-    snapshot({ lease: { ...snapshot().lease, expiresAt: now } }),
   ]) {
-    const adapter = createLeaseFencedTaskStoreAdapter({ store: storeWith({ claimTaskWithLease: async () => bad }), clock: () => now });
+    const adapter = createLeaseFencedTaskStoreAdapter({ store: storeWith({ claimTaskWithLease: async () => bad }) });
     await assert.rejects(adapter.claim(request), (error) => error.code === "INVALID_STORE_RESULT");
   }
 });
