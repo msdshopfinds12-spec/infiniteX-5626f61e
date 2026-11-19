@@ -102,5 +102,7 @@ export function createAdapterRegistry(initialAdapters = []) {
     return Object.freeze([...adapters.values()]);
   }
 
+  for (const descriptor of initialAdapters) register(descriptor);
+
   return Object.freeze({ register, get, list });
 }
