@@ -26,6 +26,7 @@ export function createApprovedCapabilityService({
   authorize,
   isTaskAwaitingApproval,
   claimTaskForExecution,
+  maxConcurrentExecutions = 4,
 } = {}) {
   if (!approvalAuthority ||
       typeof approvalAuthority.issue !== "function" ||
@@ -39,6 +40,12 @@ export function createApprovedCapabilityService({
       typeof claimTaskForExecution !== "function") {
     throw new TypeError("Server-side authorization, task-state, and atomic claim callbacks are required.");
   }
+
+  if (!Number.isSafeInteger(maxConcurrentExecutions) || maxConcurrentExecutions < 1 || maxConcurrentExecutions > 100) {
+    throw new TypeError("maxConcurrentExecutions must be an integer between 1 and 100.");
+  }
+
+  let activeExecutions = 0;
 
   async function isAllowed(principal, operation, taskId, capabilityId) {
     try {
@@ -109,37 +116,54 @@ export function createApprovedCapabilityService({
       throw new ApprovedExecutionError("TASK_NOT_AWAITING_APPROVAL", "The task is not awaiting approval.");
     }
 
-    const consumed = approvalAuthority.consume({
-      token: approvalToken,
-      principal,
-      taskId,
-      action: "execute",
-      capabilityId,
-      capabilityVersion,
-    });
-    if (!consumed) {
-      throw new ApprovedExecutionError("APPROVAL_INVALID_OR_EXPIRED", "The approval is invalid, expired, or already used.");
+    if (signal !== undefined && (!signal || typeof signal.aborted !== "boolean")) {
+      throw new ApprovedExecutionError("INVALID_SIGNAL", "signal must be an AbortSignal.");
+    }
+    if (signal?.aborted) {
+      throw new ApprovedExecutionError("ABORTED", "The approved execution was cancelled before it started.");
+    }
+    if (activeExecutions >= maxConcurrentExecutions) {
+      throw new ApprovedExecutionError("EXECUTION_CAPACITY_EXCEEDED", "The local execution capacity is full; retry after an active task finishes.");
     }
 
-    let claimed = false;
+    // JavaScript executes this reservation synchronously, so concurrent callers
+    // cannot pass the capacity check before the counter is incremented.
+    activeExecutions += 1;
     try {
-      claimed = await claimTaskForExecution(Object.freeze({ taskId, principal, capabilityId })) === true;
-    } catch {
-      claimed = false;
-    }
-    if (!claimed) {
-      throw new ApprovedExecutionError("TASK_CLAIM_FAILED", "The task could not be atomically claimed; the approval has been consumed.");
-    }
-
-    try {
-      return await capabilityExecutor.run({
-        agentId,
+      const consumed = approvalAuthority.consume({
+        token: approvalToken,
+        principal,
+        taskId,
+        action: "execute",
         capabilityId,
-        input,
-        signal,
+        capabilityVersion,
       });
-    } catch {
-      throw new ApprovedExecutionError("CAPABILITY_EXECUTION_FAILED", "The approved local capability could not be completed. The approval has been consumed.");
+      if (!consumed) {
+        throw new ApprovedExecutionError("APPROVAL_INVALID_OR_EXPIRED", "The approval is invalid, expired, or already used.");
+      }
+
+      let claimed = false;
+      try {
+        claimed = await claimTaskForExecution(Object.freeze({ taskId, principal, capabilityId })) === true;
+      } catch {
+        claimed = false;
+      }
+      if (!claimed) {
+        throw new ApprovedExecutionError("TASK_CLAIM_FAILED", "The task could not be atomically claimed; the approval has been consumed.");
+      }
+
+      try {
+        return await capabilityExecutor.run({
+          agentId,
+          capabilityId,
+          input,
+          signal,
+        });
+      } catch {
+        throw new ApprovedExecutionError("CAPABILITY_EXECUTION_FAILED", "The approved local capability could not be completed. The approval has been consumed.");
+      }
+    } finally {
+      activeExecutions -= 1;
     }
   }
 
