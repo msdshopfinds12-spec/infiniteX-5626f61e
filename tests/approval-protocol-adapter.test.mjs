@@ -21,7 +21,7 @@ const common = {
 const approvedTask = () => ({ id: "task-1", status: "approved", version: 13 });
 const runningTask = () => ({ id: "task-1", status: "running", version: 14 });
 function createAdapter({ store }) {
-  return createAdapter({
+  return createApprovalProtocolAdapter({
     store,
     resolvePrincipalSubject: (identity) => {
       if (identity !== principal) throw new Error("untrusted principal");
