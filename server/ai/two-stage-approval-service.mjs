@@ -70,52 +70,28 @@ function digest(token) {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
-function validateApprovedOutcome(result, expectedTaskId) {
-  if (!result || typeof result !== "object" || Array.isArray(result)) {
-    throw new TwoStageApprovalError("INVALID_STORE_RESULT", "The grant store returned an invalid result.");
-  }
-  if (result.outcome !== "issued") {
-    if (["conflict", "not_available", "already_issued"].includes(result.outcome)) {
-      return Object.freeze({ outcome: result.outcome });
-    }
-    throw new TwoStageApprovalError("INVALID_STORE_RESULT", "The grant store returned an unsupported result.");
-  }
-  if (!result.task || result.task.taskId !== expectedTaskId || result.task.status !== "approved") {
-    throw new TwoStageApprovalError("INVALID_STORE_RESULT", "The grant store did not confirm the expected approved task state.");
-  }
-  if (typeof result.expiresAt !== "string" || !Number.isFinite(Date.parse(result.expiresAt)) ||
-      new Date(result.expiresAt).toISOString() !== result.expiresAt) {
-    throw new TwoStageApprovalError("INVALID_STORE_RESULT", "The grant store returned an invalid grant expiry.");
-  }
-  return Object.freeze({ outcome: "issued", task: Object.freeze({ ...result.task }), expiresAt: result.expiresAt });
-}
-
 /**
  * Trusted-server composition for the durable two-stage approval protocol.
  *
- * grantStore.issueApprovalGrantV1 MUST atomically persist the grant digest and
- * transition awaiting_approval -> approved in one durable transaction. It
- * must use database time for expiry and idempotency. Only the digest is sent
- * to persistence; the raw token is returned once to the authorized caller.
+ * protocolAdapter.issueApprovalGrantV1 delegates to the same durable driver
+ * used for worker claims. The driver atomically persists the grant digest and
+ * transitions awaiting_approval -> approved, using database time for expiry.
  *
  * This service intentionally does not invoke a capability executor. Execution
  * stays disabled until durable lease renewal, cancellation, and settlement
  * operations are implemented and contract-tested.
  */
 export function createTwoStageApprovalService({
-  grantStore,
   protocolAdapter,
   loadTaskSnapshot,
   authorizeApproval,
-  resolvePrincipalSubject,
   tokenFactory = () => randomBytes(32).toString("base64url"),
   ttlMs = 5 * 60 * 1000,
 } = {}) {
-  if (!grantStore || typeof grantStore.issueApprovalGrantV1 !== "function" ||
-      !protocolAdapter || typeof protocolAdapter.claimApprovedTaskV1 !== "function" ||
-      typeof loadTaskSnapshot !== "function" || typeof authorizeApproval !== "function" ||
-      typeof resolvePrincipalSubject !== "function") {
-    throw new TypeError("A durable grant store, protocol adapter, trusted task loader, authorization callback, and principal resolver are required.");
+  if (!protocolAdapter || typeof protocolAdapter.issueApprovalGrantV1 !== "function" ||
+      typeof protocolAdapter.claimApprovedTaskV1 !== "function" ||
+      typeof loadTaskSnapshot !== "function" || typeof authorizeApproval !== "function") {
+    throw new TypeError("A versioned durable protocol adapter, trusted task loader, and authorization callback are required.");
   }
   if (!Number.isSafeInteger(ttlMs) || ttlMs < 1_000 || ttlMs > 900_000) {
     throw new TypeError("ttlMs must be between 1000 and 900000.");
@@ -125,12 +101,6 @@ export function createTwoStageApprovalService({
   async function approveTaskV1({ principal, taskId, idempotencyKey } = {}) {
     const id = requiredString(taskId, "task_id");
     const key = requiredString(idempotencyKey, "idempotency_key", 200);
-    let principalSubject;
-    try {
-      principalSubject = requiredString(resolvePrincipalSubject(principal), "principal_subject");
-    } catch {
-      throw new TwoStageApprovalError("UNTRUSTED_PRINCIPAL", "A trusted principal could not be resolved.");
-    }
     let task;
     try {
       task = await loadTaskSnapshot({ taskId: id, principal });
@@ -151,25 +121,24 @@ export function createTwoStageApprovalService({
       throw new TwoStageApprovalError("INVALID_TOKEN_SOURCE", "The secure token source returned an invalid token.");
     }
     const tokenDigest = digest(token);
-    let raw;
+    let result;
     try {
-      raw = await grantStore.issueApprovalGrantV1(Object.freeze({
-        principalSubject,
+      result = await protocolAdapter.issueApprovalGrantV1({
+        principal,
         taskId: bound.taskId,
-        expectedTaskVersion: bound.taskVersion,
-        expectedPayloadHash: bound.payloadHash,
-        expectedAgentId: bound.agentId,
-        expectedAgentVersion: bound.agentVersion,
-        expectedCapabilityId: bound.capabilityId,
-        expectedCapabilityVersion: bound.capabilityVersion,
+        taskVersion: bound.taskVersion,
+        payloadHash: bound.payloadHash,
+        agentId: bound.agentId,
+        agentVersion: bound.agentVersion,
+        capabilityId: bound.capabilityId,
+        capabilityVersion: bound.capabilityVersion,
         approvalTokenDigest: tokenDigest,
         ttlMs,
         idempotencyKey: key,
-      }));
+      });
     } catch {
       throw new TwoStageApprovalError("GRANT_STORE_UNAVAILABLE", "The durable approval grant transaction could not be completed.");
     }
-    const result = validateApprovedOutcome(raw, bound.taskId);
     if (result.outcome !== "issued") return result;
     return Object.freeze({
       outcome: "issued",
