@@ -155,3 +155,30 @@ test("local runtime rejects invalid or non-monotonic clocks", () => {
   assert.throws(() => backwards.run({ capability: "text.metrics", input: { text: "a" } }),
     (error) => error.code === "INVALID_CLOCK");
 });
+
+test("local runtime rejects accessors, symbol keys, and sparse arrays without invoking getters", () => {
+  const runtime = createLocalAdapterRuntime();
+  let getterCalled = false;
+  const accessorInput = {};
+  Object.defineProperty(accessorInput, "text", {
+    enumerable: true,
+    get() { getterCalled = true; return "should not run"; },
+  });
+  assert.throws(() => runtime.run({ capability: "text.metrics", input: accessorInput }),
+    (error) => error.code === "INVALID_INPUT");
+  assert.equal(getterCalled, false);
+
+  const symbolInput = { text: "safe", [Symbol("hidden")]: "not JSON" };
+  assert.throws(() => runtime.run({ capability: "text.metrics", input: symbolInput }),
+    (error) => error.code === "INVALID_INPUT");
+
+  const sparse = [];
+  sparse[1] = "gap";
+  assert.throws(() => runtime.run({ capability: "text.metrics", input: { text: "safe", extra: sparse } }),
+    (error) => error.code === "INVALID_INPUT");
+
+  const decorated = ["safe"];
+  decorated.extra = "not an array item";
+  assert.throws(() => runtime.run({ capability: "text.metrics", input: { text: "safe", extra: decorated } }),
+    (error) => error.code === "INVALID_INPUT");
+});
