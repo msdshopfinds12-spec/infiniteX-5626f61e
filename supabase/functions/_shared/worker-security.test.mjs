@@ -5,6 +5,7 @@ import {
   assertStepDeadline,
   clampBatchLimit,
   createStepDeadline,
+  executeWithinStepBudget,
   isClaimedRunOwnedBy,
   isClaimedRunValid,
   isWorkflowOwnedBy,
@@ -93,4 +94,20 @@ test("rejects malformed JSON, invalid UTF-8, and accepts empty bodies", async ()
   assert.deepEqual(await readJsonBodyLimited(malformed, 32), { ok: false, reason: "invalid_json" });
   assert.deepEqual(await readJsonBodyLimited(invalidUtf8, 32), { ok: false, reason: "invalid_json" });
   assert.deepEqual(await readJsonBodyLimited(empty, 32), { ok: true, value: null });
+});
+
+test("executes bounded local actions once and checks deadline after execution", () => {
+  let calls = 0;
+  const result = executeWithinStepBudget(() => { calls++; return { ok: true }; }, { input: 1 }, 2, 64, () => 100);
+  assert.deepEqual(result, { ok: true });
+  assert.equal(calls, 1);
+  const times = [100, 100, 2100];
+  let index = 0;
+  assert.throws(() => executeWithinStepBudget(() => ({ ok: true }), {}, 2, 64, () => times[index++]), /step_timeout_exceeded/);
+});
+
+test("rejects oversized action inputs before invoking the action", () => {
+  let invoked = false;
+  assert.throws(() => executeWithinStepBudget(() => { invoked = true; return {}; }, { text: "x".repeat(100) }, 2, 16), /payload_too_large/);
+  assert.equal(invoked, false);
 });
