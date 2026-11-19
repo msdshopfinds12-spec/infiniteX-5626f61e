@@ -57,3 +57,43 @@ The PR #46 baseline currently contains no tracked `supabase/migrations/` directo
 ## Safety
 
 No production database, Supabase project, secrets, environment variables, deployment, billing, merge, or live traffic is touched by this workflow.
+
+## Verified branch implementation and CI evidence
+
+### Implemented on the isolated branch
+
+- Ported the Phase 4N.8B migration and both worker call sites from PR #35 onto the main-based PR #46 source baseline.
+- Both workers now call `simula_transition_workflow_step` for step start/success/failure transitions. Static inspection found one RPC call site per worker and no direct `workflow_step_runs` insert/update calls in either worker.
+- Parent-run success/failure updates retain owner, running-status, and exact-attempt predicates.
+- Added a disposable PostgreSQL 16 test job with two independent `psql` sessions and a lock/connection barrier.
+- The fixture runner accepts only the exact local disposable service URL configured by CI; it refuses arbitrary database URLs.
+
+### Dependency remediation
+
+The initial lockfile audit found:
+- `vite`: high severity advisories;
+- `esbuild`: moderate severity advisory.
+
+The candidate was upgraded to Vite `8.3.8` and `@vitejs/plugin-react` 6.x. The committed lockfile resolves `@vitejs/plugin-react` `6.3.0` and Rolldown `1.2.19`. Node `22.16.0` satisfies the Vite 8 and plugin engine requirements.
+
+The lockfile was generated with `npm install --package-lock-only --ignore-scripts --no-audit` on the isolated branch and committed as `0954050f1308d99e2cbe37169986c80fe1dd1515`. Lifecycle scripts were disabled during lockfile generation.
+
+### Exact CI evidence
+
+GitHub Actions run `44635347256` completed successfully on the dependency-upgrade candidate:
+- npm dependency audit: **0 vulnerabilities**;
+- Node CORS tests: 6 passed, 0 failed;
+- Node worker-security tests: 10 passed, 0 failed;
+- Deno worker-security tests: 6 executed;
+- authenticated worker, cron worker, and optional Supabase integration-test type checks passed;
+- TypeScript application build and Vite production build passed (1,564 modules transformed);
+- disposable PostgreSQL contract harness passed, including independent-session same-generation contention, stale completion rejection, rollback, and newer-generation replacement.
+
+This run generated the lockfile in the runner from the same manifest and command used by the lockfile-sync workflow. A subsequent exact-head run is required after the lockfile commit and this evidence update.
+
+### Remaining blockers
+
+- The passing PostgreSQL test still uses a synthetic contract schema. Production schema compatibility remains **NOT VERIFIED**.
+- Historical migration bodies, deployed function parity, PostgREST exposure, RLS, and grants in the actual Supabase project remain **NOT VERIFIED**.
+- Existing Vercel status checks report `build-rate-limit`; no production deployment was attempted.
+- No PR was created, no merge occurred, and no production migration or deployment was performed.
