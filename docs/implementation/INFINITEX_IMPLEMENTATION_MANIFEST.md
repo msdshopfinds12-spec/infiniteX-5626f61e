@@ -166,3 +166,12 @@ Status: BUILD COMPLETE FOR THE CURRENT FRONTEND/PWA + PROVIDER-NEUTRAL AI FOUNDA
 - Added responsive task cards, per-task history disclosure, state summaries, and browser tests for approval gating, rejection, and isolated history disclosure.
 - This UI is in-memory demo state only. It is not authenticated, persistent, connected to a real worker, or allowed to invoke external tools.
 - A failed CI run exposed an ESM declaration-resolution issue; the UI import was corrected to explicitly reference `task-lifecycle.mjs`. The corrected branch-head CI result must be checked before marking this phase verified.
+
+### Phase 4 verification evidence
+
+- Final Task Center code commit tested: `4f5dea7aab28802c8d18be21079089eebb80e7cb`.
+- Frontend CI succeeded: [run 44543095965](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44543095965). Typecheck, 40/40 unit/policy tests, browser/server boundary, production build, and configured npm audit gate all passed.
+- Browser/accessibility CI succeeded: [run 44543095772](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44543095772). 10/10 Playwright tests passed, including task approval simulation, rejection, and per-task history disclosure; existing theme, mobile, navigation, offline shell, and WCAG checks also passed.
+- npm audit reported zero vulnerabilities at the configured moderate-or-higher threshold.
+- The Task Center is deliberately an in-memory UX simulation. Its client-side approval controls are not security authorization, and its simulated running/completed states do not execute work.
+- Release remains blocked: no production HTTPS host was approved, no physical Android install was tested, and no backend/auth/persistence is connected.
