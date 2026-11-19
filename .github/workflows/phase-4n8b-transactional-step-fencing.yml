@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/phase-4n8b-transactional-step-fencing-impl
+      - feat/phase-4n8c-workflow-reliability-pr35
   pull_request:
     branches:
       - main
