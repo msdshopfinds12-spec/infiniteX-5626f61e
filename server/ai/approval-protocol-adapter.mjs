@@ -33,10 +33,6 @@ function digest(value, field) {
   return result;
 }
 
-function subject(principal, field = "principal_subject") {
-  return requiredString(principal?.subject, field);
-}
-
 function idempotency(value) {
   return requiredString(value, "idempotency_key", 200);
 }
@@ -97,16 +93,32 @@ function validateOutcome(result, kind) {
  * The adapter passes only a token digest; raw approval tokens never reach the
  * persistence driver. Worker identity is derived from trusted server auth.
  */
-export function createApprovalProtocolAdapter({ store } = {}) {
+export function createApprovalProtocolAdapter({
+  store,
+  resolvePrincipalSubject,
+  resolveWorkerSubject,
+} = {}) {
   if (!store || typeof store.approveTaskWithGrantV1 !== "function" ||
       typeof store.claimApprovedTaskV1 !== "function") {
     throw new TypeError("A durable driver implementing both versioned protocol operations is required.");
+  }
+  if (typeof resolvePrincipalSubject !== "function" ||
+      typeof resolveWorkerSubject !== "function") {
+    throw new TypeError("Trusted principal and worker identity resolvers are required.");
+  }
+
+  function resolveIdentity(resolver, identity, field) {
+    let resolved;
+    try { resolved = resolver(identity); } catch {
+      throw new ApprovalProtocolError("UNTRUSTED_" + field.toUpperCase(), "A trusted identity could not be resolved.");
+    }
+    return requiredString(resolved, field);
   }
 
   async function approveTaskWithGrantV1(input = {}) {
     const request = Object.freeze({
       taskId: requiredString(input.taskId, "task_id"),
-      principalSubject: subject(input.principal),
+      principalSubject: resolveIdentity(resolvePrincipalSubject, input.principal, "principal_subject"),
       expectedTaskVersion: requiredString(input.taskVersion, "task_version"),
       expectedPayloadHash: digest(input.payloadHash, "payload_hash"),
       expectedAgentId: requiredString(input.agentId, "agent_id"),
@@ -139,7 +151,7 @@ export function createApprovalProtocolAdapter({ store } = {}) {
       expectedAgentVersion: requiredString(input.agentVersion, "agent_version"),
       expectedCapabilityId: requiredString(input.capabilityId, "capability_id"),
       expectedCapabilityVersion: requiredString(input.capabilityVersion, "capability_version"),
-      workerSubject: subject(input.worker, "worker_subject"),
+      workerSubject: resolveIdentity(resolveWorkerSubject, input.worker, "worker_subject"),
       leaseDurationMs,
       idempotencyKey: idempotency(input.idempotencyKey),
     });
