@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createAgentRegistry } from "./agent-registry.mjs";
-import { createExecutionPolicy } from "./policy.mjs";
-import { createLocalAdapterRuntime } from "../integrations/local-adapter-runtime.mjs";
-import { createLocalCapabilityExecutor, CapabilityExecutionError } from "./capability-executor.mjs";
+import { createAgentRegistry } from "../server/ai/agent-registry.mjs";
+import { createExecutionPolicy } from "../server/ai/policy.mjs";
+import { createLocalAdapterRuntime } from "../server/integrations/local-adapter-runtime.mjs";
+import { createLocalCapabilityExecutor, CapabilityExecutionError } from "../server/ai/capability-executor.mjs";
 
 const agent = {
   id: "local-helper",
