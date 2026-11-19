@@ -243,7 +243,13 @@ A code review identified an asynchronous failure-handling gap in the approved ca
 
 This fix does not add execution preemption, a durable task state store, authentication, or a production API. The current local runtime remains synchronous and deterministic. A future async runtime must enforce cooperative cancellation and retain concurrency accounting until underlying work actually settles.
 
-## 14. Change-control gates
+## 14. Bounded approved execution implementation note
+
+The approved capability service now supports a configurable in-process concurrency ceiling (`maxConcurrentExecutions`, default 4, accepted range 1–100). It reserves capacity synchronously before consuming the approval grant, rejects overload with `EXECUTION_CAPACITY_EXCEEDED`, and releases the reservation in `finally` after the executor settles. Pre-aborted requests are rejected before approval consumption. Regression tests cover saturation, release after completion, invalid configuration, and pre-aborted signals.
+
+**Scope limitation:** this is a per-service-instance in-memory bound, not a distributed/global limit. It does not provide a durable queue, request rate limiting, execution deadlines, or forced cancellation. A cooperative executor must observe the supplied AbortSignal; cancellation must not be reported as complete until the work actually stops. Multi-process deployments require a shared atomic concurrency/claim mechanism before this limit can be treated as global.
+
+## 15. Change-control gates
 
 This plan authorizes implementation only on `feat/infiniteX-zero-budget-implementation`. It does not authorize:
 - changes to `main`;
