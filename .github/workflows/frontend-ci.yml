@@ -16,6 +16,7 @@ on:
       - fix/phase-4m2c-deno-tenant-isolation
       - ci/phase-4m5c-security-regression-coverage
       - fix/infinitex-ci-a11y-audit-refresh
+      - fix/phase-4n3-step-budget-enforcement
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -39,6 +40,7 @@ on:
       - fix/phase-4m2c-deno-tenant-isolation
       - docs/phase-4m5b-github-security-posture
       - ci/phase-4m5c-security-regression-coverage
+      - fix/infinitex-ci-a11y-audit-refresh
 
 permissions:
   contents: read
