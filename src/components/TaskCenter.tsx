@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { CheckCircle2, Circle, Clock3, Play, ShieldCheck, XCircle } from "lucide-react";
-import { createTask, transitionTask, type TaskRecord } from "../lib/task-lifecycle.mjs";
+import type { TaskRecord } from "../lib/task-lifecycle.mjs";
+import { createInMemoryTaskRepository, type InMemoryTaskRepository } from "../lib/task-repository.mjs";
 
-function makeSamples(): TaskRecord[] {
+function makeSamples(repository: InMemoryTaskRepository) {
   const now = new Date().toISOString();
-  return [
-    createTask({ id: "task-demo-architecture", title: "Review application architecture", createdAt: now }),
-    createTask({ id: "task-demo-quality", title: "Prepare quality assurance checklist", createdAt: now }),
-  ];
+  repository.create({ id: "task-demo-architecture", title: "Review application architecture", createdAt: now });
+  repository.create({ id: "task-demo-quality", title: "Prepare quality assurance checklist", createdAt: now });
 }
 
 function nextAction(task: TaskRecord): { command: string; actor: "system" | "user"; label: string } | null {
@@ -22,23 +21,28 @@ function nextAction(task: TaskRecord): { command: string; actor: "system" | "use
 }
 
 export default function TaskCenter() {
-  const [tasks, setTasks] = useState<TaskRecord[]>(makeSamples);
-  const [message, setMessage] = useState("Local simulation only. No AI model, external tool, API, or background job is executed.");
+  const [repository] = useState(() => {
+    const instance = createInMemoryTaskRepository({ maxTasks: 100, maxEventsPerTask: 100 });
+    makeSamples(instance);
+    return instance;
+  });
+  const [tasks, setTasks] = useState<readonly TaskRecord[]>(() => repository.list());
+  const [message, setMessage] = useState("Local in-memory repository simulation only. No AI model, external tool, API, or background job is executed.");
   const [historyTaskId, setHistoryTaskId] = useState<string | null>(null);
 
   function apply(taskId: string, command: string, actor: "system" | "user") {
-    const target = tasks.find((task) => task.id === taskId);
+    const target = repository.get(taskId);
     if (!target) return;
     try {
-      const updated = transitionTask(target, command, {
+      const updated = repository.transition({
+        taskId,
+        command,
         expectedVersion: target.version,
         actor,
         at: new Date(Math.max(Date.now(), Date.parse(target.updatedAt))).toISOString(),
       });
-      setTasks((current) => current.map((task) =>
-        task.id === taskId && task.version === target.version ? updated : task
-      ));
-      setMessage(`${target.title}: local state changed to ${updated.state}. No external action was performed.`);
+      setTasks(repository.list());
+      setMessage(target.title + ": local repository state changed to " + updated.state + ". No external action was performed.");
     } catch {
       setMessage("The requested transition was rejected. Refresh the task state and try a valid action.");
     }
@@ -56,7 +60,7 @@ export default function TaskCenter() {
         <div className="task-center-banner-icon"><ShieldCheck size={18} aria-hidden="true" /></div>
         <div>
           <strong>Approval-gated task simulation</strong>
-          <p>Practice the task lifecycle. Approval is a UX demonstration, not authenticated authorization; controls only change local in-memory demo state.</p>
+          <p>Practice the task lifecycle using a bounded in-memory repository. Approval is a UX demonstration, not authenticated authorization; controls only change local demo state.</p>
         </div>
         <span className="badge badge-neutral">NO EXECUTION</span>
       </div>
