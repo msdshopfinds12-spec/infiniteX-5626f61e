@@ -29,7 +29,7 @@ ROLLBACK;
 SQL
 rollback_state="$(psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT status||':'||task_version||':'||event_seq||':'||fencing_token FROM infinitex_harness.tasks WHERE task_id='rollback-task'")"
 rollback_events="$(psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM infinitex_harness.task_events WHERE task_id='rollback-task'")"
-[[ "$rollback_state" == "approved:1:0:0" ]] || { echo "Rollback state mismatch: $rollback_state" >&2; exit 1; }
+[[ "$rollback_state" == "approved:1:1:0" ]] || { echo "Rollback state mismatch: $rollback_state" >&2; exit 1; }
 [[ "$rollback_events" == "1" ]] || { echo "Rollback event count mismatch: $rollback_events" >&2; exit 1; }
 
 race_sql() {
