@@ -77,7 +77,7 @@ function encodeSize(value) {
 
 function executeBuiltIn(capability, input) {
   if (capability === "text.metrics") {
-    if (typeof input.text !== "string" || input.text.length > 8_000) {
+    if (!Object.hasOwn(input, "text") || typeof input.text !== "string" || input.text.length > 8_000) {
       throw new LocalAdapterError("INVALID_ARGUMENT", "text must be a string of at most 8000 characters.");
     }
     const text = input.text;
@@ -89,7 +89,7 @@ function executeBuiltIn(capability, input) {
     });
   }
   if (capability === "task.preview") {
-    if (typeof input.title !== "string" || input.title.trim().length < 1 || input.title.trim().length > 160) {
+    if (!Object.hasOwn(input, "title") || typeof input.title !== "string" || input.title.trim().length < 1 || input.title.trim().length > 160) {
       throw new LocalAdapterError("INVALID_ARGUMENT", "title must contain 1–160 characters.");
     }
     return Object.freeze({
