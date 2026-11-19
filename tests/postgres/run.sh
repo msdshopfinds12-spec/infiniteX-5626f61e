@@ -90,9 +90,7 @@ psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT infinitex_harness.settle_lease(
  'worker-race',1,2,'succeeded')" >"$settle_out" &
 settle_pid=$!
 wait "$cancel_pid"; wait "$settle_pid"
-terminal_winners="$(cat "$cancel_out" "$settle_out" | grep -c '^techo "Verified by harness: constraints, append-only events, rollback, CAS claim race, approval/grant/claim, replay/conflict, renewal, fenced settlement, cancellation."
-echo "Not verified: authenticated principal binding, database role isolation, RLS, production driver, or production wiring."
- || true)"
+terminal_winners="$(cat "$cancel_out" "$settle_out" | grep -c '^t$' || true)"
 terminal_state="$(psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT status FROM infinitex_harness.tasks WHERE owner_subject='owner-race' AND task_id='claim-race'")"
 [[ "$terminal_winners" == "1" ]] || { echo "Expected exactly one cancellation/settlement winner; got $terminal_winners." >&2; exit 1; }
 [[ "$terminal_state" == "cancelled" || "$terminal_state" == "succeeded" ]] || { echo "Invalid terminal race state: $terminal_state" >&2; exit 1; }
