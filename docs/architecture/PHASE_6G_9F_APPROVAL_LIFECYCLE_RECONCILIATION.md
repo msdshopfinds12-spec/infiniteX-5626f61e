@@ -86,6 +86,12 @@ Only after this operation returns a validated `claimed` outcome may the capabili
 
 A consumed approval grant must not be silently reissued or restored after execution claim. Any re-approval policy must be an explicit state-machine command with an auditable event.
 
+## 3A. Identity trust boundary hardening
+
+The versioned protocol adapter requires injected `resolvePrincipalSubject` and `resolveWorkerSubject` functions. It does not trust a plain object merely because it contains a `subject` property. These resolvers must be wired only to the server's verified authentication/session context; never implement them by echoing browser request fields.
+
+The adapter rejects unknown identity objects before invoking the persistence driver. Unit tests cover spoofed principal and worker objects. This is defense-in-depth at the adapter seam, not a substitute for authentication middleware, authorization policy, tenant scoping, or database role enforcement.
+
 ## 4. Service and adapter boundaries
 
 ### Approval service
@@ -177,4 +183,4 @@ Phase 6G.9F is not complete until:
 - PostgreSQL integration tests prove concurrency, rollback, expiry, and role isolation;
 - security review confirms no browser-trusted principal/worker IDs and no raw token persistence.
 
-Current conclusion: DESIGN BASELINE ONLY. The existing runtime is not yet reconciled and must not be represented as production-ready.
+Current conclusion: DESIGN BASELINE + VERSIONED ADAPTER PROTOTYPE. The existing approved-capability service still uses the legacy one-step claim path and is not yet wired to this adapter. The adapter has no durable driver. Runtime reconciliation and production readiness are therefore NOT VERIFIED.
