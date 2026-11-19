@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createApprovalProtocolAdapter } from "../server/ai/approval-protocol-adapter.mjs";
 import {
   createTwoStageApprovalService,
+  createHmacApprovalTokenFactory,
   TwoStageApprovalError,
 } from "../server/ai/two-stage-approval-service.mjs";
 
@@ -24,6 +25,7 @@ const expiresAt = "2026-11-21T00:00:00.000Z";
 function fixture({ allowed = true } = {}) {
   let currentTask = task();
   let grantRequest;
+  let grantResult;
   let claimRequest;
   const protocolAdapter = createApprovalProtocolAdapter({
     store: {
