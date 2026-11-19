@@ -38,20 +38,21 @@ function idempotency(value) {
   return requiredString(value, "idempotency_key", 200);
 }
 
-function validateTask(task, expectedStatus) {
-  if (!task || typeof task !== "object" || Array.isArray(task) || task.status !== expectedStatus) {
+function validateTask(task, expectedStatus, expectedTaskId) {
+  if (!task || typeof task !== "object" || Array.isArray(task) || task.status !== expectedStatus ||
+      (task.taskId ?? task.id) !== expectedTaskId) {
     throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an invalid task state.");
   }
   return Object.freeze({ ...task });
 }
 
-function validateOutcome(result, kind) {
+function validateOutcome(result, kind, expectedTaskId) {
   if (!result || typeof result !== "object" || Array.isArray(result) ||
       !OUTCOMES[kind].has(result.outcome)) {
     throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an unsupported protocol outcome.");
   }
   if (kind === "approval" && result.outcome === "approved") {
-    return Object.freeze({ outcome: "approved", task: validateTask(result.task, "approved") });
+    return Object.freeze({ outcome: "approved", task: validateTask(result.task, "approved", expectedTaskId) });
   }
   if (kind === "grant" && result.outcome === "issued") {
     const task = validateTask(result.task, "approved");
@@ -62,7 +63,7 @@ function validateOutcome(result, kind) {
     return Object.freeze({ outcome: "issued", task, expiresAt: result.expiresAt });
   }
   if (kind === "claim" && result.outcome === "claimed") {
-    const task = validateTask(result.task, "running");
+    const task = validateTask(result.task, "running", expectedTaskId);
     const lease = result.lease;
     if (!lease || typeof lease !== "object" || Array.isArray(lease)) {
       throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver did not return a lease.");
@@ -154,7 +155,7 @@ export function createApprovalProtocolAdapter({
     } catch {
       throw new ApprovalProtocolError("GRANT_STORE_UNAVAILABLE", "The durable grant transaction could not be completed.");
     }
-    return validateOutcome(result, "grant");
+    return validateOutcome(result, "grant", request.taskId);
   }
 
   async function approveTaskWithGrantV1(input = {}) {
@@ -176,7 +177,7 @@ export function createApprovalProtocolAdapter({
     } catch {
       throw new ApprovalProtocolError("APPROVAL_STORE_UNAVAILABLE", "The approval transaction could not be completed.");
     }
-    return validateOutcome(result, "approval");
+    return validateOutcome(result, "approval", request.taskId);
   }
 
   async function claimApprovedTaskV1(input = {}) {
@@ -204,7 +205,7 @@ export function createApprovalProtocolAdapter({
     } catch {
       throw new ApprovalProtocolError("CLAIM_STORE_UNAVAILABLE", "The worker claim transaction could not be completed.");
     }
-    const validated = validateOutcome(result, "claim");
+    const validated = validateOutcome(result, "claim", request.taskId);
     if (validated.outcome === "claimed" && validated.lease.workerSubject !== request.workerSubject) {
       throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned a lease for a different worker.");
     }
