@@ -11,6 +11,7 @@ const common = {
   taskId: "task-1",
   taskVersion: "12",
   payloadHash: "a".repeat(64),
+  approvalTokenDigest: "9".repeat(64),
   agentId: "agent-safe",
   agentVersion: "2.0.0",
   capabilityId: "text.metrics",
@@ -179,6 +180,7 @@ test("worker claim requires authenticated worker identity and bounded lease dura
   assert.equal(result.task.status, "running");
   assert.equal(result.lease.fencingToken, 8);
   assert.equal(received.workerSubject, worker.subject);
+  assert.equal(received.approvalTokenDigest, common.approvalTokenDigest);
   assert.equal(received.leaseDurationMs, 60_000);
   assert.equal(Object.isFrozen(result.lease), true);
 });
