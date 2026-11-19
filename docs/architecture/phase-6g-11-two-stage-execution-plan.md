@@ -7,7 +7,7 @@ Release policy: no merge, production deployment, production migration, billing, 
 
 ## 1. Verified current-state constraints
 
-- `approval-protocol-adapter.mjs` exposes versioned approval and worker-claim operations and requires trusted principal/worker resolvers.
+- `approval-protocol-adapter.mjs` exposes versioned durable grant issuance and worker-claim operations and requires trusted principal/worker resolvers. Its older `approveTaskWithGrantV1` operation remains a compatibility contract, not the new issuance path.
 - The adapter delegates durability and atomicity to an injected store. It does not implement persistence or execute capabilities.
 - `approval-authority.mjs` is explicitly process-local and non-durable. Its grants disappear on process restart.
 - `approved-capability-service.mjs` remains a legacy one-step compatibility service. Its legacy transition must not be represented as the new two-stage protocol.
@@ -16,7 +16,7 @@ Release policy: no merge, production deployment, production migration, billing, 
 
 ## 2. Critical protocol gap — approval grant issuance
 
-The current adapter method `approveTaskWithGrantV1` accepts an `approvalTokenDigest` and asks the store to consume/validate it while moving a task to approved. The reviewed in-memory authority issues its own token but does not persist a grant digest in the durable store. These are not yet a connected lifecycle.
+The legacy adapter method `approveTaskWithGrantV1` accepts a digest and combines approval with grant consumption; it is not the new issuance lifecycle. The reviewed in-memory authority is process-local and does not persist grant digests. The new flow therefore adds `issueApprovalGrantV1` to persist the digest and transition the task to approved, then `claimApprovedTaskV1` consumes that same digest while claiming the task.
 
 Before execution-service implementation, define one coherent grant lifecycle:
 
@@ -28,7 +28,7 @@ Before execution-service implementation, define one coherent grant lifecycle:
 6. On worker claim, atomically validate and consume the digest, owner/task/version/payload binding, expiry, idempotency key, and worker identity while transitioning approved -> running and creating a lease.
 7. Retries must return the original idempotent result without re-consuming a grant or creating a second execution.
 
-The preferred interface is a new explicitly versioned operation such as `issueApprovalGrantV1` (or a renamed, fully specified approval operation), followed by `claimApprovedTaskV1`. Do not silently change the semantics of the existing method without updating its contract, tests, and docs together.
+The selected interface is the explicitly versioned `issueApprovalGrantV1`, followed by `claimApprovedTaskV1`. Both operations must use the same durable driver/database and grant table. The legacy method remains unchanged for compatibility.
 
 ## 3. Target state machine
 
