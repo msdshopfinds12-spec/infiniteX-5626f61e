@@ -89,13 +89,17 @@ begin
           attempt = excluded.attempt,
           started_at = now(),
           finished_at = null
-      where public.workflow_step_runs.attempt < excluded.attempt
+      where workflow_step_runs.attempt < excluded.attempt
     returning id into v_step_run_id;
 
     if v_step_run_id is null then
       raise exception 'workflow_step_attempt_superseded' using errcode = '40001';
     end if;
   else
+    if p_transition = 'succeed' and p_output is null then
+      raise exception 'workflow_step_output_required' using errcode = '22023';
+    end if;
+
     update public.workflow_step_runs as sr
     set status = case when p_transition = 'succeed' then 'succeeded' else 'failed' end,
         output = case when p_transition = 'succeed' then p_output else null end,
@@ -112,9 +116,6 @@ begin
       raise exception 'workflow_step_attempt_superseded' using errcode = '40001';
     end if;
 
-    if p_transition = 'succeed' and p_output is null then
-      raise exception 'workflow_step_output_required' using errcode = '22023';
-    end if;
   end if;
 
   return v_step_run_id;
