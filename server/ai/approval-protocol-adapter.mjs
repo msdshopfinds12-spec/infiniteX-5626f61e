@@ -152,6 +152,7 @@ export function createApprovalProtocolAdapter({
       expectedCapabilityId: requiredString(input.capabilityId, "capability_id"),
       expectedCapabilityVersion: requiredString(input.capabilityVersion, "capability_version"),
       workerSubject: resolveIdentity(resolveWorkerSubject, input.worker, "worker_subject"),
+      approvalTokenDigest: digest(input.approvalTokenDigest, "approval_token_digest"),
       leaseDurationMs,
       idempotencyKey: idempotency(input.idempotencyKey),
     });
