@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, Minus, type LucideIcon } from "lucide-react";
+import { Minus, type LucideIcon } from "lucide-react";
 import type { Accent, Trend } from "../types";
 
 const accentClass: Record<Accent, string> = {
@@ -13,7 +13,6 @@ export default function MetricCard({
   label,
   value,
   delta,
-  trend,
   icon: Icon,
   accent,
 }: {
@@ -24,21 +23,17 @@ export default function MetricCard({
   icon: LucideIcon;
   accent: Accent;
 }) {
-  const TrendIcon = trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : Minus;
-  const trendClass = trend === "up" ? "trend-up" : trend === "down" ? "trend-down" : "trend-flat";
   return (
-    <div className={`metric ${accentClass[accent]}`}>
+    <article className={"metric " + accentClass[accent]} aria-label={label + ": " + value}>
       <div className="metric-top">
         <span className="metric-label">{label}</span>
-        <span className="metric-icon">
-          <Icon size={18} />
-        </span>
+        <span className="metric-icon"><Icon size={18} aria-hidden="true" /></span>
       </div>
       <div className="metric-value">{value}</div>
-      <div className={`metric-delta ${trendClass}`}>
-        <TrendIcon size={14} />
+      <div className="metric-delta trend-flat">
+        <Minus size={14} aria-hidden="true" />
         <span>{delta}</span>
       </div>
-    </div>
+    </article>
   );
 }
