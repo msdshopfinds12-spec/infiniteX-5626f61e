@@ -29,7 +29,8 @@
 | src/components/PipelineBoard.tsx | Update | Clearly illustrative pipeline stages; no execution claim |
 | src/components/LogStream.tsx | Update | Static sample events, not live telemetry |
 | src/lib/dashboard-data.mjs | Create | Pure, safe sample-agent filtering helper |
-| src/lib/dashboard-data.d.mts | Create | TypeScript declaration for the filtering helper |
+| src/lib/dashboard-data.d.mts | Create | ESM TypeScript declaration for the filtering helper |
+| src/lib/dashboard-data.d.ts | Create | Bundler-resolution compatibility declaration |
 | tests/dashboard-data.test.mjs | Create | Search normalization, malformed data and injection-text contracts |
 | src/components/MetricCard.tsx | Update | Accessible metric and unavailable-state presentation |
 | src/components/Sidebar.tsx | Update | Responsive, keyboard-operable navigation |
