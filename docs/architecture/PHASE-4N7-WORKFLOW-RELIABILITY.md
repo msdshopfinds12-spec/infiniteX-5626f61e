@@ -131,3 +131,57 @@ A command listed here is a required test, not evidence that it has already run. 
 ## 7. Exit gate
 
 Phase 4N.7 implementation may proceed only with schema-supported ownership checks and tests that reflect the actual action execution model. A green build alone is not production readiness. Complete TEST → AUDIT → human RELEASE APPROVAL as separate gates.
+
+
+## 8. Phase 4N.7-A implementation update
+
+**Implementation status:** Shared foundation committed; worker integration remains pending.
+
+Files added on `feat/phase-4n7-workflow-reliability`:
+- `supabase/functions/_shared/worker-security.mjs`
+- `supabase/functions/_shared/worker-security.test.mjs`
+- `supabase/functions/_shared/worker-security.deno.ts`
+
+The helper layer now includes:
+- Claimed-run shape and owner binding.
+- Parent-workflow ID and owner binding.
+- Bounded queue batch limit.
+- Strict timeout validation with a default of 30 seconds and maximum of 300 seconds.
+- Monotonic deadline creation and deadline assertion.
+- UTF-8 JSON payload byte-limit validation.
+- Streamed request-body byte enforcement, fatal UTF-8 decoding, and explicit malformed-body/read-failure results.
+
+The package manifest now exposes `npm run test:edge-worker-security`.
+
+A least-privilege GitHub Actions workflow was added at `.github/workflows/phase-4n7-worker-security.yml`. It grants only `contents: read`, pins checkout to an immutable action commit, and runs the Node regression command. The Actions run result has not yet been independently retrieved; therefore CI status remains **NOT VERIFIED**.
+
+### Local test evidence
+
+An isolated Node.js v22.16.0 harness exercising the same helper behavior passed **7/7 tests**:
+- Claimed-run and tenant-owner binding
+- Batch-limit bounds
+- Timeout validation
+- Monotonic deadline behavior
+- UTF-8 payload bounds and serialization rejection
+- Actual streamed request byte limit
+- Malformed JSON, invalid UTF-8, and empty-body behavior
+
+This isolated harness is not a checkout-based execution of the committed repository files. The committed repository test suite and Deno suite remain **NOT RUN** pending a verified CI execution environment.
+
+### Updated status matrix
+
+| Area | Status | Evidence |
+|---|---|---|
+| Shared Node/Deno helper files | IMPLEMENTED | Files committed on Phase 4N.7 branch |
+| Timeout policy primitives | IMPLEMENTED | Validation/deadline/payload-bound helpers and regression cases |
+| Node test command | IMPLEMENTED | Package script added |
+| Isolated local behavior checks | PARTIAL / PASS | 7/7 in temporary Node v22.16.0 harness; not a repo checkout |
+| GitHub Actions workflow | IMPLEMENTED | Workflow file committed; run result not independently retrieved |
+| Committed Node regression suite | NOT VERIFIED | Must run in GitHub Actions or repository checkout |
+| Deno regression suite | NOT RUN | Deno runtime not available in local verification environment |
+| Worker integration | NOT STARTED | Both worker entrypoints still require selective port and integration |
+| API-key manager integration | NOT STARTED | Requires worker source and shared CORS integration |
+| Database schema / child-step ownership | BLOCKED | No authoritative schema evidence found in inspected repository paths |
+| Merge / deployment | NOT AUTHORIZED | Remains outside this phase |
+
+**Next gate:** integrate the helpers into the authenticated and cron worker entrypoints only after porting the exact shared CORS dependency and verifying all required RPC/table contracts. Do not add an `owner_id` predicate to `workflow_steps` without schema evidence.
