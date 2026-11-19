@@ -183,3 +183,13 @@ A preliminary, milestone-weighted project estimate is approximately 65%. This is
 - Vercel combined status still reports six project contexts failing with `build-rate-limit`; the separate Vercel deployment integration context reports success. No Vercel build log or new deployment artifact was verified, so this is not classified as a source-code failure or a verified release.
 - Repository reuse remains constrained by the existing audit: no external AI repository code was copied. Private access alone does not establish a license or cross-repository reuse authorization.
 - Executor remains disabled. Lease renewal, settlement, cancellation, PostgreSQL transaction semantics, production identity/tenant isolation, and release readiness remain incomplete.
+
+
+### Approval-token payload-binding regression — 2026-11-20
+
+- Added a focused HMAC regression assertion proving that changing the canonical payload hash changes the derived approval token, alongside the existing principal/task/idempotency-key scope assertions.
+- Commit: `97bf6a7aeaad52f685a4239064c24f17185f0d08`.
+- The test file was fetched back from the feature branch and the new assertion was verified in the returned content.
+- This is source-level test coverage only. No workflow run was yet associated with this exact commit at the time of the check; do not mark the new assertion as CI-passing.
+- Branch comparison: 223 commits ahead, 2 behind `main`, status `diverged`, 84 changed files. No merge or rebase was performed.
+- No production secret, durable PostgreSQL driver, lease lifecycle implementation, migration, deployment, or executor activation was performed.
