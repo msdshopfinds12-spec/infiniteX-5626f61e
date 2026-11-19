@@ -80,7 +80,6 @@ function digest(token) {
 }
 
 /**
-/**
  * Creates a deterministic, high-entropy approval token scoped to a trusted
  * principal, task, payload, and idempotency key. Only its SHA-256 digest is
  * persisted by the approval store. The secret must be server-only and at
@@ -117,6 +116,7 @@ export function createHmacApprovalTokenFactory({ secret, resolvePrincipalSubject
   };
 }
 
+/**
  * Trusted-server composition for the durable two-stage approval protocol.
  *
  * protocolAdapter.issueApprovalGrantV1 delegates to the same durable driver
