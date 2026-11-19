@@ -50,9 +50,9 @@ function validateTask(task, expectedStatus, expectedTaskId) {
 }
 
 
-function expectedVersion(value) {
+function positiveSafeInteger(value, field) {
   if (!Number.isSafeInteger(value) || value < 1) {
-    throw new ApprovalProtocolError("INVALID_EXPECTED_TASK_VERSION", "expectedTaskVersion must be a positive safe integer.");
+    throw new ApprovalProtocolError("INVALID_" + field.toUpperCase(), field + " must be a positive safe integer.");
   }
   return value;
 }
@@ -258,8 +258,8 @@ export function createApprovalProtocolAdapter({
       principalSubject: resolveIdentity(resolvePrincipalSubject, input.principal, "principal_subject"),
       workerSubject: resolveIdentity(resolveWorkerSubject, input.worker, "worker_subject"),
       leaseId: requiredString(input.leaseId, "lease_id"),
-      fencingToken: expectedVersion(input.fencingToken),
-      expectedTaskVersion: expectedVersion(input.expectedTaskVersion),
+      fencingToken: positiveSafeInteger(input.fencingToken, "fencing_token"),
+      expectedTaskVersion: positiveSafeInteger(input.expectedTaskVersion, "expected_task_version"),
       leaseDurationMs,
       idempotencyKey: idempotency(input.idempotencyKey),
     });
