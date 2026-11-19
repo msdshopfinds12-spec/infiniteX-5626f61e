@@ -90,6 +90,23 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ---------- Keyboard focus and motion preferences ---------- */
+:where(button, input, select, textarea, a):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ---------- Layout ---------- */
 .app-shell {
   display: grid;
@@ -171,6 +188,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 40px;
   padding: 10px 12px;
   border: none;
   background: transparent;
@@ -802,6 +820,12 @@ input:disabled {
   .nav {
     flex-direction: row;
     gap: 6px;
+  }
+  .nav-item {
+    min-width: 40px;
+    min-height: 40px;
+    justify-content: center;
+    padding: 8px;
   }
   .nav-item span {
     display: none;

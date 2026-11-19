@@ -20,7 +20,7 @@ export default function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark"><Zap size={18} /></div>
+        <div className="brand-mark"><Zap size={18} aria-hidden="true" /></div>
         <div className="brand-text">
           <span className="brand-title">InfiniteX</span>
           <span className="brand-sub">AI Engineering</span>
@@ -35,10 +35,12 @@ export default function Sidebar({
               key={item.key}
               type="button"
               className={"nav-item" + (active ? " active" : "")}
+              aria-label={item.label}
               aria-current={active ? "page" : undefined}
+              title={item.label}
               onClick={() => onChange(item.key)}
             >
-              <Icon size={18} />
+              <Icon size={18} aria-hidden="true" />
               <span>{item.label}</span>
             </button>
           );
