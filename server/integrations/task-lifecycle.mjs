@@ -46,6 +46,8 @@ export function createTask({ id, title, createdAt }) {
   });
 }
 
+// IMPORTANT: actor is an internal trusted-host assertion, not authentication. Never accept it
+// directly from an untrusted browser/client; derive it from a verified server-side principal.
 export function transitionTask(task, command, { expectedVersion, actor, at } = {}) {
   if (!task || typeof task !== "object" || !STATES.has(task.state) ||
       !Number.isInteger(task.version) || task.version < 0 || !Array.isArray(task.events) ||
