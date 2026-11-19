@@ -28,7 +28,7 @@ function setup({ agentRecord = agent, allowedTools = [
 
 test("runs only an agent-declared, runtime-present, policy-allowlisted local capability", async () => {
   const executor = setup();
-  const result = executor.run({
+  const result = await executor.run({
     agentId: "local-helper",
     capabilityId: "text.metrics",
     input: { text: "Alpha beta\nGamma" },
