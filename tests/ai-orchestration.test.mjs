@@ -270,8 +270,7 @@ test("retains concurrency capacity after timeout until an uncooperative provider
   assert.equal(calls, 1, "capacity rejection must happen before another provider call");
 
   releaseFirst("late completion");
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setImmediate(resolve));
   const recovered = await orchestrator.run({ agentId: "planner", input: "third request" });
   assert.equal(recovered.status, "completed");
   assert.equal(recovered.output, "completed");
