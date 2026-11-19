@@ -27,21 +27,21 @@ export default function TaskCenter() {
   const [historyTaskId, setHistoryTaskId] = useState<string | null>(null);
 
   function apply(taskId: string, command: string, actor: "system" | "user") {
-    setTasks((current) => current.map((task) => {
-      if (task.id !== taskId) return task;
-      try {
-        const updated = transitionTask(task, command, {
-          expectedVersion: task.version,
-          actor,
-          at: new Date(Math.max(Date.now(), Date.parse(task.updatedAt))).toISOString(),
-        });
-        setMessage(`${task.title}: local state changed to ${updated.state}. No external action was performed.`);
-        return updated;
-      } catch {
-        setMessage("The requested transition was rejected. Refresh the task state and try a valid action.");
-        return task;
-      }
-    }));
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target) return;
+    try {
+      const updated = transitionTask(target, command, {
+        expectedVersion: target.version,
+        actor,
+        at: new Date(Math.max(Date.now(), Date.parse(target.updatedAt))).toISOString(),
+      });
+      setTasks((current) => current.map((task) =>
+        task.id === taskId && task.version === target.version ? updated : task
+      ));
+      setMessage(`${target.title}: local state changed to ${updated.state}. No external action was performed.`);
+    } catch {
+      setMessage("The requested transition was rejected. Refresh the task state and try a valid action.");
+    }
   }
 
   const counts = {
