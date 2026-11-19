@@ -57,6 +57,14 @@ function expectedVersion(value) {
   return value;
 }
 
+function validateVersionedTask(task, expectedStatus, expectedTaskId, expectedVersion) {
+  const validated = validateTask(task, expectedStatus, expectedTaskId);
+  if (!Number.isSafeInteger(validated.version) || validated.version !== expectedVersion + 1) {
+    throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an unexpected task version.");
+  }
+  return validated;
+}
+
 function validateLease(lease, expected) {
   if (!lease || typeof lease !== "object" || Array.isArray(lease) ||
       typeof lease.leaseId !== "string" || lease.leaseId.trim() !== expected.leaseId ||
@@ -261,7 +269,7 @@ export function createApprovalProtocolAdapter({
     }
     if (!result || typeof result !== "object" || !OUTCOMES.renew.has(result.outcome)) throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an unsupported lease-renewal outcome.");
     if (result.outcome !== "renewed") return Object.freeze({ outcome: result.outcome });
-    return Object.freeze({ outcome: "renewed", task: validateTask(result.task, "running", request.taskId), lease: validateLease(result.lease, request) });
+    return Object.freeze({ outcome: "renewed", task: validateVersionedTask(result.task, "running", request.taskId, request.expectedTaskVersion), lease: validateLease(result.lease, request) });
   }
 
   async function settleExecutionV1(input = {}) {
@@ -286,7 +294,7 @@ export function createApprovalProtocolAdapter({
     }
     if (!result || typeof result !== "object" || !OUTCOMES.settle.has(result.outcome)) throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an unsupported settlement outcome.");
     if (result.outcome !== "settled") return Object.freeze({ outcome: result.outcome });
-    return Object.freeze({ outcome: "settled", task: validateTask(result.task, targetStatus, request.taskId) });
+    return Object.freeze({ outcome: "settled", task: validateVersionedTask(result.task, targetStatus, request.taskId, request.expectedTaskVersion) });
   }
 
   async function cancelApprovedOrRunningTaskV1(input = {}) {
@@ -303,7 +311,7 @@ export function createApprovalProtocolAdapter({
     }
     if (!result || typeof result !== "object" || !OUTCOMES.cancel.has(result.outcome)) throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an unsupported cancellation outcome.");
     if (result.outcome !== "cancelled") return Object.freeze({ outcome: result.outcome });
-    return Object.freeze({ outcome: "cancelled", task: validateTask(result.task, "cancelled", request.taskId) });
+    return Object.freeze({ outcome: "cancelled", task: validateVersionedTask(result.task, "cancelled", request.taskId, request.expectedTaskVersion) });
   }
 
   return Object.freeze({ issueApprovalGrantV1, approveTaskWithGrantV1, claimApprovedTaskV1, renewExecutionLeaseV1, settleExecutionV1, cancelApprovedOrRunningTaskV1 });
