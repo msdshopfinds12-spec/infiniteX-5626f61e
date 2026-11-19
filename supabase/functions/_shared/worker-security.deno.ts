@@ -3,6 +3,7 @@ import {
   assertStepDeadline,
   clampBatchLimit,
   createStepDeadline,
+  executeWithinStepBudget,
   isClaimedRunOwnedBy,
   isClaimedRunValid,
   isWorkflowOwnedBy,
@@ -77,4 +78,28 @@ Deno.test("Deno: rejects malformed JSON and accepts empty bodies", async () => {
   assertEqual(await readJsonBodyLimited(empty, 32), {
     ok: true, value: null,
   }, "empty body should be accepted");
+});
+
+
+Deno.test("Deno: executes bounded local actions once and checks the deadline after execution", () => {
+  let calls = 0;
+  const output = executeWithinStepBudget(
+    () => { calls++; return { ok: true }; },
+    { input: 1 },
+    2,
+    64,
+    () => 100,
+  );
+  assertEqual(output, { ok: true }, "action output should be returned");
+  assert(calls === 1, "deterministic local action should execute once");
+
+  const times = [100, 100, 2100];
+  let index = 0;
+  let timedOut = false;
+  try {
+    executeWithinStepBudget(() => ({ ok: true }), {}, 2, 64, () => times[index++]);
+  } catch {
+    timedOut = true;
+  }
+  assert(timedOut, "deadline exceeded during action should be reported after execution");
 });
