@@ -191,6 +191,7 @@ test("normalizes asynchronous executor rejection and keeps the approval spent", 
     },
     authorize: async () => true,
     isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({ taskId, taskVersion: "3", status: "awaiting_approval", agentId: "local-helper", agentVersion: "2.1.0", capabilityId: "text.metrics", capabilityVersion: "1.0.0", input: { text: "safe local work" } }),
     claimTaskForExecution: async () => true,
   });
   const grant = await service.requestApproval(base);
@@ -255,6 +256,7 @@ test("validates the configured concurrency ceiling and rejects pre-aborted signa
     capabilityExecutor: { run: () => ({}) },
     authorize: async () => true,
     isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({ taskId, taskVersion: "3", status: "awaiting_approval", agentId: "local-helper", agentVersion: "2.1.0", capabilityId: "text.metrics", capabilityVersion: "1.0.0", input: { text: "safe local work" } }),
     claimTaskForExecution: async () => true,
     maxConcurrentExecutions: 0,
   }), /maxConcurrentExecutions/);
