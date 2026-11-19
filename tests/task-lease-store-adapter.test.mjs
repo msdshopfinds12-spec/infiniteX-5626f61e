@@ -100,7 +100,7 @@ test("uses one consistent clock reading for each renew and settle operation", as
     }),
     clock,
   });
-  await adapter.renew({ ...request, leaseId, fencingToken: 7 });
+  await adapter.renew({ ...claimedRequest, leaseId, fencingToken: 7 });
   assert.equal(calls, 1);
   assert.equal(received.now, now);
 
