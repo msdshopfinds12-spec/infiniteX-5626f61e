@@ -21,7 +21,7 @@ function integerInRange(value, label, min, max) {
  * retriesUsed is the number of retries already consumed (0 before first retry).
  * Unknown errors fail closed and are never retried.
  *
- * Full jitter is applied to an exponential ceiling:
+ * Full jitter uses the half-open interval [0, exponentialCeiling):
  * delay = floor(random() * min(maxDelay, baseDelay * 2^retriesUsed)).
  */
 export function decideRetry({
@@ -43,13 +43,7 @@ export function decideRetry({
   integerInRange(maxDelayMs, "max_delay_ms", baseDelayMs, 24 * 60 * 60_000);
   integerInRange(maxElapsedMs, "max_elapsed_ms", 1, 7 * 24 * 60 * 60_000);
 
-  if (typeof random !== "function") throw new Error("random_must_be_function");
-  const randomValue = random();
-  if (typeof randomValue !== "number" || !Number.isFinite(randomValue) ||
-      randomValue < 0 || randomValue >= 1) {
-    throw new Error("random_out_of_range");
-  }
-
+  // Resolve deterministic terminal states before consulting randomness.
   if (!RETRYABLE.has(errorCode)) {
     return { retry: false, reason: "non_retryable_error", retriesUsed };
   }
@@ -62,9 +56,25 @@ export function decideRetry({
     return { retry: false, reason: "max_elapsed_exceeded", retriesUsed };
   }
 
+  // Randomness is required only when a retry is otherwise eligible.
+  if (typeof random !== "function") {
+    throw new Error("random_must_be_function");
+  }
+
+  const randomValue = random();
+  if (
+    typeof randomValue !== "number" ||
+    !Number.isFinite(randomValue) ||
+    randomValue < 0 ||
+    randomValue >= 1
+  ) {
+    throw new Error("random_out_of_range");
+  }
+
   const exponent = Math.min(retriesUsed, 30);
   const exponentialCeiling = Math.min(maxDelayMs, baseDelayMs * (2 ** exponent));
-  const delayMs = Math.floor(randomValue * (exponentialCeiling + 1));
+  const delayMs = Math.floor(randomValue * exponentialCeiling);
+
   if (elapsedMs + delayMs > maxElapsedMs) {
     return { retry: false, reason: "max_elapsed_would_be_exceeded", retriesUsed };
   }

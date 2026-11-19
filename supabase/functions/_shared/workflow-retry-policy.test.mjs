@@ -58,3 +58,77 @@ test("does not mutate caller input", () => {
   decideRetry(input);
   assert.deepEqual(input, base);
 });
+
+test("does not invoke randomness for non-retryable errors", () => {
+  let calls = 0;
+  const result = decideRetry({
+    ...base,
+    errorCode: "validation_error",
+    random: () => {
+      calls += 1;
+      throw new Error("random_must_not_be_called");
+    },
+  });
+
+  assert.equal(result.retry, false);
+  assert.equal(result.reason, "non_retryable_error");
+  assert.equal(calls, 0);
+});
+
+test("does not invoke randomness when retry limit is exhausted", () => {
+  let calls = 0;
+  const result = decideRetry({
+    ...base,
+    retriesUsed: 3,
+    random: () => {
+      calls += 1;
+      throw new Error("random_must_not_be_called");
+    },
+  });
+
+  assert.equal(result.reason, "retry_limit_exhausted");
+  assert.equal(calls, 0);
+});
+
+test("does not invoke randomness when elapsed-time budget is exhausted", () => {
+  let calls = 0;
+  const result = decideRetry({
+    ...base,
+    nowMs: 16 * 60_000,
+    random: () => {
+      calls += 1;
+      throw new Error("random_must_not_be_called");
+    },
+  });
+
+  assert.equal(result.reason, "max_elapsed_exceeded");
+  assert.equal(calls, 0);
+});
+
+test("full jitter permits zero and excludes the exponential ceiling", () => {
+  const zero = decideRetry({ ...base, random: () => 0 });
+  assert.equal(zero.delayMs, 0);
+
+  const upperBoundary = decideRetry({
+    ...base,
+    baseDelayMs: 1_000,
+    maxDelayMs: 1_000,
+    random: () => 0.999999999,
+  });
+  assert.ok(upperBoundary.delayMs >= 0);
+  assert.ok(upperBoundary.delayMs < 1_000);
+});
+
+test("rejects invalid random values only when a retry is eligible", () => {
+  assert.throws(
+    () => decideRetry({ ...base, random: () => 1 }),
+    /random_out_of_range/,
+  );
+
+  const terminal = decideRetry({
+    ...base,
+    errorCode: "validation_error",
+    random: () => 1,
+  });
+  assert.equal(terminal.reason, "non_retryable_error");
+});

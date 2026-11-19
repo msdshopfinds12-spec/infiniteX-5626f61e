@@ -5,6 +5,7 @@ on:
     branches:
       - fix/phase-4n8b-transactional-step-fencing-impl
       - feat/phase-4n8c-workflow-reliability-pr35
+      - fix/phase-4n8c-retry-policy-ci-hardening
   pull_request:
     branches:
       - main
@@ -33,6 +34,8 @@ jobs:
         run: npm ci
       - name: Run Node security and CORS regressions
         run: npm run test:edge-function-security
+      - name: Run workflow retry policy regression tests
+        run: npm run test:workflow-retry-policy
       - name: Run shared workflow action regression tests
         run: node --test supabase/functions/_shared/workflow-actions.test.mjs
       - name: Set up Deno
