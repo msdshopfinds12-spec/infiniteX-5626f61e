@@ -238,7 +238,7 @@ The GitHub Actions workflows pin Node.js 22.16.0 and use least-privilege `conten
 | Retry semantics | IMPLEMENTED for current local actions | Retry loop removed; each deterministic local action executes once |
 | Workflow child-step schema ownership | BLOCKED | Authoritative schema not yet found; no speculative owner column filter added |
 | Supabase RPC and table contracts | NOT VERIFIED | Requires authoritative migrations/schema and deployment config |
-| GitHub Actions | VERIFIED | Runs #44597625333 and #44597796899 passed on exact head `9d6ac04f644b936de935000c993c47c91587af06` |
+| GitHub Actions | VERIFIED | Runs #44597625333 and #44597796899 passed on exact head `9d6ac04f2bf5ec4d3765f12468b4a1dd777f0753` |
 | Merge / production deployment | NOT AUTHORIZED | Explicitly out of scope |
 
 **Next required gate:** complete review of the Phase 4N.8A attempt-generation fencing diff, verify the production CORS allowlist/configuration separately, and retain the existing release gate. The CI results above establish code-level build/test/type-check evidence; they do not establish production deployment or live end-to-end workflow behavior.
