@@ -223,7 +223,21 @@ Implemented behavior:
 
 **Critical limitation:** this is an in-memory approval primitive, not user authentication, not a deployed API, and not durable across process restarts. The principal MUST be derived by verified server authentication middleware. Never trust a subject or approval decision supplied directly by the browser. It is not yet wired into a production execution route or the Task Center.
 
-## 12. Change-control gates
+## 12. Phase 6C execution-service implementation note
+
+The branch also contains `server/ai/approved-capability-service.mjs`, with tests in `tests/approved-capability-service.test.mjs`.
+
+The service composes the approval authority with the local capability executor:
+- an injected server-side authorization callback must authorize approval and execution separately;
+- an injected trusted task-state reader must confirm the task is awaiting approval;
+- an approval is consumed once and is bound to the principal, task, action, capability, and version;
+- an injected atomic task-claim callback must move/claim the task so concurrent grants cannot execute the same task twice;
+- a consumed grant is not restored after execution failure (fail-closed behavior);
+- adapter errors are normalized to avoid leaking internal messages.
+
+**Critical limitation:** this is a server-side service primitive, not an HTTP route, authentication middleware, or durable task repository. The callbacks must be implemented against trusted server identity and task state before exposure to a client. Current test callbacks are synthetic fixtures, not production authorization.
+
+## 13. Change-control gates
 
 This plan authorizes implementation only on `feat/infiniteX-zero-budget-implementation`. It does not authorize:
 - changes to `main`;
