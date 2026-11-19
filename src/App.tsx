@@ -7,6 +7,7 @@ import MetricCard from "./components/MetricCard";
 import AgentList from "./components/AgentList";
 import PipelineBoard from "./components/PipelineBoard";
 import LogStream from "./components/LogStream";
+import TaskCenter from "./components/TaskCenter";
 import type { Metric, ViewKey } from "./types";
 
 const metrics: Metric[] = [
@@ -20,6 +21,7 @@ const titles: Record<ViewKey, string> = {
   overview: "Overview",
   agents: "AI Agents",
   pipelines: "Pipelines",
+  tasks: "Task Center",
   logs: "Sample Logs",
   security: "Security Posture",
   settings: "Settings",
@@ -29,6 +31,7 @@ const descriptions: Record<ViewKey, string> = {
   overview: "A clear view of workspace structure and verified connection state.",
   agents: "Browse illustrative agent records; no provider execution is connected.",
   pipelines: "Review example workflow stages without starting jobs or deployments.",
+  tasks: "Explore a local approval-gated task lifecycle. No jobs or external tools execute.",
   logs: "Inspect sample events that are not live telemetry or production alerts.",
   security: "Review the current verification boundaries and outstanding controls.",
   settings: "Workspace preferences and integration readiness.",
@@ -138,6 +141,8 @@ export default function App() {
                 <PipelineBoard expanded />
               </section>
             )}
+
+            {view === "tasks" && <TaskCenter />}
 
             {view === "logs" && (
               <section className="panel">
