@@ -243,13 +243,23 @@ A code review identified an asynchronous failure-handling gap in the approved ca
 
 This fix does not add execution preemption, a durable task state store, authentication, or a production API. The current local runtime remains synchronous and deterministic. A future async runtime must enforce cooperative cancellation and retain concurrency accounting until underlying work actually settles.
 
-## 14. Bounded approved execution implementation note
+## 14. Orchestrator timeout and concurrency hardening
+
+The provider-neutral orchestrator now validates the optional AbortSignal contract and enforces a configurable in-process concurrency ceiling (`maxConcurrentRuns`, default 4, accepted range 1–100). The execution slot is reserved before provider invocation and released only when the underlying provider promise settles.
+
+This closes an important timeout accounting gap: a timeout or caller cancellation may stop waiting for a provider response, but it does not prove that an uncooperative provider has stopped. Previously, a `Promise.race` timeout could return while the provider promise continued running, allowing later requests to exceed the intended resource bound. The orchestrator now retains that slot until actual settlement; overloaded requests fail with `RUN_CAPACITY_EXCEEDED`.
+
+**Limitations:** cancellation remains cooperative. This is an in-memory per-process limit, not a distributed quota or OS-level process kill. A provider that never settles after cancellation can retain a slot indefinitely; production adapters need their own enforceable network deadlines and upstream cancellation. A timeout response means the orchestrator stopped waiting, not that remote work was terminated.
+
+Regression tests cover a provider that ignores AbortSignal, capacity retention after timeout, slot recovery after actual settlement, invalid signal shapes, and invalid concurrency configuration.
+
+## 15. Bounded approved execution implementation note
 
 The approved capability service now supports a configurable in-process concurrency ceiling (`maxConcurrentExecutions`, default 4, accepted range 1–100). It reserves capacity synchronously before consuming the approval grant, rejects overload with `EXECUTION_CAPACITY_EXCEEDED`, and releases the reservation in `finally` after the executor settles. Pre-aborted requests are rejected before approval consumption. Regression tests cover saturation, release after completion, invalid configuration, and pre-aborted signals.
 
 **Scope limitation:** this is a per-service-instance in-memory bound, not a distributed/global limit. It does not provide a durable queue, request rate limiting, execution deadlines, or forced cancellation. A cooperative executor must observe the supplied AbortSignal; cancellation must not be reported as complete until the work actually stops. Multi-process deployments require a shared atomic concurrency/claim mechanism before this limit can be treated as global.
 
-## 15. Change-control gates
+## 16. Change-control gates
 
 This plan authorizes implementation only on `feat/infiniteX-zero-budget-implementation`. It does not authorize:
 - changes to `main`;
