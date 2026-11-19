@@ -8,7 +8,7 @@ END;
 $$;
 
 INSERT INTO infinitex_harness.tasks (owner_subject,task_id,status,task_version,event_seq,fencing_token,payload_hash)
-VALUES ('owner-a','rollback-task','approved',1,0,0,repeat('a',64)),
+VALUES ('owner-a','rollback-task','approved',1,1,0,repeat('a',64)),
        ('owner-a','race-task','approved',1,0,0,repeat('b',64));
 
 INSERT INTO infinitex_harness.approval_grants
