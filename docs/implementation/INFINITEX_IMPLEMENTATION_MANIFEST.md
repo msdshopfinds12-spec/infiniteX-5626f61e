@@ -185,3 +185,19 @@ Status: BUILD COMPLETE FOR THE CURRENT FRONTEND/PWA + PROVIDER-NEUTRAL AI FOUNDA
 - Built-ins remain deterministic local computations only. No shell, filesystem, network, external provider, dynamic import, third-party plugin execution, or background queue is enabled.
 - Runtime is a trusted server-side module, not a sandbox for arbitrary untrusted code. A future Python worker remains blocked until license/reuse approval, process isolation, resource limits, and independent security review are completed.
 - Verification status: awaiting CI for the latest branch commit. Do not mark Phase 5 tested until both frontend and browser workflows have completed.
+
+### Phase 5 verification evidence
+
+- Verified implementation commit: `e0f71b1f79a4e118c2fea6281a3408d0453e2784`.
+- Frontend CI succeeded: [run 44545604938](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44545604938). Typecheck, browser/server import boundary, production build, and npm audit passed; **48/48 unit and policy tests passed**, 0 failed; npm audit reported 0 vulnerabilities at the configured moderate-or-higher threshold.
+- Browser and accessibility CI succeeded: [run 44545604905](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44545604905). **10/10 Playwright tests passed**, including Task Center approval/rejection/history flows, WCAG 2.1 A/AA automated checks in both themes, mobile layout, navigation, safe search rendering, theme persistence, and offline app shell.
+- The runtime is synchronous. The misleading concurrency counter was removed rather than claiming unsupported parallelism. It performs deterministic allowlisted local computations only.
+- Remaining limitation: this is not an OS-level sandbox. Do not execute arbitrary third-party code, Python plugins, shell commands, filesystem operations, or network requests through this runtime.
+
+### Repository branch-protection incident record
+
+- During Phase 5 test-file creation, the GitHub file-creation connector unexpectedly created commit `6e1227be6b31d093bc68d3974b087a302bb0a613` on `main`, despite a feature-branch parameter being supplied.
+- Observed prior main SHA: `76b821789f52aa6f403bacb0508c6c989fdfa3a5`; observed main SHA after the connector side effect: `6e1227be6b31d093bc68d3974b087a302bb0a613`.
+- The commit adds only `tests/local-adapter-runtime.test.mjs`; the feature implementation and its actual tests are on `feat/infiniteX-zero-budget-implementation`.
+- No force push, rollback, deletion, or further main-branch write was attempted. The connector's create-file behavior was abandoned. Subsequent feature-branch writes used existing-file updates with an explicit branch.
+- This is an unexpected repository mutation and requires human review before any main-branch cleanup. Do not claim main is untouched.
