@@ -103,6 +103,38 @@ test("rejects approval when server-owned payload changes after approval", async 
   );
 });
 
+
+test("detaches execution input from mutable storage snapshots before asynchronous task claims", async () => {
+  const serverInput = { nested: { text: "approved immutable value" } };
+  const authority = createApprovalAuthority({
+    now: () => 50_000,
+    tokenFactory: () => "detached_input_token_" + "d".repeat(32),
+  });
+  const calls = [];
+  const service = createApprovedCapabilityService({
+    approvalAuthority: authority,
+    capabilityExecutor: { run: (request) => { calls.push(request); return { status: "completed" }; } },
+    authorize: async () => true,
+    isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({
+      taskId, taskVersion: "12", status: "awaiting_approval",
+      agentId: "trusted-agent", agentVersion: "4.2.0",
+      capabilityId: "text.metrics", capabilityVersion: "1.0.0",
+      input: serverInput,
+    }),
+    claimTaskForExecution: async () => {
+      serverInput.nested.text = "mutated during async claim";
+      return true;
+    },
+  });
+  const grant = await service.requestApproval(base);
+  await service.executeApproved({
+    principal, taskId: base.taskId, capabilityId: base.capabilityId,
+    capabilityVersion: base.capabilityVersion, approvalToken: grant.token,
+  });
+  assert.deepEqual(calls[0].input, { nested: { text: "approved immutable value" } });
+});
+
 test("requires authorized principal and trusted task state before issuing approval", async () => {
   const denied = setup({ authorized: false });
   await assert.rejects(
