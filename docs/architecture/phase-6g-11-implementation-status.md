@@ -156,3 +156,14 @@ A preliminary, milestone-weighted project estimate is approximately 65%. This is
 - No PR-triggered GitHub Actions workflow run was returned for this commit. Therefore no new test/build pass is claimed.
 - The branch remains divergent from `main` (203 ahead, 2 behind in the observed comparison). No merge/rebase was performed.
 - Phase 6G.12 remains PLAN ONLY. Lease renewal, settlement, cancellation, PostgreSQL driver, and executor integration are not implemented by this commit.
+
+
+### Follow-up test-model correction — 2026-11-20
+
+- The deterministic fake previously keyed issue/claim idempotency by principal and key only. This did not match the Phase 6G.12 contract requiring principal + task + operation scoping.
+- Updated the fake to scope issuance keys as principal/task/issue/key and claim keys as principal/task/claim/key.
+- Added a regression test proving the same idempotency key can be used independently for two different tasks under the same principal.
+- Commits: `480f124c4d3dce5d5d58090a5a243fb520db031a` and `6de7321ef8de7d9b1d24a17bdc5fc023dd7d4c2a`.
+- Source and test files were fetched back from the feature branch and verified. Tests have NOT been executed; the new test is not marked passing.
+- Latest observed branch comparison: 207 commits ahead, 2 behind `main`, status `diverged`. No merge or rebase was performed.
+- Latest combined statuses are Vercel `build-rate-limit` failures across six project contexts. These are platform quota signals, not passing/failing test assertions. No PR-triggered workflow run was returned.
