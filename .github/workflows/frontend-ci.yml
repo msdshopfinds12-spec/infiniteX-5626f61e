@@ -44,5 +44,11 @@ jobs:
         run: npm run check:browser-boundary
       - name: Build production assets
         run: npm run build
+      - name: Install temporary browser-test tooling without changing the lockfile
+        run: npm install --no-save --package-lock=false @playwright/test@1.63.0 @axe-core/playwright@4.13.0
+      - name: Install Chromium for browser verification
+        run: npx playwright install --with-deps chromium
+      - name: Run browser and accessibility regression tests
+        run: npm run test:e2e
       - name: Block release on moderate or higher dependency advisories
         run: npm audit --audit-level=moderate
