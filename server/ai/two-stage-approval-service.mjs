@@ -70,7 +70,7 @@ function digest(token) {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
-function validateApprovedOutcome(result) {
+function validateApprovedOutcome(result, expectedTaskId) {
   if (!result || typeof result !== "object" || Array.isArray(result)) {
     throw new TwoStageApprovalError("INVALID_STORE_RESULT", "The grant store returned an invalid result.");
   }
@@ -80,8 +80,8 @@ function validateApprovedOutcome(result) {
     }
     throw new TwoStageApprovalError("INVALID_STORE_RESULT", "The grant store returned an unsupported result.");
   }
-  if (!result.task || result.task.status !== "approved") {
-    throw new TwoStageApprovalError("INVALID_STORE_RESULT", "The grant store did not confirm the approved task state.");
+  if (!result.task || result.task.taskId !== expectedTaskId || result.task.status !== "approved") {
+    throw new TwoStageApprovalError("INVALID_STORE_RESULT", "The grant store did not confirm the expected approved task state.");
   }
   if (typeof result.expiresAt !== "string" || !Number.isFinite(Date.parse(result.expiresAt)) ||
       new Date(result.expiresAt).toISOString() !== result.expiresAt) {
@@ -131,12 +131,22 @@ export function createTwoStageApprovalService({
     } catch {
       throw new TwoStageApprovalError("UNTRUSTED_PRINCIPAL", "A trusted principal could not be resolved.");
     }
-    const task = await loadTaskSnapshot({ taskId: id, principal });
+    let task;
+    try {
+      task = await loadTaskSnapshot({ taskId: id, principal });
+    } catch {
+      throw new TwoStageApprovalError("TASK_STORE_UNAVAILABLE", "The trusted task snapshot could not be loaded.");
+    }
     const bound = snapshot(task, id, "awaiting_approval");
-    if (await authorizeApproval({ principal, task: bound }) !== true) {
+    let authorized = false;
+    try { authorized = await authorizeApproval({ principal, task: bound }) === true; } catch { authorized = false; }
+    if (!authorized) {
       throw new TwoStageApprovalError("APPROVAL_FORBIDDEN", "The principal is not authorized to approve this task.");
     }
-    const token = tokenFactory();
+    let token;
+    try { token = tokenFactory(); } catch {
+      throw new TwoStageApprovalError("TOKEN_SOURCE_UNAVAILABLE", "A secure approval token could not be generated.");
+    }
     if (typeof token !== "string" || !TOKEN.test(token)) {
       throw new TwoStageApprovalError("INVALID_TOKEN_SOURCE", "The secure token source returned an invalid token.");
     }
@@ -159,7 +169,7 @@ export function createTwoStageApprovalService({
     } catch {
       throw new TwoStageApprovalError("GRANT_STORE_UNAVAILABLE", "The durable approval grant transaction could not be completed.");
     }
-    const result = validateApprovedOutcome(raw);
+    const result = validateApprovedOutcome(raw, bound.taskId);
     if (result.outcome !== "issued") return result;
     return Object.freeze({
       outcome: "issued",
@@ -177,7 +187,12 @@ export function createTwoStageApprovalService({
     if (typeof approvalToken !== "string" || !TOKEN.test(approvalToken)) {
       throw new TwoStageApprovalError("INVALID_APPROVAL_TOKEN", "A valid one-time approval token is required.");
     }
-    const task = await loadTaskSnapshot({ taskId: id, principal });
+    let task;
+    try {
+      task = await loadTaskSnapshot({ taskId: id, principal });
+    } catch {
+      throw new TwoStageApprovalError("TASK_STORE_UNAVAILABLE", "The trusted task snapshot could not be loaded.");
+    }
     const bound = snapshot(task, id, "approved");
     try {
       return await protocolAdapter.claimApprovedTaskV1({
