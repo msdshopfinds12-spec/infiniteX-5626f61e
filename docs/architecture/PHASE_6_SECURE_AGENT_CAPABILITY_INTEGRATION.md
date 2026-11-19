@@ -115,18 +115,18 @@ Do not introduce a persistent database dependency until the repository's current
 
 ## 6. Task lifecycle
 
-Allowed transitions must be explicit and tested:
+The implemented deterministic lifecycle in `src/lib/task-lifecycle.mjs` currently permits:
 
-- `pending_approval -> rejected`
-- `pending_approval -> queued` only after server-side approval
-- `queued -> running`
-- `running -> succeeded`
-- `running -> failed`
-- `queued -> cancelled`
-- `running -> cancelling -> cancelled` only after cooperative stop is confirmed
-- `running -> timed_out` only after deadline enforcement is observed
+- `queued -> planning` via `begin_planning` (system)
+- `planning -> awaiting_approval` via `request_approval` (system)
+- `awaiting_approval -> approved` via `approve` (user intent in the local demo)
+- `awaiting_approval -> cancelled` via `reject` (user intent in the local demo)
+- `approved -> running` via `begin_execution` (system)
+- `running -> succeeded` via `complete` (system)
+- `running -> failed` via `fail` (system)
+- Any non-terminal state may be cancelled by the user via `cancel`.
 
-Terminal states are immutable. Duplicate transition requests must be idempotent or rejected without duplicating side effects. Unknown transitions fail closed.
+Terminal states are immutable. Every transition requires the expected version and a non-decreasing canonical UTC timestamp. The actor field is a lifecycle assertion, NOT authentication; a production API must derive it from a verified server principal. Cancellation here records a state change only and does not prove an external worker stopped. Timeout/cancelling states are not implemented in this lifecycle yet.
 
 ## 7. Implementation sequence and acceptance criteria
 
@@ -279,7 +279,22 @@ Implemented contract:
 
 A new orchestrator concurrency test exposed a test synchronization race: the test asserted capacity recovery after only two microtask turns, before the provider promise's `finally` handler was guaranteed to release the slot. The test now waits for the next event-loop turn with `setImmediate` before asserting recovery. This changes test synchronization only; it does not weaken the runtime capacity invariant.
 
-## 18. Change-control gates
+## 18. Phase 6F — Task Center local repository integration
+
+The bounded repository implementation now lives in the browser-safe shared module `src/lib/task-repository.mjs`, with TypeScript declarations in `src/lib/task-repository.d.mts`. The server integration path `server/integrations/in-memory-task-repository.mjs` is a thin re-export, and repository tests target the shared module directly.
+
+The Task Center now initializes a bounded in-memory repository (100 tasks, 100 events per task), seeds its two demo tasks through that repository, reads task snapshots from it, and routes UI transitions through the repository's version-checked transition method. Task history is therefore sourced from repository snapshots rather than a separate React-only task mutation path.
+
+**Verified design boundary:** this is still a local, volatile browser-side demo repository. Refreshing the page resets the sample data. It does not call the server, authenticate a user, authorize a real approval, execute a capability, persist events, or contact an AI provider. The UI explicitly labels the workflow as a local simulation. Do not describe this as production task execution or secure approval.
+
+### Phase 6F acceptance criteria remaining
+
+- Run frontend CI on the latest code SHA (typecheck, unit/policy tests, browser/server boundary scan, production build, dependency audit).
+- Run browser and accessibility CI on the same final code SHA.
+- Add/verify browser coverage for repository-backed task transitions, approval/rejection, history rendering, and narrow mobile layout.
+- Keep server authentication, API routing, durable persistence, and actual agent execution blocked until their separate contracts and approvals exist.
+
+## 19. Change-control gates
 
 This plan authorizes implementation only on `feat/infiniteX-zero-budget-implementation`. It does not authorize:
 - changes to `main`;
