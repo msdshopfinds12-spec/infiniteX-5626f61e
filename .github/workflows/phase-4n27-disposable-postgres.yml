@@ -1,0 +1,52 @@
+name: Phase 4N.27 Disposable PostgreSQL Contract Verification
+
+on:
+  push:
+    branches:
+      - eng/phase-4n27-transactional-fencing-verification
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-4n27-postgres-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  transactional-fencing:
+    name: Independent-session RPC, rollback, and stale-generation checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Record isolated test target
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "select version();"
+          echo "Target is the disposable PostgreSQL service container."
+      - name: Run independent-session transactional fencing tests
+        run: bash supabase/tests/run-phase-4n8b-postgres-contract.sh
