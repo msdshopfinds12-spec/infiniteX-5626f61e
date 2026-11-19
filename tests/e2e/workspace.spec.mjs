@@ -86,6 +86,12 @@ test("task center requires explicit approval before showing simulated execution 
   await card.getByRole("button", { name: "Preview execution state" }).click();
   await expect(card.getByText("running", { exact: true })).toBeVisible();
   await expect(page.getByText(/No external action was performed/)).toBeVisible();
+  await card.getByRole("button", { name: "View history" }).click();
+  const history = card.getByRole("list", { name: /State history/ });
+  await expect(history).toContainText("queued → planning");
+  await expect(history).toContainText("planning → awaiting_approval");
+  await expect(history).toContainText("awaiting_approval → approved");
+  await expect(history).toContainText("approved → running");
 });
 
 test("task center rejects a task through the human review control", async ({ page }) => {
@@ -106,4 +112,17 @@ test("task history disclosure is scoped to the selected task", async ({ page }) 
   await cards.nth(0).getByRole("button", { name: "View history" }).click();
   await expect(cards.nth(0).getByRole("list", { name: /State history/ })).toBeVisible();
   await expect(cards.nth(1).getByRole("list", { name: /State history/ })).toHaveCount(0);
+});
+
+test("task center clearly resets its in-memory demo state after reload", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Task Center" }).click();
+  const card = page.locator(".task-card").filter({ hasText: "Review application architecture" });
+  await card.getByRole("button", { name: "Start planning" }).click();
+  await expect(card.getByText("planning", { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Task Center" }).click();
+  const reloadedCard = page.locator(".task-card").filter({ hasText: "Review application architecture" });
+  await expect(reloadedCard.getByText("queued", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Local in-memory repository simulation only/)).toBeVisible();
 });
