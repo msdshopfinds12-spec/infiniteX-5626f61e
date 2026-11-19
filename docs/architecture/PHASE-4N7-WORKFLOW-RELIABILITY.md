@@ -185,3 +185,60 @@ This isolated harness is not a checkout-based execution of the committed reposit
 | Merge / deployment | NOT AUTHORIZED | Remains outside this phase |
 
 **Next gate:** integrate the helpers into the authenticated and cron worker entrypoints only after porting the exact shared CORS dependency and verifying all required RPC/table contracts. Do not add an `owner_id` predicate to `workflow_steps` without schema evidence.
+
+
+## 9. Phase 4N.7-B/C/F integration update
+
+**Implementation status:** Worker entrypoints and API-key manager have been ported to the isolated Phase 4N.7 branch and selectively integrated with the new shared helpers.
+
+Files added:
+- `supabase/functions/simula-workflow-worker/index.ts`
+- `supabase/functions/simula-workflow-cron-worker/index.ts`
+- `supabase/functions/ashaa-api-key-manager/index.ts`
+- `supabase/functions/_shared/cors.ts`
+- `supabase/functions/_shared/cors.test.mjs`
+
+### Worker behavior changes
+
+Both workflow workers now:
+- Validate `timeout_seconds` using the shared bounded policy (default 30 seconds; maximum 300 seconds).
+- Execute each deterministic local action once; the old retry loop has been removed.
+- Check a monotonic deadline before and after action execution.
+- Enforce a 64 KiB JSON input/output bound for each local action.
+- Retain existing workflow/run owner checks and status transitions.
+- Keep the cron worker's `x-simula-worker-secret` header and `simula_verify_worker_secret` RPC unchanged.
+
+**Timeout limitation:** This is cooperative deadline enforcement, not preemption. A synchronous JavaScript action that blocks the isolate cannot be forcibly interrupted by an AbortSignal or `Promise.race()`. Payload bounds constrain the current simple transformation actions. Any future CPU-heavy or asynchronous external action must run behind an independently cancellable worker/job boundary and have a separately designed idempotency contract.
+
+### API-key manager and CORS
+
+The API-key manager was ported with authenticated user lookup, owner-scoped key list/revoke operations, one-time raw key return, SHA-256 digest storage, and bounded streamed JSON parsing. The exact-origin CORS helper denies browser origins not present in `INFINITEX_ALLOWED_ORIGINS`; non-browser requests without an Origin header remain allowed by design.
+
+### Regression wiring
+
+Package scripts now include:
+- `npm run test:edge-function-cors`
+- `npm run test:edge-worker-security`
+- `npm run test:edge-function-security`
+
+The GitHub Actions workflow pins Node.js 22.16.0 and uses least-privilege `contents: read`. The workflow file is committed, but no workflow execution result has been retrieved; therefore CI is **NOT VERIFIED**.
+
+### Updated status matrix
+
+| Area | Status | Evidence |
+|---|---|---|
+| Shared security and budget helpers | IMPLEMENTED | Committed helper module |
+| Node regression suite | IMPLEMENTED / NOT RUN | Tests committed; no repository test run evidence |
+| Deno regression suite | IMPLEMENTED / NOT RUN | Deno tests committed; no Deno execution evidence |
+| Exact-origin CORS policy and tests | IMPLEMENTED / NOT RUN | CORS module and test file committed |
+| Authenticated workflow worker | IMPLEMENTED / NOT TYPE-CHECKED | Ported source; helper integration and retry removal committed |
+| Cron workflow worker | IMPLEMENTED / NOT TYPE-CHECKED | Ported source; custom-secret contract preserved |
+| API-key manager | IMPLEMENTED / NOT TYPE-CHECKED | Ported authenticated, owner-scoped implementation |
+| Step execution budget | IMPLEMENTED (COOPERATIVE) | Pre/post deadline checks and JSON byte bounds; no hard preemption |
+| Retry semantics | IMPLEMENTED for current local actions | Retry loop removed; each deterministic local action executes once |
+| Workflow child-step schema ownership | BLOCKED | Authoritative schema not yet found; no speculative owner column filter added |
+| Supabase RPC and table contracts | NOT VERIFIED | Requires authoritative migrations/schema and deployment config |
+| GitHub Actions | NOT VERIFIED | Workflow committed; run outcome not retrieved |
+| Merge / production deployment | NOT AUTHORIZED | Explicitly out of scope |
+
+**Next required gate:** run the committed Node regression suite, Deno regression suite, and Deno type checks against this branch. Then reconcile RPC/table schema and ownership relationships using authoritative migrations before considering any database-level change.
