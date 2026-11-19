@@ -1,0 +1,49 @@
+name: Phase 4N.8A Attempt Fencing
+
+on:
+  push:
+    branches:
+      - fix/phase-4n8a-attempt-fencing
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-4n8a-attempt-fencing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Node tests, Deno tests and checks, application build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.16.0
+          cache: npm
+      - name: Record runtime and commit
+        run: |
+          node --version
+          npm --version
+          git rev-parse HEAD
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run Node security and CORS regressions
+        run: npm run test:edge-function-security
+      - name: Run Deno regression suite
+        run: npx --yes deno@2.2.12 test --no-lock supabase/functions/_shared/worker-security.deno.ts
+      - name: Type-check authenticated workflow worker
+        run: npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-worker/index.ts
+      - name: Type-check cron workflow worker
+        run: npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
+      - name: Type-check API-key manager
+        run: npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/ashaa-api-key-manager/index.ts
+      - name: Build application and type-check TypeScript
+        run: npm run build
