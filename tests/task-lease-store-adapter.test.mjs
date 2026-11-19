@@ -28,6 +28,7 @@ test("claims a validated lease and passes a bounded duration to the atomic store
   const claimed = await adapter.claim(request);
   assert.equal(claimed.lease.fencingToken, 7);
   assert.equal(received.leaseDurationMs, 30_000);
+  assert.equal(Object.hasOwn(received, "now"), false);
   assert.equal(Object.isFrozen(claimed.lease), true);
 });
 
@@ -132,8 +133,10 @@ test("rejects renewal results that change the lease identity or fencing token", 
 });
 
 
-test("rejects caller-supplied timestamps for renewal and settlement", async () => {
+test("rejects malformed inputs and caller-supplied timestamps", async () => {
   const adapter = createLeaseFencedTaskStoreAdapter({ store: storeWith(), clock: () => now });
+  await assert.rejects(adapter.renew(null), (error) => error.code === "INVALID_INPUT");
+  await assert.rejects(adapter.complete(null), (error) => error.code === "INVALID_INPUT");
   await assert.rejects(
     adapter.renew({ ...claimedRequest, leaseId, fencingToken: 7, now: "2099-01-01T00:00:00.000Z" }),
     (error) => error.code === "UNTRUSTED_TIME_INPUT",
