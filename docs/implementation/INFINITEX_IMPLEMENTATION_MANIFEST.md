@@ -25,6 +25,12 @@
 | Path | Action | Acceptance |
 |---|---|---|
 | src/App.tsx | Update | Honest sample/connection state; working view navigation; no invented live metrics |
+| src/components/AgentList.tsx | Update | Filterable sample records with safe empty state |
+| src/components/PipelineBoard.tsx | Update | Clearly illustrative pipeline stages; no execution claim |
+| src/components/LogStream.tsx | Update | Static sample events, not live telemetry |
+| src/lib/dashboard-data.mjs | Create | Pure, safe sample-agent filtering helper |
+| src/lib/dashboard-data.d.mts | Create | TypeScript declaration for the filtering helper |
+| tests/dashboard-data.test.mjs | Create | Search normalization, malformed data and injection-text contracts |
 | src/components/MetricCard.tsx | Update | Accessible metric and unavailable-state presentation |
 | src/components/Sidebar.tsx | Update | Responsive, keyboard-operable navigation |
 | src/components/TopBar.tsx | Update | Accessible title, search and theme controls |
