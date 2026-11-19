@@ -232,6 +232,31 @@ body {
   color: var(--text-2);
 }
 
+/* ---------- Demo state disclosure ---------- */
+.demo-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  color: var(--text-1);
+  font-size: 12px;
+}
+
+.demo-notice strong {
+  flex: 0 0 auto;
+  color: var(--warning);
+  letter-spacing: 0.06em;
+}
+
+button:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 /* ---------- Topbar ---------- */
 .topbar {
   height: 64px;
