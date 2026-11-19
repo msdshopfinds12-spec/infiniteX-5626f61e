@@ -109,6 +109,38 @@ test("consumes the approval before execution and never leaks adapter errors", as
   );
 });
 
+test("normalizes asynchronous executor rejection and keeps the approval spent", async () => {
+  let calls = 0;
+  const authority = createApprovalAuthority({
+    now: () => 50_000,
+    tokenFactory: () => "async_failure_token_" + "a".repeat(32),
+  });
+  const service = createApprovedCapabilityService({
+    approvalAuthority: authority,
+    capabilityExecutor: {
+      run: async () => {
+        calls += 1;
+        await Promise.resolve();
+        throw new Error("private asynchronous adapter detail");
+      },
+    },
+    authorize: async () => true,
+    isTaskAwaitingApproval: async () => true,
+    claimTaskForExecution: async () => true,
+  });
+  const grant = await service.requestApproval(base);
+  await assert.rejects(
+    service.executeApproved({ ...base, approvalToken: grant.token }),
+    (error) => error.code === "CAPABILITY_EXECUTION_FAILED" &&
+      !error.message.includes("private asynchronous adapter detail"),
+  );
+  await assert.rejects(
+    service.executeApproved({ ...base, approvalToken: grant.token }),
+    (error) => error.code === "APPROVAL_INVALID_OR_EXPIRED",
+  );
+  assert.equal(calls, 1);
+});
+
 test("fails closed when authorization or task-state callbacks throw", async () => {
   const authority = createApprovalAuthority();
   const service = createApprovedCapabilityService({
