@@ -40,6 +40,29 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.16.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run Node security and CORS regressions
+        run: npm run test:edge-function-security
+      - name: Set up Deno
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.3
+        with:
+          deno-version: 2.2.12
+      - name: Run Deno worker security tests
+        run: deno test --no-lock supabase/functions/_shared/worker-security.deno.ts
+      - name: Type-check authenticated worker
+        run: deno check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-worker/index.ts
+      - name: Type-check cron worker
+        run: deno check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
+      - name: Type-check optional Supabase fixture integration test
+        run: deno check --node-modules-dir=auto --no-lock supabase/functions/_shared/transactional-step-fencing.integration.test.ts
+      - name: Build application and type-check TypeScript
+        run: npm run build
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update
