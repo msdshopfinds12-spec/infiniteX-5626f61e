@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 
 export class TwoStageApprovalError extends Error {
   constructor(code, message) {
@@ -46,7 +46,8 @@ function deepFreeze(value) {
 }
 
 function snapshot(task, taskId, expectedStatus) {
-  if (!task || task.taskId !== taskId || task.status !== expectedStatus) {
+  const acceptedStatuses = Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
+  if (!task || task.taskId !== taskId || !acceptedStatuses.includes(task.status)) {
     throw new TwoStageApprovalError("TASK_SNAPSHOT_INVALID", "The trusted task snapshot is missing, stale, or in an unexpected state.");
   }
   for (const field of ["taskVersion", "agentId", "agentVersion", "capabilityId", "capabilityVersion"]) {
@@ -79,6 +80,43 @@ function digest(token) {
 }
 
 /**
+/**
+ * Creates a deterministic, high-entropy approval token scoped to a trusted
+ * principal, task, payload, and idempotency key. Only its SHA-256 digest is
+ * persisted by the approval store. The secret must be server-only and at
+ * least 32 bytes; rotate it only with an explicit token-version migration.
+ */
+export function createHmacApprovalTokenFactory({ secret, resolvePrincipalSubject } = {}) {
+  const key = typeof secret === "string"
+    ? Buffer.from(secret, "utf8")
+    : secret instanceof Uint8Array
+      ? Buffer.from(secret)
+      : null;
+  if (!key || key.byteLength < 32) {
+    throw new TypeError("Approval token secret must contain at least 32 bytes.");
+  }
+  if (typeof resolvePrincipalSubject !== "function") {
+    throw new TypeError("A trusted principal subject resolver is required.");
+  }
+  return ({ principal, taskId, idempotencyKey, payloadHash } = {}) => {
+    let subject;
+    try { subject = resolvePrincipalSubject(principal); } catch {
+      throw new TwoStageApprovalError("UNTRUSTED_PRINCIPAL", "A trusted principal could not be resolved for token derivation.");
+    }
+    if (typeof payloadHash !== "string" || !HASH.test(payloadHash)) {
+      throw new TwoStageApprovalError("INVALID_PAYLOAD_HASH", "The payload hash must be a lowercase SHA-256 digest.");
+    }
+    const scope = [
+      "InfiniteX/approval-token/v1",
+      requiredString(subject, "principal_subject"),
+      requiredString(taskId, "task_id"),
+      requiredString(idempotencyKey, "idempotency_key", 200),
+      payloadHash,
+    ].join("\\0");
+    return createHmac("sha256", key).update(scope, "utf8").digest("base64url");
+  };
+}
+
  * Trusted-server composition for the durable two-stage approval protocol.
  *
  * protocolAdapter.issueApprovalGrantV1 delegates to the same durable driver
@@ -93,7 +131,7 @@ export function createTwoStageApprovalService({
   protocolAdapter,
   loadTaskSnapshot,
   authorizeApproval,
-  tokenFactory = () => randomBytes(32).toString("base64url"),
+  tokenFactory,
   ttlMs = 5 * 60 * 1000,
 } = {}) {
   if (!protocolAdapter || typeof protocolAdapter.issueApprovalGrantV1 !== "function" ||
@@ -104,7 +142,7 @@ export function createTwoStageApprovalService({
   if (!Number.isSafeInteger(ttlMs) || ttlMs < 1_000 || ttlMs > 900_000) {
     throw new TypeError("ttlMs must be between 1000 and 900000.");
   }
-  if (typeof tokenFactory !== "function") throw new TypeError("tokenFactory must be a function.");
+  if (typeof tokenFactory !== "function") throw new TypeError("A deterministic, server-secret-backed tokenFactory is required for safe idempotent approval retries.");
 
   async function approveTaskV1({ principal, taskId, idempotencyKey } = {}) {
     const id = requiredString(taskId, "task_id");
@@ -115,14 +153,14 @@ export function createTwoStageApprovalService({
     } catch {
       throw new TwoStageApprovalError("TASK_STORE_UNAVAILABLE", "The trusted task snapshot could not be loaded.");
     }
-    const bound = snapshot(task, id, "awaiting_approval");
+    const bound = snapshot(task, id, ["awaiting_approval", "approved"]);
     let authorized = false;
     try { authorized = await authorizeApproval({ principal, task: bound }) === true; } catch { authorized = false; }
     if (!authorized) {
       throw new TwoStageApprovalError("APPROVAL_FORBIDDEN", "The principal is not authorized to approve this task.");
     }
     let token;
-    try { token = tokenFactory(); } catch {
+    try { token = tokenFactory({ principal, taskId: id, idempotencyKey: key, payloadHash: bound.payloadHash }); } catch {
       throw new TwoStageApprovalError("TOKEN_SOURCE_UNAVAILABLE", "A secure approval token could not be generated.");
     }
     if (typeof token !== "string" || !TOKEN.test(token)) {
@@ -150,7 +188,7 @@ export function createTwoStageApprovalService({
       }
       throw new TwoStageApprovalError("GRANT_STORE_UNAVAILABLE", "The durable approval grant transaction could not be completed.");
     }
-    if (result.outcome !== "issued") return result;
+    if (result.outcome !== "issued" && result.outcome !== "already_issued") return result;
     return Object.freeze({
       outcome: "issued",
       task: result.task,
