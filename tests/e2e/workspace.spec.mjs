@@ -62,8 +62,7 @@ test("theme preference is accessible and persists after reload", async ({ page }
 
 test("production service worker registers and app shell remains available offline", async ({ page, context }) => {
   await page.goto("/");
-  await page.waitForFunction(() => Boolean(navigator.serviceWorker?.controller) ||
-    Boolean(navigator.serviceWorker?.getRegistration("/")));
+  await page.waitForFunction(async () => Boolean(await navigator.serviceWorker?.getRegistration("/")));
   await page.reload();
   await page.waitForFunction(() => Boolean(navigator.serviceWorker?.controller));
   await context.setOffline(true);
