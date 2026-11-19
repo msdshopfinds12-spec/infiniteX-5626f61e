@@ -13,7 +13,8 @@ esac
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 READY_FILE="$TMP_DIR/session-a-holds-parent.lock"
-export READY_FILE
+B_STARTED_FILE="$TMP_DIR/session-b-is-connected"
+export READY_FILE B_STARTED_FILE
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/supabase/tests/fixtures/phase-4n8b-contract-schema.sql"
@@ -36,23 +37,34 @@ insert into public.workflow_steps (id, workflow_id) values
   ('40000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001');
 SQL
 
-# Session A holds the parent row lock. Session B is launched only after the
-# lock-ready marker exists, so B must wait behind A at the RPC serialization row.
+# Session A owns the parent lock before Session B connects. A waits until B
+# has connected and is about to issue the RPC, then proceeds while B is queued.
 cat > "$TMP_DIR/session-a.sql" <<'SQL'
 begin;
 select id from public.workflow_runs
 where id = '30000000-0000-4000-8000-000000000001'
 for update;
 \! touch "$READY_FILE"
-select pg_sleep(1);
+\! while [ ! -f "$B_STARTED_FILE" ]; do sleep 0.02; done
+select pg_sleep(0.25);
 select public.simula_transition_workflow_step(
   '30000000-0000-4000-8000-000000000001',
   '40000000-0000-4000-8000-000000000001',
   '20000000-0000-4000-8000-000000000001',
   1, 'start', '{"session":"A"}'::jsonb, null, null
 );
-select pg_sleep(1);
+select pg_sleep(0.25);
 commit;
+SQL
+
+cat > "$TMP_DIR/session-b.sql" <<'SQL'
+\! touch "$B_STARTED_FILE"
+select public.simula_transition_workflow_step(
+  '30000000-0000-4000-8000-000000000001',
+  '40000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  1, 'start', '{"session":"B"}'::jsonb, null, null
+);
 SQL
 
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$TMP_DIR/session-a.sql" >"$TMP_DIR/session-a.log" 2>&1 &
@@ -74,14 +86,9 @@ if [[ ! -f "$READY_FILE" ]]; then
   exit 1
 fi
 
-if psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "
-  select public.simula_transition_workflow_step(
-    '30000000-0000-4000-8000-000000000001',
-    '40000000-0000-4000-8000-000000000001',
-    '20000000-0000-4000-8000-000000000001',
-    1, 'start', '{\"session\":\"B\"}'::jsonb, null, null
-  );
-" >"$TMP_DIR/session-b.log" 2>&1; then
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$TMP_DIR/session-b.sql" >"$TMP_DIR/session-b.log" 2>&1 &
+SESSION_B_PID=$!
+if wait "$SESSION_B_PID"; then
   echo "FAIL: concurrent same-generation Session B unexpectedly succeeded." >&2
   cat "$TMP_DIR/session-b.log" >&2
   exit 1
