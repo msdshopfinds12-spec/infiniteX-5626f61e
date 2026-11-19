@@ -55,7 +55,7 @@ function validateOutcome(result, kind, expectedTaskId) {
     return Object.freeze({ outcome: "approved", task: validateTask(result.task, "approved", expectedTaskId) });
   }
   if (kind === "grant" && result.outcome === "issued") {
-    const task = validateTask(result.task, "approved");
+    const task = validateTask(result.task, "approved", expectedTaskId);
     if (typeof result.expiresAt !== "string" || !Number.isFinite(Date.parse(result.expiresAt)) ||
         new Date(result.expiresAt).toISOString() !== result.expiresAt) {
       throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an invalid grant expiry.");
