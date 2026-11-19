@@ -242,3 +242,18 @@ The GitHub Actions workflow pins Node.js 22.16.0 and uses least-privilege `conte
 | Merge / production deployment | NOT AUTHORIZED | Explicitly out of scope |
 
 **Next required gate:** run the committed Node regression suite, Deno regression suite, and Deno type checks against this branch. Then reconcile RPC/table schema and ownership relationships using authoritative migrations before considering any database-level change.
+
+
+## 10. Follow-up hardening: bound step configuration
+
+A second review found that the initial cooperative action budget bounded the workflow input and output but did not include the per-step configuration object. Both workflow workers now pass a combined `{ input, config }` envelope into the byte-limit check before invoking the action. This prevents oversized step configuration from bypassing the intended 64 KiB pre-execution bound.
+
+Latest change commits:
+- Authenticated worker: `24911f9384fddd51114b3bd0d7f68b5edb37407e`
+- Cron worker: `74ff776a8ce3cac0506c425e6e7245c94e301d66`
+
+## 11. CI and deployment signal review
+
+The commit status endpoint reports Vercel checks as failed with a build-rate-limit upgrade URL for multiple linked projects. This is a provider/account build-capacity limitation signal, not evidence of an application compile failure. The GitHub Actions run lookup available to this review is limited to pull-request-triggered runs and returned no runs for the branch commit; therefore the new push-triggered workflow's execution result remains **NOT VERIFIED**.
+
+Do not bypass this limit by changing billing, switching production projects, or deploying through another provider without explicit approval. The free-first alternatives are to run the committed Node tests in a local/online Node 22 environment, use GitHub Actions when the run can be inspected, and defer Vercel deployment until its build capacity is available.
