@@ -131,3 +131,12 @@ Status: BUILD COMPLETE FOR THE CURRENT FRONTEND/PWA + PROVIDER-NEUTRAL AI FOUNDA
 - Android physical-device installation, APK generation, live backend, live model-provider execution, tenant isolation, persistent audit storage and production security are NOT TESTED / NOT IMPLEMENTED.
 - No merge, deployment, public release, database migration, paid service, billing change, destructive operation or branch-protection change was performed.
 
+
+## Phase 2 — Repository adapter foundation (2026-11-19)
+
+- Added `server/integrations/adapter-contract.mjs`: metadata-only adapter registry; validates source URL, 40-character source commit, explicit license/reuse gates, runtime, narrow capability allowlist, no-network policy, and USD 0 budget; all adapters remain disabled.
+- Added `tests/adapter-contract.test.mjs`: fail-closed tests for registration, duplicates, provenance, capabilities, network, budget, and reuse gates.
+- Reviewed IQ Core source at `a0c81d1b7f691066320bf9dfd467ec828f0d11fc`; findings are documented in `docs/architecture/IQ_CORE_REPOSITORY_REVIEW.md`.
+- IQ Core repository tree contained no LICENSE/COPYING file and README-referenced `docs/IQ_ARCHITECTURE.md` was absent. Therefore no IQ Core code was copied or executed. A future local Python worker remains blocked pending explicit license/reuse authorization and additional security/testing.
+- IQ Core's current plugin manager trusts caller-supplied permission sets and does not sandbox handlers; event bus is synchronous and shallow-copies payloads; feedback loop is in-memory and unbounded. These are not production-ready integration guarantees.
+- Current adapter contract is a metadata registry only; it is not a Python bridge and does not execute third-party code.
