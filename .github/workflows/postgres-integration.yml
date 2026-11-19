@@ -1,0 +1,55 @@
+name: InfiniteX PostgreSQL 17 Disposable Contract CI
+on:
+  push:
+    branches:
+      - feat/infiniteX-zero-budget-implementation
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+concurrency:
+  group: infinitex-postgres-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  postgres-contract:
+    name: Disposable PostgreSQL 17 contract smoke tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: infinitex_test
+          POSTGRES_USER: infinitex_test
+          POSTGRES_PASSWORD: infinitex_test_only_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U infinitex_test -d infinitex_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      INFINITEX_TEST_DATABASE: "1"
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGDATABASE: infinitex_test
+      PGUSER: infinitex_test
+      PGPASSWORD: infinitex_test_only_password
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify PostgreSQL major version
+        run: psql -X -v ON_ERROR_STOP=1 -c "SHOW server_version;"
+      - name: Run isolated contract and concurrency checks
+        run: bash tests/postgres/run.sh
