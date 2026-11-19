@@ -1,0 +1,53 @@
+name: InfiniteX dependency and build verification
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Node 22 / npm verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Record runtime
+        run: |
+          node --version
+          npm --version
+
+      - name: Install from lockfile
+        run: npm ci
+
+      - name: Security audit
+        run: npm audit
+
+      - name: TypeScript lint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build
+
+      - name: Upload production build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: infinitex-dist-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
