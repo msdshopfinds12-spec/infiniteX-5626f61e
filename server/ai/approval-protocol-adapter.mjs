@@ -17,6 +17,7 @@ export class ApprovalProtocolError extends Error {
 const HASH = /^[a-f0-9]{64}$/u;
 const OUTCOMES = Object.freeze({
   approval: new Set(["approved", "conflict", "approval_invalid", "not_available"]),
+  grant: new Set(["issued", "conflict", "not_available", "already_issued"]),
   claim: new Set(["claimed", "conflict", "not_available", "already_claimed"]),
 });
 
@@ -51,6 +52,14 @@ function validateOutcome(result, kind) {
   }
   if (kind === "approval" && result.outcome === "approved") {
     return Object.freeze({ outcome: "approved", task: validateTask(result.task, "approved") });
+  }
+  if (kind === "grant" && result.outcome === "issued") {
+    const task = validateTask(result.task, "approved");
+    if (typeof result.expiresAt !== "string" || !Number.isFinite(Date.parse(result.expiresAt)) ||
+        new Date(result.expiresAt).toISOString() !== result.expiresAt) {
+      throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an invalid grant expiry.");
+    }
+    return Object.freeze({ outcome: "issued", task, expiresAt: result.expiresAt });
   }
   if (kind === "claim" && result.outcome === "claimed") {
     const task = validateTask(result.task, "running");
@@ -98,7 +107,8 @@ export function createApprovalProtocolAdapter({
   resolvePrincipalSubject,
   resolveWorkerSubject,
 } = {}) {
-  if (!store || typeof store.approveTaskWithGrantV1 !== "function" ||
+  if (!store || (typeof store.approveTaskWithGrantV1 !== "function" &&
+      typeof store.issueApprovalGrantV1 !== "function") ||
       typeof store.claimApprovedTaskV1 !== "function") {
     throw new TypeError("A durable driver implementing both versioned protocol operations is required.");
   }
@@ -113,6 +123,36 @@ export function createApprovalProtocolAdapter({
       throw new ApprovalProtocolError("UNTRUSTED_" + field.toUpperCase(), "A trusted identity could not be resolved.");
     }
     return requiredString(resolved, field);
+  }
+
+  async function issueApprovalGrantV1(input = {}) {
+    if (typeof store.issueApprovalGrantV1 !== "function") {
+      throw new ApprovalProtocolError("GRANT_ISSUANCE_UNAVAILABLE", "The durable driver does not implement grant issuance.");
+    }
+    const ttlMs = input.ttlMs;
+    if (!Number.isSafeInteger(ttlMs) || ttlMs < 1_000 || ttlMs > 900_000) {
+      throw new ApprovalProtocolError("INVALID_GRANT_TTL", "ttlMs must be between 1000 and 900000.");
+    }
+    const request = Object.freeze({
+      taskId: requiredString(input.taskId, "task_id"),
+      principalSubject: resolveIdentity(resolvePrincipalSubject, input.principal, "principal_subject"),
+      expectedTaskVersion: requiredString(input.taskVersion, "task_version"),
+      expectedPayloadHash: digest(input.payloadHash, "payload_hash"),
+      expectedAgentId: requiredString(input.agentId, "agent_id"),
+      expectedAgentVersion: requiredString(input.agentVersion, "agent_version"),
+      expectedCapabilityId: requiredString(input.capabilityId, "capability_id"),
+      expectedCapabilityVersion: requiredString(input.capabilityVersion, "capability_version"),
+      approvalTokenDigest: digest(input.approvalTokenDigest, "approval_token_digest"),
+      ttlMs,
+      idempotencyKey: idempotency(input.idempotencyKey),
+    });
+    let result;
+    try {
+      result = await store.issueApprovalGrantV1(request);
+    } catch {
+      throw new ApprovalProtocolError("GRANT_STORE_UNAVAILABLE", "The durable grant transaction could not be completed.");
+    }
+    return validateOutcome(result, "grant");
   }
 
   async function approveTaskWithGrantV1(input = {}) {
