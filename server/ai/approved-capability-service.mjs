@@ -32,7 +32,7 @@ function canonicalJson(value, seen = new Set()) {
   return result;
 }
 
-function hashPayload(task) {
+function snapshotPayload(task) {
   const boundPayload = {
     input: task.input,
     taskId: task.taskId,
@@ -42,7 +42,11 @@ function hashPayload(task) {
     capabilityId: task.capabilityId,
     capabilityVersion: task.capabilityVersion,
   };
-  return createHash("sha256").update(canonicalJson(boundPayload), "utf8").digest("hex");
+  const canonical = canonicalJson(boundPayload);
+  return Object.freeze({
+    payloadHash: createHash("sha256").update(canonical, "utf8").digest("hex"),
+    input: JSON.parse(canonicalJson(task.input)),
+  });
 }
 
 function validateTaskSnapshot(task, taskId, capabilityId, capabilityVersion) {
@@ -55,6 +59,7 @@ function validateTaskSnapshot(task, taskId, capabilityId, capabilityVersion) {
       throw new ApprovedExecutionError("TASK_SNAPSHOT_INVALID", "The trusted task snapshot is incomplete.");
     }
   }
+  const payload = snapshotPayload(task);
   return Object.freeze({
     taskId: task.taskId,
     taskVersion: task.taskVersion,
@@ -62,8 +67,8 @@ function validateTaskSnapshot(task, taskId, capabilityId, capabilityVersion) {
     agentVersion: task.agentVersion,
     capabilityId: task.capabilityId,
     capabilityVersion: task.capabilityVersion,
-    input: task.input,
-    payloadHash: hashPayload(task),
+    input: payload.input,
+    payloadHash: payload.payloadHash,
   });
 }
 
