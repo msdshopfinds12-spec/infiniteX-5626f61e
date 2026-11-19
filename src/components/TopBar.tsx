@@ -1,37 +1,48 @@
-import { Bell, Moon, Search, Sun } from "lucide-react";
+import { Moon, Search, Sun } from "lucide-react";
 import type { Theme } from "../hooks/useTheme";
 
 export default function TopBar({
   title,
+  description,
   theme,
   onToggleTheme,
+  searchValue,
+  onSearchChange,
 }: {
   title: string;
+  description: string;
   theme: Theme;
   onToggleTheme: () => void;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
 }) {
   const isDark = theme === "dark";
   return (
     <header className="topbar">
-      <h1 className="topbar-title">{title}</h1>
+      <div className="topbar-heading">
+        <h1 className="topbar-title">{title}</h1>
+        <p className="topbar-description">{description}</p>
+      </div>
       <div className="topbar-actions">
-        <div className="search">
-          <Search size={14} />
-          <input placeholder="Search agents, runs, logs..." />
-        </div>
+        <span className="workspace-state"><span aria-hidden="true" /> LOCAL DEMO</span>
+        <label className="search">
+          <Search size={14} aria-hidden="true" />
+          <input
+            type="search"
+            aria-label="Search sample agents"
+            placeholder="Search sample agents..."
+            value={searchValue}
+            onChange={(event) => onSearchChange(event.target.value)}
+          />
+        </label>
         <button
           className="icon-btn"
-          aria-label="Notifications"
-        >
-          <Bell size={18} />
-        </button>
-        <button
-          className="icon-btn"
+          type="button"
           aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
           title={isDark ? "Switch to light mode" : "Switch to dark mode"}
           onClick={onToggleTheme}
         >
-          {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          {isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
         </button>
       </div>
     </header>
