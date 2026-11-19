@@ -4,8 +4,8 @@
  */
 const STATES = new Set(["queued", "planning", "awaiting_approval", "approved", "running", "succeeded", "failed", "cancelled"]);
 const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
-const ISO_UTC = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?Z$/;
-const isIsoUtc = (value) => typeof value === "string" && ISO_UTC.test(value) && !Number.isNaN(Date.parse(value));
+const isIsoUtc = (value) => typeof value === "string" && !Number.isNaN(Date.parse(value)) &&
+  new Date(value).toISOString() === value;
 const COMMANDS = Object.freeze({
   begin_planning: { from: "queued", to: "planning", actor: "system" },
   request_approval: { from: "planning", to: "awaiting_approval", actor: "system" },
