@@ -3,9 +3,11 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { corsHeadersForRequest } from "../_shared/cors.ts";
 import {
   clampBatchLimit,
+  executeWithinStepBudget,
   isClaimedRunOwnedBy,
   isWorkflowOwnedBy,
   readJsonBodyLimited,
+  validateStepTimeoutSeconds,
 } from "../_shared/worker-security.mjs";
 
 type JsonRecord = Record<string, unknown>;
@@ -219,7 +221,12 @@ Deno.serve(async (req: Request) => {
         const retries = Math.max(0, Math.min(Number.isInteger(step.retry_limit) ? step.retry_limit : 0, 10));
         for (let attempt = 0; attempt <= retries; attempt++) {
           try {
-            actionOutput = executeSafeAction(step.action_type, payload, config);
+            const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
+            actionOutput = executeWithinStepBudget(
+              (input) => executeSafeAction(step.action_type, input, config),
+              payload,
+              timeoutSeconds,
+            );
             actionError = "";
             break;
           } catch (error) {

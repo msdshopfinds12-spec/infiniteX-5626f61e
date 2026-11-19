@@ -2,9 +2,11 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import {
   clampBatchLimit,
+  executeWithinStepBudget,
   isClaimedRunValid,
   isWorkflowOwnedBy,
   readJsonBodyLimited,
+  validateStepTimeoutSeconds,
 } from "../_shared/worker-security.mjs";
 
 type JsonRecord = Record<string, unknown>;
@@ -150,8 +152,18 @@ Deno.serve(async (req: Request) => {
         let actionError = "";
         const retries = Math.max(0, Math.min(Number.isInteger(step.retry_limit) ? step.retry_limit : 0, 10));
         for (let attempt = 0; attempt <= retries; attempt++) {
-          try { output = executeSafeAction(step.action_type, payload, config); actionError = ""; break; }
-          catch (error) { actionError = error instanceof Error ? error.message : "action_failed"; }
+          try {
+            const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
+            output = executeWithinStepBudget(
+              (input) => executeSafeAction(step.action_type, input, config),
+              payload,
+              timeoutSeconds,
+            );
+            actionError = "";
+            break;
+          } catch (error) {
+            actionError = error instanceof Error ? error.message : "action_failed";
+          }
         }
         if (actionError || !output) {
           await admin.from("workflow_step_runs").update({

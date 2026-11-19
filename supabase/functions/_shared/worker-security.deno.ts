@@ -1,9 +1,14 @@
 import {
+  assertJsonByteLimit,
+  assertStepDeadline,
   clampBatchLimit,
+  createStepDeadline,
+  executeWithinStepBudget,
   isClaimedRunOwnedBy,
   isClaimedRunValid,
   isWorkflowOwnedBy,
   readJsonBodyLimited,
+  validateStepTimeoutSeconds,
 } from "./worker-security.mjs";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -69,4 +74,48 @@ Deno.test("Deno: rejects malformed JSON and accepts an empty request body", asyn
     ok: true,
     value: null,
   }, "empty body should be accepted");
+});
+
+
+Deno.test("Deno: validates bounded step timeout configuration", () => {
+  assert(validateStepTimeoutSeconds(1) === 1, "minimum timeout should pass");
+  assert(validateStepTimeoutSeconds(60) === 60, "maximum timeout should pass");
+  for (const value of [undefined, null, 0, -1, 1.5, 61, "5"]) {
+    let rejected = false;
+    try { validateStepTimeoutSeconds(value); } catch { rejected = true; }
+    assert(rejected, "invalid timeout must fail closed");
+  }
+});
+
+Deno.test("Deno: detects cooperative deadline overruns", () => {
+  let clock = 0;
+  const deadline = createStepDeadline(1, () => clock);
+  assert(deadline === 1000, "deadline should be one second after start");
+  clock = 1001;
+  let rejected = false;
+  try { assertStepDeadline(deadline, () => clock); } catch { rejected = true; }
+  assert(rejected, "expired deadline must fail");
+});
+
+Deno.test("Deno: bounds step input and output JSON payloads", () => {
+  let inputRejected = false;
+  try {
+    executeWithinStepBudget((value) => value, { payload: "x".repeat(100) }, 5, 32);
+  } catch { inputRejected = true; }
+  assert(inputRejected, "oversized input must fail");
+  let outputRejected = false;
+  try {
+    executeWithinStepBudget(() => ({ payload: "x".repeat(100) }), {}, 5, 32);
+  } catch { outputRejected = true; }
+  assert(outputRejected, "oversized output must fail");
+  assert(assertJsonByteLimit({ ok: true }, 32) === 11, "UTF-8 JSON byte count should match");
+});
+
+Deno.test("Deno: detects synchronous overrun after bounded action returns", () => {
+  let clock = 0;
+  let rejected = false;
+  try {
+    executeWithinStepBudget(() => { clock = 1001; return { ok: true }; }, {}, 1, 1024, () => clock);
+  } catch { rejected = true; }
+  assert(rejected, "overrun must fail after action returns");
 });

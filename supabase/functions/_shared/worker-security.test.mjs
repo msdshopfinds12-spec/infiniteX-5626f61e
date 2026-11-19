@@ -1,11 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  assertJsonByteLimit,
+  assertStepDeadline,
   clampBatchLimit,
+  createStepDeadline,
+  executeWithinStepBudget,
   isClaimedRunOwnedBy,
   isClaimedRunValid,
   isWorkflowOwnedBy,
   readJsonBodyLimited,
+  validateStepTimeoutSeconds,
 } from "./worker-security.mjs";
 
 const validRun = { id: "run-a", workflow_id: "workflow-a", owner_id: "user-a" };
@@ -70,4 +75,50 @@ test("body reader reports malformed JSON and accepts an empty body", async () =>
   const empty = new Request("https://example.test", { method: "POST" });
   assert.deepEqual(await readJsonBodyLimited(malformed, 32), { ok: false, reason: "invalid_json" });
   assert.deepEqual(await readJsonBodyLimited(empty, 32), { ok: true, value: null });
+});
+
+
+test("step timeout accepts only bounded integer seconds", () => {
+  assert.equal(validateStepTimeoutSeconds(1), 1);
+  assert.equal(validateStepTimeoutSeconds(60), 60);
+  for (const value of [undefined, null, 0, -1, 1.5, 61, "5"]) {
+    assert.throws(() => validateStepTimeoutSeconds(value), /invalid_step_timeout_seconds/);
+  }
+});
+
+test("step deadline uses an injected monotonic clock and rejects overruns", () => {
+  let clock = 100;
+  const deadline = createStepDeadline(2, () => clock);
+  assert.equal(deadline, 2100);
+  assert.doesNotThrow(() => assertStepDeadline(deadline, () => clock));
+  clock = 2101;
+  assert.throws(() => assertStepDeadline(deadline, () => clock), /step_timeout_exceeded/);
+});
+
+test("step budget rejects oversized input and output JSON", () => {
+  assert.throws(
+    () => executeWithinStepBudget((value) => value, { payload: "x".repeat(100) }, 5, 32),
+    /step_input_payload_too_large/,
+  );
+  assert.throws(
+    () => executeWithinStepBudget(() => ({ payload: "x".repeat(100) }), {}, 5, 32),
+    /step_output_payload_too_large/,
+  );
+  assert.equal(assertJsonByteLimit({ ok: true }, 32), 11);
+});
+
+test("step budget detects a synchronous action overrun after it returns", () => {
+  let clock = 0;
+  assert.throws(() => executeWithinStepBudget(
+    () => { clock = 1001; return { ok: true }; },
+    {},
+    1,
+    1024,
+    () => clock,
+  ), /step_timeout_exceeded/);
+});
+
+test("step budget passes bounded actions without changing their result", () => {
+  const output = executeWithinStepBudget((input) => ({ ...input, completed: true }), { id: "step-a" }, 5);
+  assert.deepEqual(output, { id: "step-a", completed: true });
 });
