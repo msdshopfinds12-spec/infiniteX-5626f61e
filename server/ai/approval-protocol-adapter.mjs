@@ -281,8 +281,8 @@ export function createApprovalProtocolAdapter({
       principalSubject: resolveIdentity(resolvePrincipalSubject, input.principal, "principal_subject"),
       workerSubject: resolveIdentity(resolveWorkerSubject, input.worker, "worker_subject"),
       leaseId: requiredString(input.leaseId, "lease_id"),
-      fencingToken: expectedVersion(input.fencingToken),
-      expectedTaskVersion: expectedVersion(input.expectedTaskVersion),
+      fencingToken: positiveSafeInteger(input.fencingToken, "fencing_token"),
+      expectedTaskVersion: positiveSafeInteger(input.expectedTaskVersion, "expected_task_version"),
       targetStatus,
       resultDigest: input.resultDigest == null ? null : digest(input.resultDigest, "result_digest"),
       failureCode: input.failureCode == null ? null : requiredString(input.failureCode, "failure_code", 64),
@@ -302,7 +302,7 @@ export function createApprovalProtocolAdapter({
     const request = Object.freeze({
       taskId: requiredString(input.taskId, "task_id"),
       principalSubject: resolveIdentity(resolvePrincipalSubject, input.principal, "principal_subject"),
-      expectedTaskVersion: expectedVersion(input.expectedTaskVersion),
+      expectedTaskVersion: positiveSafeInteger(input.expectedTaskVersion, "expected_task_version"),
       idempotencyKey: idempotency(input.idempotencyKey),
     });
     let result;
