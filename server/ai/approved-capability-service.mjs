@@ -25,6 +25,7 @@ export function createApprovedCapabilityService({
   capabilityExecutor,
   authorize,
   isTaskAwaitingApproval,
+  claimTaskForExecution,
 } = {}) {
   if (!approvalAuthority ||
       typeof approvalAuthority.issue !== "function" ||
@@ -34,8 +35,9 @@ export function createApprovedCapabilityService({
   if (!capabilityExecutor || typeof capabilityExecutor.run !== "function") {
     throw new TypeError("A valid capability executor is required.");
   }
-  if (typeof authorize !== "function" || typeof isTaskAwaitingApproval !== "function") {
-    throw new TypeError("Server-side authorize and task-state callbacks are required.");
+  if (typeof authorize !== "function" || typeof isTaskAwaitingApproval !== "function" ||
+      typeof claimTaskForExecution !== "function") {
+    throw new TypeError("Server-side authorization, task-state, and atomic claim callbacks are required.");
   }
 
   async function isAllowed(principal, operation, taskId, capabilityId) {
@@ -117,6 +119,16 @@ export function createApprovedCapabilityService({
     });
     if (!consumed) {
       throw new ApprovedExecutionError("APPROVAL_INVALID_OR_EXPIRED", "The approval is invalid, expired, or already used.");
+    }
+
+    let claimed = false;
+    try {
+      claimed = await claimTaskForExecution(Object.freeze({ taskId, principal, capabilityId })) === true;
+    } catch {
+      claimed = false;
+    }
+    if (!claimed) {
+      throw new ApprovedExecutionError("TASK_CLAIM_FAILED", "The task could not be atomically claimed; the approval has been consumed.");
     }
 
     try {
