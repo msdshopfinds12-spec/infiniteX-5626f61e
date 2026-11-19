@@ -222,7 +222,7 @@ Deno.serve(async (req: Request) => {
           const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
           actionOutput = executeWithinStepBudget(
             () => executeSafeAction(step.action_type, payload, config),
-            payload,
+            { input: payload, config },
             timeoutSeconds,
             64 * 1024,
           );
