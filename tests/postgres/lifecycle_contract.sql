@@ -9,11 +9,11 @@ VALUES
 DO $$
 DECLARE approved jsonb; claimed jsonb; replay jsonb; renewed jsonb;
         lease uuid := '33333333-3333-4333-8333-333333333333';
-        grant uuid := '44444444-4444-4444-8444-444444444444';
+        grant_id_value uuid := '44444444-4444-4444-8444-444444444444';
         changed_fingerprint_rejected boolean := false;
 BEGIN
   approved := infinitex_harness.approve_and_issue_grant(
-    'owner-15','lifecycle-task',0,grant,repeat('a',64),clock_timestamp()+interval '5 minutes');
+    'owner-15','lifecycle-task',0,grant_id_value,repeat('a',64),clock_timestamp()+interval '5 minutes');
   IF approved->>'status' <> 'approved' OR (approved->>'version')::int <> 1 THEN
     RAISE EXCEPTION 'approval transition failed: %',approved;
   END IF;
