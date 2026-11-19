@@ -34,6 +34,7 @@ function setup({ authorized = true, awaiting = true, failExecution = false } = {
       return authorized && ["approve", "execute"].includes(request.operation);
     },
     isTaskAwaitingApproval: async () => awaiting,
+    claimTaskForExecution: async () => true,
   });
   return { service, calls };
 }
@@ -87,6 +88,7 @@ test("requires execution permission even when an approval grant exists", async (
     capabilityExecutor: { run: () => assert.fail("must not execute") },
     authorize: async () => false,
     isTaskAwaitingApproval: async () => true,
+    claimTaskForExecution: async () => true,
   });
   await assert.rejects(
     blocked.executeApproved({ ...base, approvalToken: grant.token }),
@@ -114,9 +116,38 @@ test("fails closed when authorization or task-state callbacks throw", async () =
     capabilityExecutor: { run: () => assert.fail("must not execute") },
     authorize: async () => { throw new Error("auth backend down"); },
     isTaskAwaitingApproval: async () => { throw new Error("task store down"); },
+    claimTaskForExecution: async () => false,
   });
   await assert.rejects(
     service.requestApproval(base),
     (error) => error.code === "APPROVAL_FORBIDDEN",
   );
+});
+
+test("requires an atomic task claim and rejects duplicate execution attempts", async () => {
+  const authority = createApprovalAuthority({
+    now: () => 50_000,
+    tokenFactory: (() => { let n = 0; return () => "race_token_" + String(++n).padStart(40, "0"); })(),
+  });
+  let claimed = false;
+  let executionCount = 0;
+  const service = createApprovedCapabilityService({
+    approvalAuthority: authority,
+    capabilityExecutor: { run: () => { executionCount += 1; return { status: "completed" }; } },
+    authorize: async () => true,
+    isTaskAwaitingApproval: async () => true,
+    claimTaskForExecution: async () => {
+      if (claimed) return false;
+      claimed = true;
+      return true;
+    },
+  });
+  const first = await service.requestApproval(base);
+  const second = await service.requestApproval(base);
+  await service.executeApproved({ ...base, approvalToken: first.token });
+  await assert.rejects(
+    service.executeApproved({ ...base, approvalToken: second.token }),
+    (error) => error.code === "TASK_CLAIM_FAILED",
+  );
+  assert.equal(executionCount, 1);
 });
