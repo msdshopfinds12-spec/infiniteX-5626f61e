@@ -62,9 +62,16 @@ function validateOutcome(result, kind) {
     if (!lease || typeof lease !== "object" || Array.isArray(lease)) {
       throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver did not return a lease.");
     }
-    const leaseId = requiredString(lease.leaseId, "lease_id");
-    const workerSubject = requiredString(lease.workerSubject, "worker_subject");
+    let leaseId;
+    let workerSubject;
+    try {
+      leaseId = requiredString(lease.leaseId, "lease_id");
+      workerSubject = requiredString(lease.workerSubject, "worker_subject");
+    } catch {
+      throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an invalid lease tuple.");
+    }
     if (!Number.isSafeInteger(lease.fencingToken) || lease.fencingToken < 1 ||
+        typeof lease.expiresAt !== "string" ||
         !Number.isFinite(Date.parse(lease.expiresAt)) ||
         new Date(lease.expiresAt).toISOString() !== lease.expiresAt) {
       throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an invalid lease tuple.");
