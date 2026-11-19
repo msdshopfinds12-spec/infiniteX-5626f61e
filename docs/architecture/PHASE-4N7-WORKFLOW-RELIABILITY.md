@@ -1,6 +1,6 @@
 # Phase 4N.7 — Workflow Worker Reliability Remediation
 
-**Status:** PLAN / source reconciliation complete; implementation not yet verified  
+**Status:** Phase 4N.7 implementation verified by Phase 4N.8A CI on the integrated branch; production release not approved  
 **Target repository:** `msdshopfinds12-spec/infiniteX-5626f61e`  
 **Implementation branch:** `feat/phase-4n7-workflow-reliability` (created from current `main`)  
 **Reference branch:** `fix/phase-4m2c-deno-tenant-isolation`  
@@ -221,27 +221,27 @@ Package scripts now include:
 - `npm run test:edge-worker-security`
 - `npm run test:edge-function-security`
 
-The GitHub Actions workflow pins Node.js 22.16.0 and uses least-privilege `contents: read`. The workflow file is committed, but no workflow execution result has been retrieved; therefore CI is **NOT VERIFIED**.
+The GitHub Actions workflows pin Node.js 22.16.0 and use least-privilege `contents: read`. The Phase 4N.8A integrated branch was verified on exact head `9d6ac04f2bf5ec4d3765f12468b4a1dd777f0753` by run [#44597625333](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44597625333) and PR run [#44597796899](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44597796899). Both completed successfully. Node tests: 16 passed (6 CORS + 10 worker-security); Deno tests: 6 passed; all three Edge Function type checks and `npm run build` passed.
 
 ### Updated status matrix
 
 | Area | Status | Evidence |
 |---|---|---|
 | Shared security and budget helpers | IMPLEMENTED | Committed helper module |
-| Node regression suite | IMPLEMENTED / NOT RUN | Tests committed; no repository test run evidence |
-| Deno regression suite | IMPLEMENTED / NOT RUN | Deno tests committed; no Deno execution evidence |
-| Exact-origin CORS policy and tests | IMPLEMENTED / NOT RUN | CORS module and test file committed |
-| Authenticated workflow worker | IMPLEMENTED / NOT TYPE-CHECKED | Ported source; helper integration and retry removal committed |
-| Cron workflow worker | IMPLEMENTED / NOT TYPE-CHECKED | Ported source; custom-secret contract preserved |
-| API-key manager | IMPLEMENTED / NOT TYPE-CHECKED | Ported authenticated, owner-scoped implementation |
+| Node regression suite | VERIFIED | 10/10 passed on exact integrated head |
+| Deno regression suite | VERIFIED | 6/6 passed on exact integrated head |
+| Exact-origin CORS policy and tests | VERIFIED | 6/6 passed on exact integrated head |
+| Authenticated workflow worker | VERIFIED | Deno type check passed on exact integrated head |
+| Cron workflow worker | VERIFIED | Deno type check passed on exact integrated head |
+| API-key manager | VERIFIED | Deno type check passed on exact integrated head |
 | Step execution budget | IMPLEMENTED (COOPERATIVE) | Pre/post deadline checks and JSON byte bounds; no hard preemption |
 | Retry semantics | IMPLEMENTED for current local actions | Retry loop removed; each deterministic local action executes once |
 | Workflow child-step schema ownership | BLOCKED | Authoritative schema not yet found; no speculative owner column filter added |
 | Supabase RPC and table contracts | NOT VERIFIED | Requires authoritative migrations/schema and deployment config |
-| GitHub Actions | NOT VERIFIED | Workflow committed; run outcome not retrieved |
+| GitHub Actions | VERIFIED | Runs #44597625333 and #44597796899 passed on exact head `9d6ac04f644b936de935000c993c47c91587af06` |
 | Merge / production deployment | NOT AUTHORIZED | Explicitly out of scope |
 
-**Next required gate:** run the committed Node regression suite, Deno regression suite, and Deno type checks against this branch. Then reconcile RPC/table schema and ownership relationships using authoritative migrations before considering any database-level change.
+**Next required gate:** complete review of the Phase 4N.8A attempt-generation fencing diff, verify the production CORS allowlist/configuration separately, and retain the existing release gate. The CI results above establish code-level build/test/type-check evidence; they do not establish production deployment or live end-to-end workflow behavior.
 
 
 ## 10. Follow-up hardening: bound step configuration
@@ -254,6 +254,6 @@ Latest change commits:
 
 ## 11. CI and deployment signal review
 
-The commit status endpoint reports Vercel checks as failed with a build-rate-limit upgrade URL for multiple linked projects. This is a provider/account build-capacity limitation signal, not evidence of an application compile failure. The GitHub Actions run lookup available to this review is limited to pull-request-triggered runs and returned no runs for the branch commit; therefore the new push-triggered workflow's execution result remains **NOT VERIFIED**.
+The commit status endpoint previously reported Vercel checks as failed with a build-rate-limit upgrade URL for multiple linked projects. This is a provider/account build-capacity signal, not evidence of an application compile failure. The Phase 4N.8A GitHub Actions push and pull-request runs both passed on the same exact head. No Vercel deployment was attempted or authorized.
 
 Do not bypass this limit by changing billing, switching production projects, or deploying through another provider without explicit approval. The free-first alternatives are to run the committed Node tests in a local/online Node 22 environment, use GitHub Actions when the run can be inspected, and defer Vercel deployment until its build capacity is available.
