@@ -71,6 +71,7 @@ test("keeps adapter disabled even after metadata gates are marked true", () => {
     ...descriptor,
     licenseVerified: true,
     ownerReuseApproved: true,
+    status: "disabled",
   }]);
   assert.equal(registry.get("iq-core-reference").status, "disabled");
 });
