@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CheckCircle2, Circle, Clock3, Play, ShieldCheck, XCircle } from "lucide-react";
-import { createTask, transitionTask, type TaskRecord } from "../lib/task-lifecycle";
+import { createTask, transitionTask, type TaskRecord } from "../lib/task-lifecycle.mjs";
 
 function makeSamples(): TaskRecord[] {
   const now = new Date().toISOString();
