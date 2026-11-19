@@ -22,9 +22,8 @@ test("all six primary workspace views are represented", () => {
 });
 
 test("mobile navigation controls preserve a minimum 40px target", () => {
-  const mobileRules = styles.split("@media (max-width: 760px)")[1] ?? "";
-  assert.match(mobileRules, /\.nav-item\s*\{[^}]*min-width:\s*40px/s);
-  assert.match(mobileRules, /\.nav-item\s*\{[^}]*min-height:\s*40px/s);
+  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*?\.nav-item\s*\{[^}]*min-width:\s*40px/s);
+  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*?\.nav-item\s*\{[^}]*min-height:\s*40px/s);
 });
 
 test("keyboard focus is visibly indicated", () => {
