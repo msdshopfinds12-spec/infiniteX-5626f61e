@@ -19,7 +19,7 @@ test("extracts static, side-effect and dynamic imports", () => {
     'import React from "react";',
     'import "./styles.css";',
     'const module = await import("../../server/secret.mjs");',
-  ].join("\\n");
+  ].join("\n");
   assert.deepEqual(extractImportSpecifiers(source), [
     "react",
     "./styles.css",
