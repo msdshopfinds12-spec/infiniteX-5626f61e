@@ -15,6 +15,7 @@ on:
       - fix/phase-4m2b-edge-worker-hardening
       - fix/phase-4m2c-deno-tenant-isolation
       - ci/phase-4m5c-security-regression-coverage
+      - fix/infinitex-ci-a11y-audit-refresh
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -37,6 +38,7 @@ on:
       - fix/phase-4m2b-edge-worker-hardening
       - fix/phase-4m2c-deno-tenant-isolation
       - docs/phase-4m5b-github-security-posture
+      - ci/phase-4m5c-security-regression-coverage
 
 permissions:
   contents: read
@@ -89,7 +91,7 @@ jobs:
       - name: Build production assets
         run: npm run build
       - name: Dependency security audit (final blocking gate)
-        run: npm audit --audit-level=moderate
+        run: npm audit --audit-level=moderate --cache "${RUNNER_TEMP}/infinitex-npm-audit-cache"
 
   deno-worker-security:
     name: Deno worker runtime tests and type checks
