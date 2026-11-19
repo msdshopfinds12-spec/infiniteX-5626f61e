@@ -237,7 +237,13 @@ The service composes the approval authority with the local capability executor:
 
 **Critical limitation:** this is a server-side service primitive, not an HTTP route, authentication middleware, or durable task repository. The callbacks must be implemented against trusted server identity and task state before exposure to a client. Current test callbacks are synthetic fixtures, not production authorization.
 
-## 13. Change-control gates
+## 13. Async execution hardening note
+
+A code review identified an asynchronous failure-handling gap in the approved capability service: a rejected Promise from an async executor was not caught by a synchronous `try/catch`. The service now awaits the executor inside the guarded block, and the test suite includes an asynchronous rejection case. This ensures asynchronous adapter failures are normalized and the single-use approval remains consumed.
+
+This fix does not add execution preemption, a durable task state store, authentication, or a production API. The current local runtime remains synchronous and deterministic. A future async runtime must enforce cooperative cancellation and retain concurrency accounting until underlying work actually settles.
+
+## 14. Change-control gates
 
 This plan authorizes implementation only on `feat/infiniteX-zero-budget-implementation`. It does not authorize:
 - changes to `main`;
