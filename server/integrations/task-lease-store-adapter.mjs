@@ -113,9 +113,9 @@ export function createLeaseFencedTaskStoreAdapter({ store, leaseDurationMs = 30_
   }
 
   async function renew(input = {}) {
-    requireLeaseTuple({ ...input, now: input.now ?? now() });
-    const operation = requireMethod("renewTaskLease");
     const timestamp = input.now ?? now();
+    requireLeaseTuple({ ...input, now: timestamp });
+    const operation = requireMethod("renewTaskLease");
     const result = await operation({
       taskId: input.taskId, ownerId: input.ownerId, leaseId: input.leaseId,
       fencingToken: input.fencingToken, expectedVersion: input.expectedVersion,
@@ -129,7 +129,8 @@ export function createLeaseFencedTaskStoreAdapter({ store, leaseDurationMs = 30_
   }
 
   async function settle(kind, input = {}) {
-    requireLeaseTuple({ ...input, now: input.now ?? now() });
+    const timestamp = input.now ?? now();
+    requireLeaseTuple({ ...input, now: timestamp });
     if (kind !== "complete" && kind !== "fail") {
       throw new TaskLeaseError("INVALID_SETTLEMENT", "Only complete or fail is supported.");
     }
@@ -137,7 +138,7 @@ export function createLeaseFencedTaskStoreAdapter({ store, leaseDurationMs = 30_
     const result = await requireMethod(method)({
       taskId: input.taskId, ownerId: input.ownerId, leaseId: input.leaseId,
       fencingToken: input.fencingToken, expectedVersion: input.expectedVersion,
-      now: input.now ?? now(),
+      now: timestamp,
     });
     if (result !== true && result !== false) {
       throw new TaskLeaseError("INVALID_STORE_RESULT", "The durable store must return a boolean settlement result.");
