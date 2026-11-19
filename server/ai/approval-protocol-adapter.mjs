@@ -19,6 +19,9 @@ const OUTCOMES = Object.freeze({
   approval: new Set(["approved", "conflict", "approval_invalid", "not_available"]),
   grant: new Set(["issued", "conflict", "not_available", "already_issued"]),
   claim: new Set(["claimed", "conflict", "not_available", "already_claimed"]),
+  renew: new Set(["renewed", "conflict", "lease_expired", "stale_fence", "not_available"]),
+  settle: new Set(["settled", "conflict", "lease_expired", "stale_fence", "not_available"]),
+  cancel: new Set(["cancelled", "conflict", "not_available"]),
 });
 
 function requiredString(value, field, max = 128) {
@@ -44,6 +47,31 @@ function validateTask(task, expectedStatus, expectedTaskId) {
     throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an invalid task state.");
   }
   return Object.freeze({ ...task });
+}
+
+
+function expectedVersion(value) {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new ApprovalProtocolError("INVALID_EXPECTED_TASK_VERSION", "expectedTaskVersion must be a positive safe integer.");
+  }
+  return value;
+}
+
+function validateLease(lease, expected) {
+  if (!lease || typeof lease !== "object" || Array.isArray(lease) ||
+      typeof lease.leaseId !== "string" || lease.leaseId.trim() !== expected.leaseId ||
+      typeof lease.workerSubject !== "string" || lease.workerSubject !== expected.workerSubject ||
+      lease.fencingToken !== expected.fencingToken ||
+      typeof lease.expiresAt !== "string" || !Number.isFinite(Date.parse(lease.expiresAt)) ||
+      new Date(lease.expiresAt).toISOString() !== lease.expiresAt) {
+    throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned a lease that does not match the authenticated lease tuple.");
+  }
+  return Object.freeze({
+    leaseId: lease.leaseId,
+    workerSubject: lease.workerSubject,
+    fencingToken: lease.fencingToken,
+    expiresAt: lease.expiresAt,
+  });
 }
 
 function validateOutcome(result, kind, expectedTaskId) {
@@ -212,5 +240,71 @@ export function createApprovalProtocolAdapter({
     return validated;
   }
 
-  return Object.freeze({ issueApprovalGrantV1, approveTaskWithGrantV1, claimApprovedTaskV1 });
+
+  async function renewExecutionLeaseV1(input = {}) {
+    if (typeof store.renewExecutionLeaseV1 !== "function") throw new ApprovalProtocolError("LEASE_RENEWAL_UNAVAILABLE", "The durable driver does not implement lease renewal.");
+    const leaseDurationMs = input.leaseDurationMs;
+    if (!Number.isSafeInteger(leaseDurationMs) || leaseDurationMs < 1_000 || leaseDurationMs > 900_000) throw new ApprovalProtocolError("INVALID_LEASE_DURATION", "leaseDurationMs must be between 1000 and 900000.");
+    const request = Object.freeze({
+      taskId: requiredString(input.taskId, "task_id"),
+      principalSubject: resolveIdentity(resolvePrincipalSubject, input.principal, "principal_subject"),
+      workerSubject: resolveIdentity(resolveWorkerSubject, input.worker, "worker_subject"),
+      leaseId: requiredString(input.leaseId, "lease_id"),
+      fencingToken: expectedVersion(input.fencingToken),
+      expectedTaskVersion: expectedVersion(input.expectedTaskVersion),
+      leaseDurationMs,
+      idempotencyKey: idempotency(input.idempotencyKey),
+    });
+    let result;
+    try { result = await store.renewExecutionLeaseV1(request); } catch {
+      throw new ApprovalProtocolError("LEASE_RENEWAL_STORE_UNAVAILABLE", "The lease renewal transaction could not be completed.");
+    }
+    if (!result || typeof result !== "object" || !OUTCOMES.renew.has(result.outcome)) throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an unsupported lease-renewal outcome.");
+    if (result.outcome !== "renewed") return Object.freeze({ outcome: result.outcome });
+    return Object.freeze({ outcome: "renewed", task: validateTask(result.task, "running", request.taskId), lease: validateLease(result.lease, request) });
+  }
+
+  async function settleExecutionV1(input = {}) {
+    if (typeof store.settleExecutionV1 !== "function") throw new ApprovalProtocolError("LEASE_SETTLEMENT_UNAVAILABLE", "The durable driver does not implement lease settlement.");
+    const targetStatus = input.targetStatus;
+    if (targetStatus !== "succeeded" && targetStatus !== "failed") throw new ApprovalProtocolError("INVALID_SETTLEMENT_STATUS", "targetStatus must be succeeded or failed.");
+    const request = Object.freeze({
+      taskId: requiredString(input.taskId, "task_id"),
+      principalSubject: resolveIdentity(resolvePrincipalSubject, input.principal, "principal_subject"),
+      workerSubject: resolveIdentity(resolveWorkerSubject, input.worker, "worker_subject"),
+      leaseId: requiredString(input.leaseId, "lease_id"),
+      fencingToken: expectedVersion(input.fencingToken),
+      expectedTaskVersion: expectedVersion(input.expectedTaskVersion),
+      targetStatus,
+      resultDigest: input.resultDigest == null ? null : digest(input.resultDigest, "result_digest"),
+      failureCode: input.failureCode == null ? null : requiredString(input.failureCode, "failure_code", 64),
+      idempotencyKey: idempotency(input.idempotencyKey),
+    });
+    let result;
+    try { result = await store.settleExecutionV1(request); } catch {
+      throw new ApprovalProtocolError("LEASE_SETTLEMENT_STORE_UNAVAILABLE", "The execution settlement transaction could not be completed.");
+    }
+    if (!result || typeof result !== "object" || !OUTCOMES.settle.has(result.outcome)) throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an unsupported settlement outcome.");
+    if (result.outcome !== "settled") return Object.freeze({ outcome: result.outcome });
+    return Object.freeze({ outcome: "settled", task: validateTask(result.task, targetStatus, request.taskId) });
+  }
+
+  async function cancelApprovedOrRunningTaskV1(input = {}) {
+    if (typeof store.cancelApprovedOrRunningTaskV1 !== "function") throw new ApprovalProtocolError("TASK_CANCELLATION_UNAVAILABLE", "The durable driver does not implement task cancellation.");
+    const request = Object.freeze({
+      taskId: requiredString(input.taskId, "task_id"),
+      principalSubject: resolveIdentity(resolvePrincipalSubject, input.principal, "principal_subject"),
+      expectedTaskVersion: expectedVersion(input.expectedTaskVersion),
+      idempotencyKey: idempotency(input.idempotencyKey),
+    });
+    let result;
+    try { result = await store.cancelApprovedOrRunningTaskV1(request); } catch {
+      throw new ApprovalProtocolError("TASK_CANCELLATION_STORE_UNAVAILABLE", "The task cancellation transaction could not be completed.");
+    }
+    if (!result || typeof result !== "object" || !OUTCOMES.cancel.has(result.outcome)) throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an unsupported cancellation outcome.");
+    if (result.outcome !== "cancelled") return Object.freeze({ outcome: result.outcome });
+    return Object.freeze({ outcome: "cancelled", task: validateTask(result.task, "cancelled", request.taskId) });
+  }
+
+  return Object.freeze({ issueApprovalGrantV1, approveTaskWithGrantV1, claimApprovedTaskV1, renewExecutionLeaseV1, settleExecutionV1, cancelApprovedOrRunningTaskV1 });
 }
