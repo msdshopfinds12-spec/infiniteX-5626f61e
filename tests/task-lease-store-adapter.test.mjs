@@ -85,3 +85,32 @@ test("validates lease tuple and clock before calling the store", async () => {
   await assert.rejects(badClock.claim(request), (error) => error.code === "INVALID_CLOCK");
   assert.throws(() => createLeaseFencedTaskStoreAdapter({ store: storeWith(), leaseDurationMs: 0 }), /leaseDurationMs/);
 });
+
+test("uses one consistent clock reading for each renew and settle operation", async () => {
+  let calls = 0;
+  let received;
+  const clock = () => {
+    calls += 1;
+    return calls === 1 ? now : "2026-11-19T12:00:01.000Z";
+  };
+  const adapter = createLeaseFencedTaskStoreAdapter({
+    store: storeWith({
+      renewTaskLease: async (input) => { received = input; return snapshot({ version: 6 }); },
+    }),
+    clock,
+  });
+  await adapter.renew({ ...request, leaseId, fencingToken: 7 });
+  assert.equal(calls, 1);
+  assert.equal(received.now, now);
+
+  calls = 0;
+  const settleAdapter = createLeaseFencedTaskStoreAdapter({
+    store: storeWith({
+      completeTaskWithLease: async (input) => { received = input; return true; },
+    }),
+    clock,
+  });
+  await settleAdapter.complete({ ...request, leaseId, fencingToken: 7 });
+  assert.equal(calls, 1);
+  assert.equal(received.now, now);
+});
