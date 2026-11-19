@@ -8,18 +8,26 @@ import {
   executeWithinStepBudget,
   isClaimedRunOwnedBy,
   isClaimedRunValid,
+  isValidAttempt,
   isWorkflowOwnedBy,
   readJsonBodyLimited,
   validateStepTimeoutSeconds,
 } from "./worker-security.mjs";
 
-const validRun = { id: "run-a", workflow_id: "workflow-a", owner_id: "user-a" };
+const validRun = { id: "run-a", workflow_id: "workflow-a", owner_id: "user-a", attempt: 1 };
 
 test("validates claimed-run shape and rejects malformed values", () => {
   assert.equal(isClaimedRunValid(validRun), true);
-  for (const value of [null, [], {}, { ...validRun, owner_id: "" }, { ...validRun, id: 7 }]) {
+  for (const value of [null, [], {}, { ...validRun, owner_id: "" }, { ...validRun, id: 7 },
+    { ...validRun, attempt: 0 }, { ...validRun, attempt: -1 },
+    { ...validRun, attempt: 1.5 }, { ...validRun, attempt: "1" },
+    { ...validRun, attempt: Number.MAX_SAFE_INTEGER + 1 }]) {
     assert.equal(isClaimedRunValid(value), false);
   }
+  assert.equal(isValidAttempt(1), true);
+  assert.equal(isValidAttempt(Number.MAX_SAFE_INTEGER), true);
+  assert.equal(isValidAttempt(0), false);
+  assert.equal(isValidAttempt("1"), false);
 });
 
 test("binds claimed runs and parent workflows to the authenticated owner", () => {
