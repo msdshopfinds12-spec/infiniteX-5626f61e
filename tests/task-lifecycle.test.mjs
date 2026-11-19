@@ -66,3 +66,22 @@ test("records an append-only, sequenced transition history", () => {
   assert.equal(task.events[1].to, "awaiting_approval");
   assert.equal(Object.isFrozen(task.events[1]), true);
 });
+
+test("allows explicit user cancellation from a running task", () => {
+  let task = createTask({ id: "task_7", title: "Review", createdAt: at });
+  task = command(task, "begin_planning", "system", 1);
+  task = command(task, "request_approval", "system", 2);
+  task = command(task, "approve", "user", 3);
+  task = command(task, "begin_execution", "system", 4);
+  task = command(task, "cancel", "user", 5);
+  assert.equal(task.state, "cancelled");
+  assert.equal(task.events.at(-1).command, "cancel");
+});
+
+test("rejects non-canonical timestamps and malformed task snapshots", () => {
+  assert.throws(() => createTask({ id: "task_8", title: "Review", createdAt: "2026-11-19" }),
+    (error) => error.code === "INVALID_TIMESTAMP");
+  assert.throws(() => transitionTask({ state: "queued", version: 0, updatedAt: at, id: "x" },
+    "begin_planning", { expectedVersion: 0, actor: "system", at }),
+    (error) => error.code === "INVALID_TASK");
+});
