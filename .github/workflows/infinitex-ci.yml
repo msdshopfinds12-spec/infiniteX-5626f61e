@@ -41,6 +41,9 @@ jobs:
       - name: TypeScript lint
         run: npm run lint
 
+      - name: Regression tests
+        run: npm test
+
       - name: Production build
         run: npm run build
 
