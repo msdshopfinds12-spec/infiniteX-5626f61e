@@ -141,6 +141,68 @@ test("normalizes asynchronous executor rejection and keeps the approval spent", 
   assert.equal(calls, 1);
 });
 
+
+test("bounds concurrent approved executions and releases capacity after completion", async () => {
+  let sequence = 0;
+  let releaseExecution;
+  let markStarted;
+  const started = new Promise((resolve) => { markStarted = resolve; });
+  const pending = new Promise((resolve) => { releaseExecution = resolve; });
+  const authority = createApprovalAuthority({
+    now: () => 50_000,
+    tokenFactory: () => "capacity_token_" + String(++sequence).padStart(40, "0"),
+  });
+  const service = createApprovedCapabilityService({
+    approvalAuthority: authority,
+    capabilityExecutor: {
+      run: async () => {
+        markStarted();
+        await pending;
+        return { status: "completed" };
+      },
+    },
+    authorize: async () => true,
+    isTaskAwaitingApproval: async () => true,
+    claimTaskForExecution: async () => true,
+    maxConcurrentExecutions: 1,
+  });
+  const firstGrant = await service.requestApproval(base);
+  const secondGrant = await service.requestApproval({ ...base, taskId: "task-101" });
+  const firstExecution = service.executeApproved({ ...base, approvalToken: firstGrant.token });
+  await started;
+  await assert.rejects(
+    service.executeApproved({ ...base, taskId: "task-101", approvalToken: secondGrant.token }),
+    (error) => error.code === "EXECUTION_CAPACITY_EXCEEDED",
+  );
+  releaseExecution();
+  const result = await firstExecution;
+  assert.equal(result.status, "completed");
+  const retryGrant = await service.requestApproval({ ...base, taskId: "task-102" });
+  const retry = await service.executeApproved({ ...base, taskId: "task-102", approvalToken: retryGrant.token });
+  assert.equal(retry.status, "completed");
+});
+
+test("validates the configured concurrency ceiling and rejects pre-aborted signals without spending approval", async () => {
+  const { service } = setup();
+  assert.throws(() => createApprovedCapabilityService({
+    approvalAuthority: { issue: () => ({}), consume: () => true },
+    capabilityExecutor: { run: () => ({}) },
+    authorize: async () => true,
+    isTaskAwaitingApproval: async () => true,
+    claimTaskForExecution: async () => true,
+    maxConcurrentExecutions: 0,
+  }), /maxConcurrentExecutions/);
+  const grant = await service.requestApproval(base);
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    service.executeApproved({ ...base, approvalToken: grant.token, signal: controller.signal }),
+    (error) => error.code === "ABORTED",
+  );
+  const result = await service.executeApproved({ ...base, approvalToken: grant.token });
+  assert.equal(result.status, "completed");
+});
+
 test("fails closed when authorization or task-state callbacks throw", async () => {
   const authority = createApprovalAuthority();
   const service = createApprovedCapabilityService({
