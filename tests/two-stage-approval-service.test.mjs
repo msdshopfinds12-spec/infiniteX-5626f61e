@@ -118,6 +118,7 @@ test("HMAC approval tokens are deterministic and scoped to principal, task, payl
   assert.equal(factory(input), first);
   assert.notEqual(factory({ ...input, idempotencyKey: "approve-43" }), first);
   assert.notEqual(factory({ ...input, taskId: "task-43" }), first);
+  assert.notEqual(factory({ ...input, payloadHash: "c".repeat(64) }), first);
   assert.notEqual(factory({ ...input, principal: Object.freeze({ authContext: "other" }) }), first);
   assert.match(first, /^[A-Za-z0-9_-]{43}$/u);
   assert.throws(() => createHmacApprovalTokenFactory({
