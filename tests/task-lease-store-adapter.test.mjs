@@ -28,7 +28,6 @@ test("claims a validated lease and passes a bounded duration to the atomic store
   const claimed = await adapter.claim(request);
   assert.equal(claimed.lease.fencingToken, 7);
   assert.equal(received.leaseDurationMs, 30_000);
-  assert.equal(received.now, now);
   assert.equal(Object.isFrozen(claimed.lease), true);
 });
 
@@ -87,7 +86,7 @@ test("validates lease tuple and clock before calling the store", async () => {
   assert.throws(() => createLeaseFencedTaskStoreAdapter({ store: storeWith(), leaseDurationMs: 0 }), /leaseDurationMs/);
 });
 
-test("uses one consistent clock reading for each renew and settle operation", async () => {
+test("uses trusted adapter time and never forwards caller-controlled timestamps", async () => {
   let calls = 0;
   let received;
   const clock = () => {
@@ -102,7 +101,7 @@ test("uses one consistent clock reading for each renew and settle operation", as
   });
   await adapter.renew({ ...claimedRequest, leaseId, fencingToken: 7 });
   assert.equal(calls, 1);
-  assert.equal(received.now, now);
+  assert.equal(Object.hasOwn(received, "now"), false);
 
   calls = 0;
   const settleAdapter = createLeaseFencedTaskStoreAdapter({
@@ -113,7 +112,7 @@ test("uses one consistent clock reading for each renew and settle operation", as
   });
   await settleAdapter.complete({ ...claimedRequest, leaseId, fencingToken: 7 });
   assert.equal(calls, 1);
-  assert.equal(received.now, now);
+  assert.equal(Object.hasOwn(received, "now"), false);
 });
 
 test("rejects renewal results that change the lease identity or fencing token", async () => {
@@ -130,4 +129,17 @@ test("rejects renewal results that change the lease identity or fencing token", 
       (error) => error.code === "INVALID_STORE_RESULT",
     );
   }
+});
+
+
+test("rejects caller-supplied timestamps for renewal and settlement", async () => {
+  const adapter = createLeaseFencedTaskStoreAdapter({ store: storeWith(), clock: () => now });
+  await assert.rejects(
+    adapter.renew({ ...claimedRequest, leaseId, fencingToken: 7, now: "2099-01-01T00:00:00.000Z" }),
+    (error) => error.code === "UNTRUSTED_TIME_INPUT",
+  );
+  await assert.rejects(
+    adapter.complete({ ...claimedRequest, leaseId, fencingToken: 7, now: "2000-01-01T00:00:00.000Z" }),
+    (error) => error.code === "UNTRUSTED_TIME_INPUT",
+  );
 });
