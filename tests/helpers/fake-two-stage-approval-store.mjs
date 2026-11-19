@@ -27,6 +27,10 @@ export function createFakeTwoStageApprovalStore({
   const grants = new Map();
   const issueKeys = new Map();
   const claimKeys = new Map();
+  const renewKeys = new Map();
+  const settleKeys = new Map();
+  const cancelKeys = new Map();
+  const leases = new Map();
   const events = [];
   let leaseSequence = 0;
   let fencingSequence = 0;
@@ -141,9 +145,88 @@ export function createFakeTwoStageApprovalStore({
     const running = { ...task, status: "running", version: (task.version ?? 0) + 1 };
     grant.consumed = true;
     tasks.set(request.taskId, running);
+    leases.set(request.taskId, { ...clone(lease), expiresAtMs: at + request.leaseDurationMs });
     const result = { outcome: "claimed", task: clone(running), lease };
     claimKeys.set(key, { fingerprint: fp, result: clone(result) });
     events.push({ sequence: events.length + 1, taskId: request.taskId, type: "claimed", at, fencingToken: lease.fencingToken });
+    return result;
+  }
+
+
+  async function renewExecutionLeaseV1(request) {
+    const key = request.principalSubject + ":" + request.taskId + ":renew:" + request.idempotencyKey;
+    const fp = fingerprint(request);
+    const previous = renewKeys.get(key);
+    if (previous) return previous.fingerprint === fp ? clone(previous.result) : { outcome: "conflict" };
+    const task = tasks.get(request.taskId);
+    const lease = leases.get(request.taskId);
+    const at = timestamp();
+    if (!task || task.status !== "running" || task.ownerSubject !== request.principalSubject ||
+        task.version !== request.expectedTaskVersion || !lease ||
+        lease.leaseId !== request.leaseId || lease.workerSubject !== request.workerSubject ||
+        lease.fencingToken !== request.fencingToken || lease.expiresAtMs <= at) {
+      return { outcome: lease && lease.expiresAtMs <= at ? "lease_expired" : "stale_fence" };
+    }
+    nextFailure();
+    const renewedLease = {
+      leaseId: lease.leaseId, workerSubject: lease.workerSubject, fencingToken: lease.fencingToken,
+      expiresAt: new Date(at + request.leaseDurationMs).toISOString(), expiresAtMs: at + request.leaseDurationMs,
+    };
+    const updated = { ...task, version: task.version + 1 };
+    tasks.set(request.taskId, updated);
+    leases.set(request.taskId, renewedLease);
+    const result = { outcome: "renewed", task: clone(updated), lease: {
+      leaseId: renewedLease.leaseId, workerSubject: renewedLease.workerSubject,
+      fencingToken: renewedLease.fencingToken, expiresAt: renewedLease.expiresAt,
+    }};
+    renewKeys.set(key, { fingerprint: fp, result: clone(result) });
+    events.push({ sequence: events.length + 1, taskId: request.taskId, type: "lease_renewed", at, fencingToken: lease.fencingToken });
+    return result;
+  }
+
+  async function settleExecutionV1(request) {
+    const key = request.principalSubject + ":" + request.taskId + ":settle:" + request.idempotencyKey;
+    const fp = fingerprint(request);
+    const previous = settleKeys.get(key);
+    if (previous) return previous.fingerprint === fp ? clone(previous.result) : { outcome: "conflict" };
+    const task = tasks.get(request.taskId);
+    const lease = leases.get(request.taskId);
+    const at = timestamp();
+    if (!task || task.status !== "running" || task.ownerSubject !== request.principalSubject ||
+        task.version !== request.expectedTaskVersion || !lease ||
+        lease.leaseId !== request.leaseId || lease.workerSubject !== request.workerSubject ||
+        lease.fencingToken !== request.fencingToken || lease.expiresAtMs <= at) {
+      return { outcome: lease && lease.expiresAtMs <= at ? "lease_expired" : "stale_fence" };
+    }
+    nextFailure();
+    const settled = { ...task, status: request.targetStatus, version: task.version + 1,
+      resultDigest: request.resultDigest, failureCode: request.failureCode };
+    tasks.set(request.taskId, settled);
+    leases.delete(request.taskId);
+    const result = { outcome: "settled", task: clone(settled) };
+    settleKeys.set(key, { fingerprint: fp, result: clone(result) });
+    events.push({ sequence: events.length + 1, taskId: request.taskId, type: request.targetStatus, at, fencingToken: lease.fencingToken });
+    return result;
+  }
+
+  async function cancelApprovedOrRunningTaskV1(request) {
+    const key = request.principalSubject + ":" + request.taskId + ":cancel:" + request.idempotencyKey;
+    const fp = fingerprint(request);
+    const previous = cancelKeys.get(key);
+    if (previous) return previous.fingerprint === fp ? clone(previous.result) : { outcome: "conflict" };
+    const task = tasks.get(request.taskId);
+    if (!task || task.ownerSubject !== request.principalSubject || task.version !== request.expectedTaskVersion ||
+        (task.status !== "approved" && task.status !== "running")) return { outcome: "conflict" };
+    const at = timestamp();
+    nextFailure();
+    const activeLease = leases.get(request.taskId);
+    if (activeLease) { leases.delete(request.taskId); fencingSequence += 1; }
+    const cancelled = { ...task, status: "cancelled", version: task.version + 1 };
+    tasks.set(request.taskId, cancelled);
+    const result = { outcome: "cancelled", task: clone(cancelled) };
+    cancelKeys.set(key, { fingerprint: fp, result: clone(result) });
+    events.push({ sequence: events.length + 1, taskId: request.taskId, type: "cancelled", at,
+      fencingToken: activeLease ? fencingSequence : null });
     return result;
   }
 
@@ -152,6 +235,9 @@ export function createFakeTwoStageApprovalStore({
     snapshotTask,
     issueApprovalGrantV1,
     claimApprovedTaskV1,
+    renewExecutionLeaseV1,
+    settleExecutionV1,
+    cancelApprovedOrRunningTaskV1,
     advanceTime(ms) {
       if (!Number.isSafeInteger(ms) || ms < 0) throw new TypeError("advanceTime requires a non-negative integer.");
       const base = timestamp();
