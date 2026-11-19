@@ -80,3 +80,28 @@ Deno.test({
     );
   },
 });
+
+function isLocalSupabaseUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:"
+      && ["localhost", "127.0.0.1"].includes(url.hostname)
+      && url.username.length === 0
+      && url.password.length === 0;
+  } catch {
+    return false;
+  }
+}
+
+const configuredUrl = Deno.env.get("SUPABASE_URL") ?? "";
+if (configuredUrl && !isLocalSupabaseUrl(configuredUrl)) {
+  throw new Error("integration_test_requires_local_supabase_url");
+}
+
+Deno.test("accepts only loopback HTTP Supabase URLs for mutating fixtures", () => {
+  assert(isLocalSupabaseUrl("http://localhost:54321"));
+  assert(isLocalSupabaseUrl("http://127.0.0.1:54321"));
+  assert(!isLocalSupabaseUrl("https://example.supabase.co"));
+  assert(!isLocalSupabaseUrl("http://example.supabase.co"));
+  assert(!isLocalSupabaseUrl("http://user:secret@localhost:54321"));
+});
