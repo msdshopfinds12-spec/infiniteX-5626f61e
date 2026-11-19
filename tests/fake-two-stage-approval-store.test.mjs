@@ -70,12 +70,27 @@ test("grant issuance idempotency does not create a second digest after a lost re
   const first = await issue(store, common, "stable-approval-key");
   const replay = await store.issueApprovalGrantV1({
     ...common,
-    approvalTokenDigest: "c".repeat(64),
+    approvalTokenDigest: digest,
     ttlMs: 60_000,
     idempotencyKey: "stable-approval-key",
   });
   assert.equal(first.outcome, "issued");
   assert.deepEqual(replay, { outcome: "already_issued" });
+  assert.equal(store.getGrantCount(), 1);
+  assert.equal(store.snapshotTask(common.taskId).status, "approved");
+});
+
+test("grant issuance rejects the same idempotency key with a different token digest", async () => {
+  const { store, common } = createFixture();
+  const first = await issue(store, common, "stable-approval-key");
+  const conflicting = await store.issueApprovalGrantV1({
+    ...common,
+    approvalTokenDigest: "c".repeat(64),
+    ttlMs: 60_000,
+    idempotencyKey: "stable-approval-key",
+  });
+  assert.equal(first.outcome, "issued");
+  assert.deepEqual(conflicting, { outcome: "conflict" });
   assert.equal(store.getGrantCount(), 1);
   assert.equal(store.snapshotTask(common.taskId).status, "approved");
 });
