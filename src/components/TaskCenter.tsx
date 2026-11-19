@@ -24,7 +24,7 @@ function nextAction(task: TaskRecord): { command: string; actor: "system" | "use
 export default function TaskCenter() {
   const [tasks, setTasks] = useState<TaskRecord[]>(makeSamples);
   const [message, setMessage] = useState("Local simulation only. No AI model, external tool, API, or background job is executed.");
-  const [showHistory, setShowHistory] = useState(false);
+  const [historyTaskId, setHistoryTaskId] = useState<string | null>(null);
 
   function apply(taskId: string, command: string, actor: "system" | "user") {
     setTasks((current) => current.map((task) => {
@@ -112,12 +112,12 @@ export default function TaskCenter() {
                 {!terminal && task.state !== "awaiting_approval" && task.state !== "running" ? (
                   <button className="btn btn-ghost" type="button" onClick={() => apply(task.id, "cancel", "user")}>Cancel demo task</button>
                 ) : null}
-                <button className="btn btn-ghost" type="button" aria-expanded={showHistory} onClick={() => setShowHistory((value) => !value)}>
-                  {showHistory ? "Hide history" : "View history"}
+                <button className="btn btn-ghost" type="button" aria-expanded={historyTaskId === task.id} onClick={() => setHistoryTaskId((current) => current === task.id ? null : task.id)}>
+                  {historyTaskId === task.id ? "Hide history" : "View history"}
                 </button>
               </div>
 
-              {showHistory && (
+              {historyTaskId === task.id && (
                 <ol className="task-history" aria-label={`State history for ${task.id}`}>
                   <li><span>Created</span><time dateTime={task.createdAt}>{new Date(task.createdAt).toLocaleString()}</time></li>
                   {task.events.map((event) => (
