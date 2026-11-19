@@ -264,7 +264,7 @@ The approved capability service now supports a configurable in-process concurren
 Added `server/integrations/in-memory-task-repository.mjs` with regression coverage in `tests/in-memory-task-repository.test.mjs`.
 
 Implemented contract:
-- bounded task count and bounded per-task event history;
+- bounded task count and bounded per-task event history, with the final event slot reserved for a terminal transition so a full history does not prevent cancellation;
 - duplicate task IDs rejected;
 - immutable task/event snapshots from the existing deterministic lifecycle state machine;
 - synchronous in-process create/read/list/transition operations;
@@ -283,7 +283,7 @@ A new orchestrator concurrency test exposed a test synchronization race: the tes
 
 The bounded repository implementation now lives in the browser-safe shared module `src/lib/task-repository.mjs`, with TypeScript declarations in `src/lib/task-repository.d.mts`. The server integration path `server/integrations/in-memory-task-repository.mjs` is a thin re-export, and repository tests target the shared module directly.
 
-The Task Center now initializes a bounded in-memory repository (100 tasks, 100 events per task), seeds its two demo tasks through that repository, reads task snapshots from it, and routes UI transitions through the repository's version-checked transition method. Task history is therefore sourced from repository snapshots rather than a separate React-only task mutation path.
+The Task Center now initializes a bounded in-memory repository (100 tasks, 100 events per task), seeds its two demo tasks through that repository, reads task snapshots from it, and routes UI transitions through the repository's version-checked transition method. The repository reserves its final configured event slot for a terminal command (`cancel`, `reject`, `complete`, or `fail`) so reaching the normal event limit does not strand a non-terminal task without a cancellation path. Task history is therefore sourced from repository snapshots rather than a separate React-only task mutation path.
 
 **Verified design boundary:** this is still a local, volatile browser-side demo repository. Refreshing the page resets the sample data. It does not call the server, authenticate a user, authorize a real approval, execute a capability, persist events, or contact an AI provider. The UI explicitly labels the workflow as a local simulation. Do not describe this as production task execution or secure approval.
 
