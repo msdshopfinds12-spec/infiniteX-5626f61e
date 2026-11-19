@@ -1,8 +1,8 @@
 # Phase 4N.8 — Verification, Contract Reconciliation and Release Gate
 
-**Status:** PLAN / NOT EXECUTED  
+**Status:** Phase 4N.8A implementation and CI verification complete; broader Phase 4N.8 release gates remain open  
 **Base branch:** `main`  
-**Working branch:** `feat/phase-4n7-workflow-reliability`  
+**Working branch:** `fix/phase-4n8a-attempt-fencing` (based on `feat/phase-4n7-workflow-reliability`)  
 **Release policy:** no merge, migration, secret change, billing change, or deployment without separate human approval.
 
 ## 1. Objective
@@ -23,17 +23,17 @@ Source presence is not proof of runtime correctness.
 
 ## 3. Required local/CI verification
 
-Run from the repository root on the Phase 4N.7 branch:
+Run from the repository root on `fix/phase-4n8a-attempt-fencing` (Deno CLI pinned to 2.2.12 in CI):
 
 ```bash
 node --version
 npm --version
 npm run test:edge-function-security
-deno --version
-deno test --no-lock supabase/functions/_shared/worker-security.deno.ts
-deno check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-worker/index.ts
-deno check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
-deno check --node-modules-dir=auto --no-lock supabase/functions/ashaa-api-key-manager/index.ts
+npx --yes deno@2.2.12 --version
+npx --yes deno@2.2.12 test --no-lock supabase/functions/_shared/worker-security.deno.ts
+npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-worker/index.ts
+npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
+npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/ashaa-api-key-manager/index.ts
 npm run build
 ```
 
@@ -87,9 +87,12 @@ Verify primary keys, foreign keys, owner columns, unique constraints, RPC argume
 
 ## 7. GitHub Actions evidence limitation
 
-The connected GitHub workflow-run helper available to this review returns only pull-request-triggered runs. A branch push run cannot be declared successful or failed from an empty response from that helper. Obtain the run from GitHub Actions UI/API or a supported workflow-run listing action, then capture run ID, event, commit SHA, conclusion, and job logs.
+GitHub Actions evidence is now recorded for the exact Phase 4N.8A head `9d6ac04f2bf5ec4d3765f12468b4a1dd777f0753`:
+- Push run [#44597625333](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44597625333): success.
+- Pull-request run [#44597796899](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44597796899): success.
+- Existing Phase 4N.7 workflow pull-request run [#44597796900](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44597796900): success.
 
-Do not create a pull request, dispatch a workflow, or alter repository permissions solely to work around this visibility limitation without approval.
+The two Phase 4N.8A runs include 6/6 CORS tests, 10/10 Node worker-security tests, 6/6 Deno tests, Deno type checks for all three Edge Functions, and the application build. This is code-level CI evidence, not a production runtime test.
 
 ## 8. Exit criteria
 
