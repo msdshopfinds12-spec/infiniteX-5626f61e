@@ -6,9 +6,11 @@ on:
       - fix/phase-4n8b-transactional-step-fencing-impl
       - feat/phase-4n8c-workflow-reliability-pr35
       - fix/phase-4n8c-retry-policy-ci-hardening
+      - fix/phase-4n8c-local-integration-test-safety
   pull_request:
     branches:
       - main
+      - fix/phase-4n8c-retry-policy-ci-hardening
 
 permissions:
   contents: read
@@ -51,6 +53,6 @@ jobs:
       - name: Type-check transactional integration test
         run: deno check --node-modules-dir=auto --no-lock supabase/functions/_shared/transactional-step-fencing.integration.test.ts
       - name: Run transactional integration test when local fixture secrets are supplied
-        run: deno test --no-lock --allow-env --allow-net supabase/functions/_shared/transactional-step-fencing.integration.test.ts
+        run: deno test --no-lock --allow-env=SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,PHASE_4N8B_TEST_RUN_ID,PHASE_4N8B_TEST_STEP_ID,PHASE_4N8B_TEST_OWNER_ID,PHASE_4N8B_TEST_ATTEMPT --allow-net=localhost,127.0.0.1 supabase/functions/_shared/transactional-step-fencing.integration.test.ts
       - name: Build application and type-check TypeScript
         run: npm run build
