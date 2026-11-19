@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createTask, transitionTask, TaskLifecycleError } from "../server/integrations/task-lifecycle.mjs";
+import { createTask, transitionTask, TaskLifecycleError } from "../src/lib/task-lifecycle.mjs";
 
 const at = "2026-11-19T10:00:00.000Z";
 const command = (task, name, actor, offset = 0) => transitionTask(task, name, {
