@@ -25,17 +25,12 @@ function fixture({ allowed = true } = {}) {
   let currentTask = task();
   let grantRequest;
   let claimRequest;
-  const grantStore = {
-    async issueApprovalGrantV1(request) {
-      grantRequest = request;
-      currentTask = task("approved");
-      return { outcome: "issued", task: currentTask, expiresAt };
-    },
-  };
   const protocolAdapter = createApprovalProtocolAdapter({
     store: {
-      async approveTaskWithGrantV1() {
-        return { outcome: "conflict" };
+      async issueApprovalGrantV1(request) {
+        grantRequest = request;
+        currentTask = task("approved");
+        return { outcome: "issued", task: currentTask, expiresAt };
       },
       async claimApprovedTaskV1(request) {
         claimRequest = request;
@@ -61,14 +56,9 @@ function fixture({ allowed = true } = {}) {
     },
   });
   const service = createTwoStageApprovalService({
-    grantStore,
     protocolAdapter,
     loadTaskSnapshot: async () => currentTask,
     authorizeApproval: async () => allowed,
-    resolvePrincipalSubject(identity) {
-      if (identity !== principal) throw new Error("untrusted");
-      return "principal-verified";
-    },
     tokenFactory: () => token,
     ttlMs: 60_000,
   });
