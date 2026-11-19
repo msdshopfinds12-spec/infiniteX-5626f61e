@@ -36,15 +36,38 @@ function assertJsonData(value, depth = 0) {
   }
   if (Array.isArray(value)) {
     if (value.length > 100) throw new LocalAdapterError("INPUT_TOO_LARGE", "Input arrays exceed the item limit.");
-    for (const item of value) assertJsonData(item, depth + 1);
+    const keys = Reflect.ownKeys(value);
+    for (const key of keys) {
+      if (key === "length") continue;
+      if (typeof key !== "string" || !/^(0|[1-9][0-9]*)$/u.test(key) || Number(key) >= value.length) {
+        throw new LocalAdapterError("INVALID_INPUT", "Arrays must contain only indexed JSON values.");
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor?.enumerable || !Object.hasOwn(descriptor, "value")) {
+        throw new LocalAdapterError("INVALID_INPUT", "Array accessors and hidden properties are not accepted.");
+      }
+    }
+    for (let index = 0; index < value.length; index += 1) {
+      if (!Object.hasOwn(value, index)) {
+        throw new LocalAdapterError("INVALID_INPUT", "Sparse arrays are not accepted.");
+      }
+      assertJsonData(value[index], depth + 1);
+    }
     return;
   }
   if (!isPlainRecord(value)) throw new LocalAdapterError("INVALID_INPUT", "Input must contain plain JSON data only.");
-  for (const [key, item] of Object.entries(value)) {
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== "string") {
+      throw new LocalAdapterError("INVALID_INPUT", "Symbol keys are not accepted.");
+    }
     if (["__proto__", "prototype", "constructor"].includes(key)) {
       throw new LocalAdapterError("UNSAFE_KEY", "Prototype-related keys are not accepted.");
     }
-    assertJsonData(item, depth + 1);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, "value")) {
+      throw new LocalAdapterError("INVALID_INPUT", "Accessors and hidden properties are not accepted.");
+    }
+    assertJsonData(descriptor.value, depth + 1);
   }
 }
 
