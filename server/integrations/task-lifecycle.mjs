@@ -14,7 +14,6 @@ const COMMANDS = Object.freeze({
   begin_execution: { from: "approved", to: "running", actor: "system" },
   complete: { from: "running", to: "succeeded", actor: "system" },
   fail: { from: "running", to: "failed", actor: "system" },
-  cancel: { from: "queued", to: "cancelled", actor: "user" },
 });
 
 export class TaskLifecycleError extends Error {
