@@ -50,3 +50,20 @@ The feature-branch CI was triggered after the adapter/fake/test changes. Results
 ## Design decision
 
 Preferred production alternative: PostgreSQL 17 with short, explicit transactions and conditional updates/row locks. An alternative durable database is acceptable only if it proves equivalent atomic compare-and-set, DB-authoritative expiry, monotonic fencing, owner scoping, idempotency, and append-only audit semantics. Process-local memory remains development/test-only.
+
+
+## Latest GitHub CI verification — 2026-11-20
+
+The lifecycle adapter/fake/test changes were corrected in commit `3a526b6cf047361b8cf13c03350ff6274ac2b1af` after the first CI run exposed three `expectedVersion is not defined` runtime errors in settlement and cancellation. The adapter now uses the field-specific positive-safe-integer validator consistently.
+
+Verified workflow evidence for that commit:
+- Frontend CI: SUCCESS — [run 44571583625](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44571583625)
+- Browser and Accessibility CI: SUCCESS — [run 44571583688](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44571583688)
+- Node test runner: 142 tests passed, 0 failed.
+- Typecheck: passed.
+- Browser/server import boundary: passed.
+- Production asset build: passed.
+- Playwright and WCAG browser workflow: passed.
+- npm audit: 0 vulnerabilities reported by the workflow.
+
+These checks validate the current repository test suite and browser workflow only. They do not validate PostgreSQL durability, production authentication, multi-tenant isolation, real worker concurrency, or production deployment. The initial failed run remains part of the engineering history and was fixed; do not erase it from the audit trail.
