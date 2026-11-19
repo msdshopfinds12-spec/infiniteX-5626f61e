@@ -5,6 +5,7 @@ import { createLeaseFencedTaskStoreAdapter, TaskLeaseError } from "../server/int
 const now = "2026-11-19T12:00:00.000Z";
 const request = { taskId: "task_1", ownerId: "owner_1", expectedVersion: 4 };
 const leaseId = "lease_identifier_123456";
+const claimedRequest = { ...request, expectedVersion: 5 };
 const snapshot = (overrides = {}) => ({
   id: "task_1", state: "running", version: 5,
   lease: { ownerId: "owner_1", leaseId, fencingToken: 7, expiresAt: "2026-11-19T12:00:30.000Z" },
@@ -53,13 +54,13 @@ test("renews only with the caller's fencing tuple and returns null for stale lea
     store: storeWith({ renewTaskLease: async (input) => { received = input; return snapshot({ version: 6 }); } }),
     clock: () => now,
   });
-  const renewed = await adapter.renew({ ...request, leaseId, fencingToken: 7 });
+  const renewed = await adapter.renew({ ...claimedRequest, leaseId, fencingToken: 7 });
   assert.equal(renewed.version, 6);
   assert.equal(received.fencingToken, 7);
   const stale = createLeaseFencedTaskStoreAdapter({
     store: storeWith({ renewTaskLease: async () => null }), clock: () => now,
   });
-  assert.equal(await stale.renew({ ...request, leaseId, fencingToken: 6 }), null);
+  assert.equal(await stale.renew({ ...claimedRequest, leaseId, fencingToken: 6 }), null);
 });
 
 test("completion and failure require exact boolean results from atomic store methods", async () => {
@@ -110,7 +111,7 @@ test("uses one consistent clock reading for each renew and settle operation", as
     }),
     clock,
   });
-  await settleAdapter.complete({ ...request, leaseId, fencingToken: 7 });
+  await settleAdapter.complete({ ...claimedRequest, leaseId, fencingToken: 7 });
   assert.equal(calls, 1);
   assert.equal(received.now, now);
 });
