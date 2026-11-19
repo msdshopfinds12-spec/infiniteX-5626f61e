@@ -80,7 +80,8 @@ alter table private.ai_tasks enable row level security;
 alter table private.ai_task_events enable row level security;
 alter table private.ai_approval_grants enable row level security;
 
-revoke all on schema private from public, anon, authenticated;
+-- Preserve existing private-schema grants for unrelated project functions.
+-- The new tables and RPC below receive object-level grants only.
 grant usage on schema private to service_role;
 
 revoke all on private.ai_tasks from public, anon, authenticated;
@@ -90,7 +91,7 @@ revoke all on private.ai_approval_grants from public, anon, authenticated;
 grant select, insert, update on private.ai_tasks to service_role;
 grant select, insert on private.ai_task_events to service_role;
 grant select, insert, update on private.ai_approval_grants to service_role;
-grant usage, select on all sequences in schema private to service_role;
+grant usage, select on sequence private.ai_task_events_id_seq to service_role;
 
 create or replace function private.claim_ai_task_with_approval(
   p_task_id uuid,
