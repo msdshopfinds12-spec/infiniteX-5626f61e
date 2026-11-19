@@ -108,7 +108,7 @@ Deno.serve(async (req: Request) => {
     return reply(500, { ok: false, error: "queue_claim_failed" });
   }
 
-  const summary = { ok: true, claimed: (claimedRuns ?? []).length, succeeded: 0, failed: 0, runs: [] as JsonRecord[] };
+  const summary = { ok: true, claimed: (claimedRuns ?? []).length, succeeded: 0, failed: 0, superseded: 0, runs: [] as JsonRecord[] };
 
   for (const run of (claimedRuns ?? []) as ClaimedRun[]) {
     if (!isClaimedRunValid(run)) {
@@ -141,12 +141,35 @@ Deno.serve(async (req: Request) => {
           .eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId).maybeSingle();
         if (previousError) throw new Error("step_run_lookup_failed");
 
-        const { error: startError } = await admin.from("workflow_step_runs").upsert({
+        // Step attempts track the workflow-run generation so stale workers
+        // cannot replace state written by a newer claim.
+        const stepAttempt = run.attempt;
+        const stepRunPayload = {
           run_id: run.id, step_id: step.id, owner_id: ownerId, status: "running",
           input: record(payload), output: null, error_message: null,
-          attempt: (previous?.attempt ?? 0) + 1, started_at: new Date().toISOString(), finished_at: null,
-        }, { onConflict: "run_id,step_id" });
-        if (startError) throw new Error("step_run_start_failed");
+          attempt: stepAttempt, started_at: new Date().toISOString(), finished_at: null,
+        };
+        if (previous) {
+          const { data: startedStep, error: startError } = await admin
+            .from("workflow_step_runs").update(stepRunPayload)
+            .eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
+            .lt("attempt", stepAttempt).select("id").maybeSingle();
+          if (startError) throw new Error("step_run_start_failed");
+          if (!startedStep) throw new Error("workflow_step_attempt_superseded");
+        } else {
+          const { data: insertedStep, error: insertError } = await admin
+            .from("workflow_step_runs").insert(stepRunPayload).select("id").maybeSingle();
+          if (insertError?.code === "23505") {
+            const { data: startedStep, error: startError } = await admin
+              .from("workflow_step_runs").update(stepRunPayload)
+              .eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
+              .lt("attempt", stepAttempt).select("id").maybeSingle();
+            if (startError) throw new Error("step_run_start_failed");
+            if (!startedStep) throw new Error("workflow_step_attempt_superseded");
+          } else {
+            if (insertError || !insertedStep) throw new Error("step_run_start_failed");
+          }
+        }
 
         let output: JsonRecord | null = null;
         let actionError = "";
@@ -162,27 +185,34 @@ Deno.serve(async (req: Request) => {
           actionError = error instanceof Error ? error.message : "action_failed";
         }
         if (actionError || !output) {
-          await admin.from("workflow_step_runs").update({
+          const { data: failedStep, error: stepFailureError } = await admin.from("workflow_step_runs").update({
             status: "failed", error_message: (actionError || "action_failed").slice(0, 500),
             finished_at: new Date().toISOString(),
-          }).eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId);
+          }).eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
+            .eq("attempt", stepAttempt).select("id").maybeSingle();
+          if (stepFailureError) throw new Error("step_run_failure_update_failed");
+          if (!failedStep) throw new Error("workflow_step_attempt_superseded");
           throw new Error("step_failed:" + step.name + ":" + (actionError || "action_failed"));
         }
 
         payload = output;
-        const { error: finishStepError } = await admin.from("workflow_step_runs").update({
+        const { data: finishedStep, error: finishStepError } = await admin.from("workflow_step_runs").update({
           status: "succeeded", output, error_message: null, finished_at: new Date().toISOString(),
-        }).eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId);
+        }).eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
+          .eq("attempt", stepAttempt).select("id").maybeSingle();
         if (finishStepError) throw new Error("step_run_finish_failed");
+        if (!finishedStep) throw new Error("workflow_step_attempt_superseded");
         await logEvent(admin, ownerId, run.workflow_id, run.id, "info", "workflow_step_succeeded", {
           step_id: step.id, step_order: step.step_order, action_type: step.action_type,
         });
       }
 
-      const { error: finishRunError } = await admin.from("workflow_runs").update({
+      const { data: finishedRun, error: finishRunError } = await admin.from("workflow_runs").update({
         status: "succeeded", output: record(payload), error_message: null, finished_at: new Date().toISOString(),
-      }).eq("id", run.id).eq("owner_id", ownerId).eq("status", "running");
+      }).eq("id", run.id).eq("owner_id", ownerId).eq("status", "running")
+        .eq("attempt", run.attempt).select("id").maybeSingle();
       if (finishRunError) throw new Error("workflow_run_finish_failed");
+      if (!finishedRun) throw new Error("workflow_run_attempt_superseded");
       await logEvent(admin, ownerId, run.workflow_id, run.id, "info", "workflow_run_succeeded", {
         attempt: run.attempt, step_count: steps.length,
       });
@@ -193,10 +223,21 @@ Deno.serve(async (req: Request) => {
     }
 
     if (failure) {
-      const { error: updateError } = await admin.from("workflow_runs").update({
+      if (failure.includes("attempt_superseded")) {
+        summary.superseded++;
+        summary.runs.push({ id: run.id, status: "superseded", reason: "attempt_generation_changed" });
+        continue;
+      }
+      const { data: failedRun, error: updateError } = await admin.from("workflow_runs").update({
         status: "failed", error_message: failure, finished_at: new Date().toISOString(),
-      }).eq("id", run.id).eq("owner_id", ownerId).eq("status", "running");
+      }).eq("id", run.id).eq("owner_id", ownerId).eq("status", "running")
+        .eq("attempt", run.attempt).select("id").maybeSingle();
       if (updateError) console.error("workflow_run_failure_update_failed", updateError.message);
+      if (!failedRun) {
+        summary.superseded++;
+        summary.runs.push({ id: run.id, status: "superseded", reason: "attempt_generation_changed" });
+        continue;
+      }
       await logEvent(admin, ownerId, run.workflow_id, run.id, "error", "workflow_run_failed", {
         attempt: run.attempt, error: failure,
       });
