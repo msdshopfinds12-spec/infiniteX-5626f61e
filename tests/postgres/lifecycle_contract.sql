@@ -19,7 +19,7 @@ BEGIN
   END IF;
 
   claimed := infinitex_harness.claim_with_approval(
-    'owner-15','lifecycle-task',grant,repeat('a',64),'worker-15',lease,30000,
+    'owner-15','lifecycle-task',grant_id_value,repeat('a',64),'worker-15',lease,30000,
     'claim-key-15',repeat('b',64));
   IF claimed->>'status' <> 'running' OR (claimed->>'fencing_token')::int <> 1
      OR (claimed->>'version')::int <> 2 THEN
@@ -27,7 +27,7 @@ BEGIN
   END IF;
 
   replay := infinitex_harness.claim_with_approval(
-    'owner-15','lifecycle-task',grant,repeat('a',64),'worker-15',lease,30000,
+    'owner-15','lifecycle-task',grant_id_value,repeat('a',64),'worker-15',lease,30000,
     'claim-key-15',repeat('b',64));
   IF replay IS DISTINCT FROM claimed THEN
     RAISE EXCEPTION 'same-key replay did not return original snapshot';
@@ -35,7 +35,7 @@ BEGIN
 
   BEGIN
     PERFORM infinitex_harness.claim_with_approval(
-      'owner-15','lifecycle-task',grant,repeat('a',64),'worker-15',lease,30000,
+      'owner-15','lifecycle-task',grant_id_value,repeat('a',64),'worker-15',lease,30000,
       'claim-key-15',repeat('c',64));
   EXCEPTION WHEN unique_violation THEN changed_fingerprint_rejected := true;
   END;
