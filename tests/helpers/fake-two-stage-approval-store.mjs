@@ -58,9 +58,7 @@ export function createFakeTwoStageApprovalStore({
 
   async function issueApprovalGrantV1(request) {
     const key = request.principalSubject + ":" + request.taskId + ":issue:" + request.idempotencyKey;
-    const idempotentRequest = { ...request };
-    delete idempotentRequest.approvalTokenDigest;
-    const fp = fingerprint(idempotentRequest);
+    const fp = fingerprint(request);
     const previous = issueKeys.get(key);
     if (previous) return previous.fingerprint === fp ? { outcome: "already_issued" } : { outcome: "conflict" };
 
