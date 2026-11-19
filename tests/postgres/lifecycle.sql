@@ -58,6 +58,12 @@ BEGIN
     RAISE EXCEPTION 'invalid claim input' USING ERRCODE='22023';
   END IF;
 
+  -- Serialize same-task requests before checking the idempotency ledger.
+  -- A concurrent identical retry therefore observes the first committed result.
+  SELECT * INTO t FROM infinitex_harness.tasks
+   WHERE owner_subject=p_owner AND task_id=p_task FOR UPDATE;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+
   SELECT * INTO prior FROM infinitex_harness.operation_idempotency
    WHERE owner_subject=p_owner AND task_id=p_task
      AND operation='claim' AND idempotency_key=p_idempotency_key;
@@ -68,10 +74,7 @@ BEGIN
     END IF;
     RETURN prior.response_snapshot;
   END IF;
-
-  SELECT * INTO t FROM infinitex_harness.tasks
-   WHERE owner_subject=p_owner AND task_id=p_task FOR UPDATE;
-  IF NOT FOUND OR t.status <> 'approved' THEN RETURN NULL; END IF;
+  IF t.status <> 'approved' THEN RETURN NULL; END IF;
 
   SELECT * INTO g FROM infinitex_harness.approval_grants
    WHERE grant_id=p_grant_id AND owner_subject=p_owner AND task_id=p_task
