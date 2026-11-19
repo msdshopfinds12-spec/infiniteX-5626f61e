@@ -4,11 +4,16 @@ export function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+export function isValidAttempt(value) {
+  return Number.isSafeInteger(value) && value > 0;
+}
+
 export function isClaimedRunValid(run) {
   return run !== null && typeof run === "object" && !Array.isArray(run) &&
     isNonEmptyString(run.id) &&
     isNonEmptyString(run.workflow_id) &&
-    isNonEmptyString(run.owner_id);
+    isNonEmptyString(run.owner_id) &&
+    isValidAttempt(run.attempt);
 }
 
 export function isClaimedRunOwnedBy(run, ownerId) {
