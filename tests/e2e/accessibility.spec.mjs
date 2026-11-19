@@ -10,6 +10,12 @@ test("workspace has no WCAG 2.1 A/AA automated accessibility violations", async 
       await page.getByRole("button", { name: "Switch to light mode" }).click();
     }
 
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await page.locator(".nav-item").evaluateAll(async (items) => {
+      const transitions = items.flatMap((item) => item.getAnimations());
+      await Promise.all(transitions.map((transition) => transition.finished.catch(() => undefined)));
+    });
+
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
       .analyze();

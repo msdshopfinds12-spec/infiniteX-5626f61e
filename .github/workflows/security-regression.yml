@@ -7,6 +7,7 @@ on:
       - fix/phase-4m1a-ci-coverage
       - fix/phase-4m1b-browser-boundary
       - ci/phase-4m5c-security-regression-coverage
+      - fix/infinitex-ci-a11y-audit-refresh
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -19,6 +20,7 @@ on:
       - phase-4m-ai-orchestration-readiness
       - fix/phase-4m1a-ci-coverage
       - docs/phase-4m5b-github-security-posture
+      - ci/phase-4m5c-security-regression-coverage
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -69,4 +71,4 @@ jobs:
       - name: Test Edge worker ownership and request boundaries
         run: npm run test:edge-worker-security
       - name: Dependency security audit (final blocking gate)
-        run: npm audit --audit-level=moderate
+        run: npm audit --audit-level=moderate --cache "${RUNNER_TEMP}/infinitex-npm-audit-cache"

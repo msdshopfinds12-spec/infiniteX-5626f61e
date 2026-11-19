@@ -7,10 +7,12 @@ on:
       - feat/phase-4m2f-release-integrity
       - fix/phase-4m2c-deno-tenant-isolation
       - docs/phase-4m5b-github-security-posture
+      - ci/phase-4m5c-security-regression-coverage
   push:
     branches:
       - feat/phase-4m4f-dependency-governance
       - ci/phase-4m5c-security-regression-coverage
+      - fix/infinitex-ci-a11y-audit-refresh
   workflow_dispatch:
 
 permissions:
@@ -55,6 +57,8 @@ jobs:
       - name: Enforce dependency security policy
         if: steps.install.outcome == 'success'
         run: node scripts/dependency-policy.mjs --output dependency-audit-report.json
+        env:
+          npm_config_cache: ${{ runner.temp }}/infinitex-npm-audit-cache
 
       - name: Upload dependency evidence
         if: always()
