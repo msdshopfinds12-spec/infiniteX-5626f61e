@@ -259,7 +259,27 @@ The approved capability service now supports a configurable in-process concurren
 
 **Scope limitation:** this is a per-service-instance in-memory bound, not a distributed/global limit. It does not provide a durable queue, request rate limiting, execution deadlines, or forced cancellation. A cooperative executor must observe the supplied AbortSignal; cancellation must not be reported as complete until the work actually stops. Multi-process deployments require a shared atomic concurrency/claim mechanism before this limit can be treated as global.
 
-## 16. Change-control gates
+## 17. Phase 6E — bounded in-memory task repository
+
+Added `server/integrations/in-memory-task-repository.mjs` with regression coverage in `tests/in-memory-task-repository.test.mjs`.
+
+Implemented contract:
+- bounded task count and bounded per-task event history;
+- duplicate task IDs rejected;
+- immutable task/event snapshots from the existing deterministic lifecycle state machine;
+- synchronous in-process create/read/list/transition operations;
+- optimistic `expectedVersion` checks delegated to the lifecycle state machine;
+- explicit approval transition remains required before execution;
+- unknown tasks, invalid transitions, terminal-state changes, stale versions, and capacity exhaustion fail closed;
+- append-only event history within the lifetime of this adapter instance.
+
+**Critical limitations:** this repository is volatile and process-local. It is not durable, not shared across server instances, not authenticated, and not a distributed lock. The synchronous read-check-write sequence is atomic only inside one JavaScript process/event loop. A future database adapter must implement a transaction or compare-and-swap update on task ID + expected version, append the event in the same transaction, and enforce uniqueness on task ID + event sequence. Do not connect this adapter to a public API until trusted authentication and authorization are implemented.
+
+### CI regression-test stabilization
+
+A new orchestrator concurrency test exposed a test synchronization race: the test asserted capacity recovery after only two microtask turns, before the provider promise's `finally` handler was guaranteed to release the slot. The test now waits for the next event-loop turn with `setImmediate` before asserting recovery. This changes test synchronization only; it does not weaken the runtime capacity invariant.
+
+## 18. Change-control gates
 
 This plan authorizes implementation only on `feat/infiniteX-zero-budget-implementation`. It does not authorize:
 - changes to `main`;
