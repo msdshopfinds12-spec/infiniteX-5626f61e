@@ -79,41 +79,21 @@ test("fails closed when a durable atomic operation is absent", async () => {
   await assert.rejects(adapter.claim(request), (error) => error.code === "STORE_OPERATION_UNAVAILABLE");
 });
 
-test("validates lease tuple and clock before calling the store", async () => {
-  const adapter = createLeaseFencedTaskStoreAdapter({ store: storeWith(), clock: () => now });
+test("validates lease tuple and bounded duration without relying on an application clock", async () => {
+  const adapter = createLeaseFencedTaskStoreAdapter({ store: storeWith() });
   await assert.rejects(adapter.complete({ ...request, leaseId: "short", fencingToken: 7 }), (error) => error.code === "INVALID_INPUT");
-  const badClock = createLeaseFencedTaskStoreAdapter({ store: storeWith(), clock: () => "not-a-date" });
-  await assert.rejects(badClock.claim(request), (error) => error.code === "INVALID_CLOCK");
   assert.throws(() => createLeaseFencedTaskStoreAdapter({ store: storeWith(), leaseDurationMs: 0 }), /leaseDurationMs/);
 });
 
-test("uses trusted adapter time and never forwards caller-controlled timestamps", async () => {
-  let calls = 0;
-  let received;
-  const clock = () => {
-    calls += 1;
-    return calls === 1 ? now : "2026-11-19T12:00:01.000Z";
-  };
+test("treats the durable store database clock as authoritative for lease expiry", async () => {
+  const dbIssuedLease = snapshot({
+    lease: { ...snapshot().lease, expiresAt: "2026-11-19T12:00:30.000Z" },
+  });
   const adapter = createLeaseFencedTaskStoreAdapter({
-    store: storeWith({
-      renewTaskLease: async (input) => { received = input; return snapshot({ version: 6 }); },
-    }),
-    clock,
+    store: storeWith({ claimTaskWithLease: async () => dbIssuedLease }),
   });
-  await adapter.renew({ ...claimedRequest, leaseId, fencingToken: 7 });
-  assert.equal(calls, 1);
-  assert.equal(Object.hasOwn(received, "now"), false);
-
-  calls = 0;
-  const settleAdapter = createLeaseFencedTaskStoreAdapter({
-    store: storeWith({
-      completeTaskWithLease: async (input) => { received = input; return true; },
-    }),
-    clock,
-  });
-  await settleAdapter.complete({ ...claimedRequest, leaseId, fencingToken: 7 });
-  assert.equal(calls, 1);
-  assert.equal(Object.hasOwn(received, "now"), false);
+  const claimed = await adapter.claim(request);
+  assert.equal(claimed.lease.expiresAt, "2026-11-19T12:00:30.000Z");
 });
 
 test("rejects renewal results that change the lease identity or fencing token", async () => {
