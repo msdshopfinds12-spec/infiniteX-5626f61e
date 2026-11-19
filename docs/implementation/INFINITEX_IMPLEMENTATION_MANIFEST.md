@@ -175,3 +175,13 @@ Status: BUILD COMPLETE FOR THE CURRENT FRONTEND/PWA + PROVIDER-NEUTRAL AI FOUNDA
 - npm audit reported zero vulnerabilities at the configured moderate-or-higher threshold.
 - The Task Center is deliberately an in-memory UX simulation. Its client-side approval controls are not security authorization, and its simulated running/completed states do not execute work.
 - Release remains blocked: no production HTTPS host was approved, no physical Android install was tested, and no backend/auth/persistence is connected.
+
+## Phase 5 — Deterministic local adapter runtime (2026-11-19)
+
+- Corrected whitespace and newline parsing in `text.metrics`. Word counting now splits on Unicode whitespace; line counting handles LF, CRLF, and CR.
+- Removed the ineffective `maxConcurrentRuns` control. The built-in capabilities are synchronous and bounded, so a concurrency counter could never meaningfully limit overlapping runs. This runtime does not claim parallel execution.
+- Added finite, non-decreasing clock validation and retained strict input/output byte ceilings, nesting bounds, plain-JSON validation, prototype-key rejection, capability allowlisting, and pre-dispatch cancellation checks.
+- Added runtime regression coverage in the existing `tests/adapter-contract.test.mjs` file for metrics, empty input, title preview, unsupported capabilities, malformed JSON shapes, prototype keys, nesting, byte limits, abort signals, and clock invariants.
+- Built-ins remain deterministic local computations only. No shell, filesystem, network, external provider, dynamic import, third-party plugin execution, or background queue is enabled.
+- Runtime is a trusted server-side module, not a sandbox for arbitrary untrusted code. A future Python worker remains blocked until license/reuse approval, process isolation, resource limits, and independent security review are completed.
+- Verification status: awaiting CI for the latest branch commit. Do not mark Phase 5 tested until both frontend and browser workflows have completed.
