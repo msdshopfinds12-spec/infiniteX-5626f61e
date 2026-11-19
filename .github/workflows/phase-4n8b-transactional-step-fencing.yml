@@ -32,6 +32,8 @@ jobs:
         run: npm ci
       - name: Run Node security and CORS regressions
         run: npm run test:edge-function-security
+      - name: Run shared workflow action regression tests
+        run: node --test supabase/functions/_shared/workflow-actions.test.mjs
       - name: Set up Deno
         uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.3
         with:
