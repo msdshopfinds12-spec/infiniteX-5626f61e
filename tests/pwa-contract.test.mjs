@@ -19,6 +19,9 @@ test("service worker only caches same-origin GET assets and excludes API paths",
   assert.match(worker, /url\.origin !== self\.location\.origin/);
   assert.match(worker, /url\.pathname\.startsWith\("\/api\/"\)/);
   assert.match(worker, /request\.destination/);
+  assert.match(worker, /url\.pathname === "\/assets\//);
+  assert.match(worker, /url\.pathname === "\/"/);
+  assert.match(worker, /private\|no-store/);
   assert.match(worker, /offline\.html/);
 });
 
