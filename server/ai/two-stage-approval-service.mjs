@@ -136,7 +136,10 @@ export function createTwoStageApprovalService({
         ttlMs,
         idempotencyKey: key,
       });
-    } catch {
+    } catch (error) {
+      if (error?.code === "UNTRUSTED_PRINCIPAL_SUBJECT") {
+        throw new TwoStageApprovalError("UNTRUSTED_PRINCIPAL", "A trusted principal could not be resolved.");
+      }
       throw new TwoStageApprovalError("GRANT_STORE_UNAVAILABLE", "The durable approval grant transaction could not be completed.");
     }
     if (result.outcome !== "issued") return result;
