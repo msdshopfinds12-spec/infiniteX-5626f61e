@@ -5,6 +5,7 @@ on:
     branches:
       - fix/phase-4n8b-transactional-step-fencing-impl
       - feat/phase-4n8c-workflow-reliability-pr35
+      - fix/phase-4n8c-retry-policy-ci-hardening
   pull_request:
     branches:
       - main
