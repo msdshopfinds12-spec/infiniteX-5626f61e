@@ -82,7 +82,7 @@ export default function TaskCenter() {
                   </span>
                   <div><h3>{task.title}</h3><span className="task-id">{task.id}</span></div>
                 </div>
-                <span className={`task-state-pill state-pill-${task.state}`}>{task.state.replaceAll("_", " ")}</span>
+                <span className={`task-state-pill state-pill-${task.state}`}>{task.state.replace(/_/g, " ")}</span>
               </div>
 
               <div className="task-progress" aria-label={`Task state: ${task.state}`}>
@@ -94,7 +94,7 @@ export default function TaskCenter() {
               <div className="task-card-meta">
                 <span>Version {task.version}</span>
                 <span>{task.events.length} state events</span>
-                <span>Approval: {task.approval.replaceAll("_", " ")}</span>
+                <span>Approval: {task.approval.replace(/_/g, " ")}</span>
               </div>
 
               <div className="task-actions">
