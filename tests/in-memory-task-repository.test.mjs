@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createInMemoryTaskRepository, TaskRepositoryError } from "../server/integrations/in-memory-task-repository.mjs";
+import { createInMemoryTaskRepository, TaskRepositoryError } from "../src/lib/task-repository.mjs";
 
 const createdAt = "2026-11-19T10:00:00.000Z";
 const taskInput = (id = "task_1") => ({ id, title: "Review architecture", createdAt });
