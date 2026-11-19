@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: phase-4n27-postgres-contract-${{ github.ref }}
-  cancel-in-progress: true
+  group: phase-4n27-postgres-contract-v2-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   transactional-fencing:
