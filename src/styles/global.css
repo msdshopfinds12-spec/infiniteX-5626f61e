@@ -232,6 +232,31 @@ body {
   color: var(--text-2);
 }
 
+/* ---------- Demo state disclosure ---------- */
+.demo-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  color: var(--text-1);
+  font-size: 12px;
+}
+
+.demo-notice strong {
+  flex: 0 0 auto;
+  color: var(--warning);
+  letter-spacing: 0.06em;
+}
+
+button:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 /* ---------- Topbar ---------- */
 .topbar {
   height: 64px;
@@ -793,5 +818,33 @@ body {
   }
   .log-source {
     display: none;
+  }
+}
+
+
+/* ---------- Accessibility: keyboard focus and reduced motion ---------- */
+:where(button, input, select, textarea, a):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Mobile navigation: preserve usable touch targets when labels are collapsed. */
+@media (max-width: 760px) {
+  .nav-item {
+    min-width: 40px;
+    min-height: 40px;
+    justify-content: center;
+    padding: 8px;
   }
 }
