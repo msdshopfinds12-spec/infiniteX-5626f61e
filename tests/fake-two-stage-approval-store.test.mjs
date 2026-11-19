@@ -65,6 +65,21 @@ test("fake durable contract models approval, digest consumption, and lease creat
   assert.equal(store.getEvents().map((event) => event.type).join(","), "approved,claimed");
 });
 
+test("grant issuance idempotency does not create a second digest after a lost response", async () => {
+  const { store, common } = createFixture();
+  const first = await issue(store, common, "stable-approval-key");
+  const replay = await store.issueApprovalGrantV1({
+    ...common,
+    approvalTokenDigest: "c".repeat(64),
+    ttlMs: 60_000,
+    idempotencyKey: "stable-approval-key",
+  });
+  assert.equal(first.outcome, "issued");
+  assert.deepEqual(replay, { outcome: "already_issued" });
+  assert.equal(store.getGrantCount(), 1);
+  assert.equal(store.snapshotTask(common.taskId).status, "approved");
+});
+
 test("fake store rejects expired grants and cannot claim them", async () => {
   const { store, common } = createFixture();
   await issue(store, common);
