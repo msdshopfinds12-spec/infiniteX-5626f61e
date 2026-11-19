@@ -109,6 +109,27 @@ async function logEvent(
   if (error) console.error("workflow_log_insert_failed", error.message);
 }
 
+async function transitionStep(
+  admin: SupabaseClient<any, "public", any, any, any>,
+  args: {
+    p_run_id: string;
+    p_step_id: string;
+    p_owner_id: string;
+    p_attempt: number;
+    p_transition: "start" | "succeed" | "fail";
+    p_input: JsonRecord | null;
+    p_output: JsonRecord | null;
+    p_error_message: string | null;
+  },
+) {
+  const { data, error } = await admin.rpc("simula_transition_workflow_step", args);
+  if (error) throw new Error(error.message || "workflow_step_transition_failed");
+  if (typeof data !== "string" || data.length === 0) {
+    throw new Error("workflow_step_transition_failed");
+  }
+  return data;
+}
+
 Deno.serve(async (req: Request) => {
   const cors = corsHeadersForRequest(req);
   if (!cors.allowed) return new Response("origin_not_allowed", { status: 403, headers: cors.headers });
@@ -189,67 +210,17 @@ Deno.serve(async (req: Request) => {
 
       for (const step of steps as Step[]) {
         const config = record(step.config);
-        const { data: previousStepRun, error: previousError } = await admin
-          .from("workflow_step_runs")
-          .select("id,attempt")
-          .eq("run_id", run.id)
-          .eq("step_id", step.id)
-          .eq("owner_id", ownerId)
-          .maybeSingle();
-        if (previousError) throw new Error("step_run_lookup_failed");
-
-        // The step attempt is the workflow-run generation. A stale worker can only
-        // advance a row to a lower generation; the conditional update prevents it
-        // from replacing a newer worker's step state.
         const stepAttempt = run.attempt;
-        const stepRunPayload = {
-          run_id: run.id,
-          step_id: step.id,
-          owner_id: ownerId,
-          status: "running",
-          input: record(payload),
-          output: null,
-          error_message: null,
-          attempt: stepAttempt,
-          started_at: new Date().toISOString(),
-          finished_at: null,
-        };
-        if (previousStepRun) {
-          const { data: startedStep, error: startError } = await admin
-            .from("workflow_step_runs")
-            .update(stepRunPayload)
-            .eq("run_id", run.id)
-            .eq("step_id", step.id)
-            .eq("owner_id", ownerId)
-            .lt("attempt", stepAttempt)
-            .select("id")
-            .maybeSingle();
-          if (startError) throw new Error("step_run_start_failed");
-          if (!startedStep) throw new Error("workflow_step_attempt_superseded");
-        } else {
-          const { data: insertedStep, error: insertError } = await admin
-            .from("workflow_step_runs")
-            .insert(stepRunPayload)
-            .select("id")
-            .maybeSingle();
-          if (insertError?.code === "23505") {
-            // Resolve the absent-row insert race using the same generation CAS.
-            const { data: startedStep, error: startError } = await admin
-              .from("workflow_step_runs")
-              .update(stepRunPayload)
-              .eq("run_id", run.id)
-              .eq("step_id", step.id)
-              .eq("owner_id", ownerId)
-              .lt("attempt", stepAttempt)
-              .select("id")
-              .maybeSingle();
-            if (startError) throw new Error("step_run_start_failed");
-            if (!startedStep) throw new Error("workflow_step_attempt_superseded");
-          } else {
-            if (insertError) throw new Error("step_run_start_failed");
-            if (!insertedStep) throw new Error("step_run_start_failed");
-          }
-        }
+        await transitionStep(admin, {
+          p_run_id: run.id,
+          p_step_id: step.id,
+          p_owner_id: ownerId,
+          p_attempt: stepAttempt,
+          p_transition: "start",
+          p_input: record(payload),
+          p_output: null,
+          p_error_message: null,
+        });
 
         let actionOutput: JsonRecord | null = null;
         let actionError = "";
@@ -266,34 +237,30 @@ Deno.serve(async (req: Request) => {
         }
 
         if (actionError || !actionOutput) {
-          const { data: failedStep, error: stepFailureError } = await admin.from("workflow_step_runs").update({
-            status: "failed",
-            error_message: actionError || "action_failed",
-            finished_at: new Date().toISOString(),
-          }).eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
-            .eq("attempt", stepAttempt).select("id").maybeSingle();
-          if (stepFailureError) throw new Error("step_run_failure_update_failed");
-          if (!failedStep) throw new Error("workflow_step_attempt_superseded");
+          await transitionStep(admin, {
+            p_run_id: run.id,
+            p_step_id: step.id,
+            p_owner_id: ownerId,
+            p_attempt: stepAttempt,
+            p_transition: "fail",
+            p_input: null,
+            p_output: null,
+            p_error_message: (actionError || "action_failed").slice(0, 500),
+          });
           throw new Error("step_failed:" + step.name + ":" + (actionError || "action_failed"));
         }
 
         payload = actionOutput;
-        const { data: finishedStep, error: stepFinishError } = await admin
-          .from("workflow_step_runs")
-          .update({
-            status: "succeeded",
-            output: actionOutput,
-            error_message: null,
-            finished_at: new Date().toISOString(),
-          })
-          .eq("run_id", run.id)
-          .eq("step_id", step.id)
-          .eq("owner_id", ownerId)
-          .eq("attempt", stepAttempt)
-          .select("id")
-          .maybeSingle();
-        if (stepFinishError) throw new Error("step_run_finish_failed");
-        if (!finishedStep) throw new Error("workflow_step_attempt_superseded");
+        await transitionStep(admin, {
+          p_run_id: run.id,
+          p_step_id: step.id,
+          p_owner_id: ownerId,
+          p_attempt: stepAttempt,
+          p_transition: "succeed",
+          p_input: null,
+          p_output: actionOutput,
+          p_error_message: null,
+        });
 
         await logEvent(admin, ownerId, run.workflow_id, run.id, "info", "workflow_step_succeeded", {
           step_id: step.id,
