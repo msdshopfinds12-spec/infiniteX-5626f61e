@@ -1,4 +1,4 @@
-const TOOL_RISKS = new Set(["read", "write", "external", "destructive"]);
+const TOOL_RISKS = new Set(["read", "compute", "write", "external", "destructive"]);
 
 export class PolicyError extends Error {
   constructor(code, message) {
@@ -86,7 +86,7 @@ export function createExecutionPolicy({
     if (risk === "destructive") {
       return Object.freeze({ allowed: false, code: "DESTRUCTIVE_TOOL_BLOCKED" });
     }
-    if (risk === "read") {
+    if (risk === "read" || risk === "compute") {
       return Object.freeze({ allowed: true, code: "ALLOWED" });
     }
     let verified = false;
