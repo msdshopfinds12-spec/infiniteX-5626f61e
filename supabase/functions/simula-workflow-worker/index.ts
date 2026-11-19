@@ -17,7 +17,6 @@ type Step = {
   name: string;
   action_type: string;
   config: JsonRecord;
-  retry_limit: number;
   timeout_seconds: number;
 };
 type ClaimedRun = {
@@ -180,7 +179,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: steps, error: stepsError } = await admin
         .from("workflow_steps")
-        .select("id,step_order,name,action_type,config,retry_limit,timeout_seconds")
+        .select("id,step_order,name,action_type,config,timeout_seconds")
         .eq("workflow_id", run.workflow_id)
         .order("step_order", { ascending: true });
 
@@ -218,20 +217,15 @@ Deno.serve(async (req: Request) => {
 
         let actionOutput: JsonRecord | null = null;
         let actionError = "";
-        const retries = Math.max(0, Math.min(Number.isInteger(step.retry_limit) ? step.retry_limit : 0, 10));
-        for (let attempt = 0; attempt <= retries; attempt++) {
-          try {
-            const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
-            actionOutput = executeWithinStepBudget(
-              (input: unknown) => executeSafeAction(step.action_type, input, config),
-              payload,
-              timeoutSeconds,
-            );
-            actionError = "";
-            break;
-          } catch (error) {
-            actionError = error instanceof Error ? error.message : "action_failed";
-          }
+        try {
+          const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
+          actionOutput = executeWithinStepBudget(
+            (input: unknown) => executeSafeAction(step.action_type, input, config),
+            payload,
+            timeoutSeconds,
+          );
+        } catch (error) {
+          actionError = error instanceof Error ? error.message : "action_failed";
         }
 
         if (actionError || !actionOutput) {
