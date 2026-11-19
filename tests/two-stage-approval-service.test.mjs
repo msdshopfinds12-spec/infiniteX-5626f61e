@@ -170,15 +170,14 @@ test("rejects untrusted principal and malformed token before store calls", async
   assert.equal(f.getClaimRequest(), undefined);
 });
 
-test("rejects a task in the wrong state before attempting a grant", async () => {
+test("a different idempotency key cannot issue a second grant for an already approved task", async () => {
   const f = fixture();
-  await f.service.approveTaskV1({
+  const first = await f.service.approveTaskV1({
     principal, taskId: "task-42", idempotencyKey: "approve-42",
   });
-  await assert.rejects(
-    f.service.approveTaskV1({
-      principal, taskId: "task-42", idempotencyKey: "approve-again",
-    }),
-    (error) => error.code === "TASK_SNAPSHOT_INVALID",
-  );
+  const second = await f.service.approveTaskV1({
+    principal, taskId: "task-42", idempotencyKey: "approve-again",
+  });
+  assert.equal(first.outcome, "issued");
+  assert.deepEqual(second, { outcome: "conflict" });
 });
