@@ -25,7 +25,7 @@ Deno.test("Deno: computes capped full jitter", () => {
 });
 Deno.test("Deno: retries transient failures within attempt budget", async () => {
   let calls = 0;
-  const result = await runWithRetry(async ({ attempt }) => {
+  const result = await runWithRetry(async ({ attempt }: { attempt: number }) => {
     calls++;
     if (attempt === 1) throw Object.assign(new Error("temporary"), { status: 503 });
     return "ok";
