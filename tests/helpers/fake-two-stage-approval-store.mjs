@@ -57,7 +57,7 @@ export function createFakeTwoStageApprovalStore({
   }
 
   async function issueApprovalGrantV1(request) {
-    const key = request.principalSubject + ":" + request.idempotencyKey;
+    const key = request.principalSubject + ":" + request.taskId + ":issue:" + request.idempotencyKey;
     const idempotentRequest = { ...request };
     delete idempotentRequest.approvalTokenDigest;
     const fp = fingerprint(idempotentRequest);
@@ -101,7 +101,7 @@ export function createFakeTwoStageApprovalStore({
   }
 
   async function claimApprovedTaskV1(request) {
-    const key = request.principalSubject + ":" + request.idempotencyKey;
+    const key = request.principalSubject + ":" + request.taskId + ":claim:" + request.idempotencyKey;
     const fp = fingerprint(request);
     const previous = claimKeys.get(key);
     if (previous) return previous.fingerprint === fp ? clone(previous.result) : { outcome: "conflict" };
