@@ -69,3 +69,41 @@ test("production service worker registers and app shell remains available offlin
   await page.reload();
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
 });
+
+test("task center requires explicit approval before showing simulated execution state", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Task Center" }).click();
+  await expect(page.getByRole("heading", { name: "Task Center" })).toBeVisible();
+  await expect(page.getByText("NO EXECUTION")).toBeVisible();
+
+  const card = page.locator(".task-card").filter({ hasText: "Review application architecture" });
+  await card.getByRole("button", { name: "Start planning" }).click();
+  await card.getByRole("button", { name: "Request approval" }).click();
+  await expect(card.getByText("awaiting approval")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Approve simulation" })).toBeVisible();
+  await card.getByRole("button", { name: "Approve simulation" }).click();
+  await expect(card.getByText("approved", { exact: true })).toBeVisible();
+  await card.getByRole("button", { name: "Preview execution state" }).click();
+  await expect(card.getByText("running", { exact: true })).toBeVisible();
+  await expect(page.getByText(/No external action was performed/)).toBeVisible();
+});
+
+test("task center rejects a task through the human review control", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Task Center" }).click();
+  const card = page.locator(".task-card").filter({ hasText: "Prepare quality assurance checklist" });
+  await card.getByRole("button", { name: "Start planning" }).click();
+  await card.getByRole("button", { name: "Request approval" }).click();
+  await card.getByRole("button", { name: "Reject" }).click();
+  await expect(card.getByText("cancelled", { exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Approve simulation" })).toHaveCount(0);
+});
+
+test("task history disclosure is scoped to the selected task", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Task Center" }).click();
+  const cards = page.locator(".task-card");
+  await cards.nth(0).getByRole("button", { name: "View history" }).click();
+  await expect(cards.nth(0).getByRole("list", { name: /State history/ })).toBeVisible();
+  await expect(cards.nth(1).getByRole("list", { name: /State history/ })).toHaveCount(0);
+});
