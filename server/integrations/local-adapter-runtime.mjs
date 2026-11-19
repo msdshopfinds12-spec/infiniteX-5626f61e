@@ -5,6 +5,7 @@
  * - Only the two built-in pure functions below can run.
  * - No dynamic imports, eval, shell, filesystem, network, provider, or plugin code.
  * - Inputs/outputs are JSON data with strict size and shape limits.
+ * - Built-ins are synchronous and bounded; cancellation is checked before dispatch.
  * - This is a trusted server-side module, not a sandbox for untrusted code.
  */
 export class LocalAdapterError extends Error {
@@ -81,20 +82,17 @@ function executeBuiltIn(capability, input) {
 export function createLocalAdapterRuntime({
   maxInputBytes = 16_384,
   maxOutputBytes = 32_768,
-  maxConcurrentRuns = 2,
   now = () => Date.now(),
 } = {}) {
   for (const [name, value, max] of [
     ["maxInputBytes", maxInputBytes, 65_536],
     ["maxOutputBytes", maxOutputBytes, 65_536],
-    ["maxConcurrentRuns", maxConcurrentRuns, 8],
   ]) {
     if (!Number.isSafeInteger(value) || value < 1 || value > max) {
       throw new TypeError(name + " must be a positive bounded integer.");
     }
   }
   if (typeof now !== "function") throw new TypeError("now must be a function.");
-  let activeRuns = 0;
 
   function listCapabilities() {
     return Object.freeze(Object.entries(CAPABILITIES).map(([id, value]) =>
@@ -117,30 +115,28 @@ export function createLocalAdapterRuntime({
       throw new LocalAdapterError("INVALID_SIGNAL", "signal must be an AbortSignal.");
     }
     if (signal?.aborted) throw new LocalAdapterError("ABORTED", "The local operation was cancelled.");
-    if (activeRuns >= maxConcurrentRuns) {
-      throw new LocalAdapterError("CAPACITY_LIMIT", "The local adapter concurrency limit has been reached.");
-    }
-
-    activeRuns += 1;
     const startedAt = now();
-    try {
-      const output = executeBuiltIn(capability, input);
-      if (signal?.aborted) throw new LocalAdapterError("ABORTED", "The local operation was cancelled.");
-      if (encodeSize(output) > maxOutputBytes) {
-        throw new LocalAdapterError("OUTPUT_TOO_LARGE", "Capability output exceeds the configured byte limit.");
-      }
-      return Object.freeze({
-        capability,
-        status: "completed",
-        output,
-        startedAt,
-        finishedAt: now(),
-        sideEffects: "none",
-      });
-    } finally {
-      activeRuns -= 1;
+    if (!Number.isFinite(startedAt)) {
+      throw new LocalAdapterError("INVALID_CLOCK", "The runtime clock must return a finite number.");
     }
+    const output = executeBuiltIn(capability, input);
+    if (signal?.aborted) throw new LocalAdapterError("ABORTED", "The local operation was cancelled.");
+    if (encodeSize(output) > maxOutputBytes) {
+      throw new LocalAdapterError("OUTPUT_TOO_LARGE", "Capability output exceeds the configured byte limit.");
+    }
+    const finishedAt = now();
+    if (!Number.isFinite(finishedAt) || finishedAt < startedAt) {
+      throw new LocalAdapterError("INVALID_CLOCK", "The runtime clock must be finite and non-decreasing.");
+    }
+    return Object.freeze({
+      capability,
+      status: "completed",
+      output,
+      startedAt,
+      finishedAt,
+      sideEffects: "none",
+    });
   }
 
-  return Object.freeze({ listCapabilities, run, get activeRuns() { return activeRuns; } });
+  return Object.freeze({ listCapabilities, run });
 }
