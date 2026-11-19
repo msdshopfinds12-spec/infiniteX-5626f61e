@@ -112,7 +112,7 @@ export function createHmacApprovalTokenFactory({ secret, resolvePrincipalSubject
       requiredString(taskId, "task_id"),
       requiredString(idempotencyKey, "idempotency_key", 200),
       payloadHash,
-    ].join("\\0");
+    ].join("\0");
     return createHmac("sha256", key).update(scope, "utf8").digest("base64url");
   };
 }
@@ -190,7 +190,7 @@ export function createTwoStageApprovalService({
     }
     if (result.outcome !== "issued" && result.outcome !== "already_issued") return result;
     return Object.freeze({
-      outcome: "issued",
+      outcome: result.outcome,
       task: result.task,
       approvalToken: token,
       expiresAt: result.expiresAt,
