@@ -6,6 +6,7 @@ import {
   executeWithinStepBudget,
   isClaimedRunOwnedBy,
   isClaimedRunValid,
+  isValidAttempt,
   isWorkflowOwnedBy,
   readJsonBodyLimited,
   validateStepTimeoutSeconds,
@@ -18,12 +19,16 @@ function assertEqual(actual: unknown, expected: unknown, message: string) {
   assert(JSON.stringify(actual) === JSON.stringify(expected), message);
 }
 
-const validRun = { id: "run-a", workflow_id: "workflow-a", owner_id: "user-a" };
+const validRun = { id: "run-a", workflow_id: "workflow-a", owner_id: "user-a", attempt: 1 };
 
 Deno.test("Deno: validates claimed run shape and owner binding", () => {
   assert(isClaimedRunValid(validRun), "valid run should pass");
   assert(!isClaimedRunValid(null), "null run should fail");
   assert(!isClaimedRunValid([]), "array run should fail");
+  assert(!isClaimedRunValid({ ...validRun, attempt: 0 }), "zero attempt should fail");
+  assert(!isClaimedRunValid({ ...validRun, attempt: 1.5 }), "fractional attempt should fail");
+  assert(isValidAttempt(1), "positive integer attempt should pass");
+  assert(!isValidAttempt(-1), "negative attempt should fail");
   assert(isClaimedRunOwnedBy(validRun, "user-a"), "matching owner should pass");
   assert(!isClaimedRunOwnedBy(validRun, "user-b"), "mismatched owner should fail");
   const workflow = { id: "workflow-a", owner_id: "user-a" };
