@@ -20,19 +20,17 @@ This phase must not claim exactly-once execution for external side effects. The 
 
 The following findings are based on the Phase 4N.8B source files inspected for this branch.
 
-### F-01 — Retry configuration is read but not enforced
+### F-01 — Retry configuration is read but not enforced — BLOCKED pending state-model design
 
-Both `simula-workflow-worker` and `simula-workflow-cron-worker` select `retry_limit` from `workflow_steps`, but the worker execution loops do not consult it. A step failure currently fails the workflow run rather than implementing a bounded per-step retry policy.
+Both workers select `retry_limit`, but neither execution loop enforces it. The current fencing RPC permits `start`, `succeed`, and `fail`, and its uniqueness rule allows a step row to be restarted only when the parent run generation increases. A naive retry loop within the same generation would be rejected by the existing transition contract; incrementing the parent run generation for a single-step retry would also change the fencing identity for the whole run.
 
-**Required change:** define retry semantics before implementation: attempt counter scope, backoff policy, retryable error classes, maximum elapsed time, and terminal states. Do not silently retry validation, authorization, or deterministic configuration errors.
+**Decision:** do not add a superficial retry loop. First design a separate per-step execution generation/attempt and lease identity, plus retry scheduling fields and a transactional claim/retry transition. Specify retryable error classes, maximum elapsed time, backoff, jitter, and terminal states. Validation, authorization, and deterministic configuration errors must not retry.
 
-### F-02 — Worker implementations duplicate the execution pipeline
+### F-02 — Worker implementations duplicate the execution pipeline — PARTIALLY REDUCED
 
-The authenticated worker and cron worker contain parallel implementations of action dispatch, step transitions, output validation, logging, and run finalization.
+The authenticated worker and cron worker previously duplicated the allowlisted local action dispatcher. Phase 4N.8C now extracts that deterministic action contract into `supabase/functions/_shared/workflow-actions.mjs`, with Node regression tests, and both workers import the same implementation. The CI workflow now runs those tests.
 
-**Risk:** fixes can diverge between entry points.
-
-**Required change:** extract a runtime-neutral shared workflow execution module. Keep authentication, CORS, and claim acquisition in the respective HTTP entry points. Share orchestration and transition semantics.
+**Remaining:** step orchestration, transition handling, logging, and run finalization are still duplicated. A full shared orchestrator extraction is deferred until typed contracts and parity tests are in place; changing both entry points at once without those tests would increase regression risk.
 
 ### F-03 — Step start is intentionally single-winner per generation
 
@@ -133,3 +131,16 @@ This branch is not production-ready merely because source checks pass. Release r
 ## 8. Cost and safety constraints
 
 Prefer local Supabase CLI/PostgreSQL fixtures and existing GitHub Actions infrastructure. Do not add paid services, create cloud resources, alter secrets, run production migrations, merge, or deploy as part of this phase without separate explicit approval.
+
+## 9. Phase 4N.8C implementation checkpoint
+
+The following repository changes have been committed to `feat/phase-4n8c-workflow-reliability-pr35`:
+
+- Added `supabase/functions/_shared/workflow-actions.mjs` as the single runtime-neutral allowlisted local action dispatcher.
+- Added `supabase/functions/_shared/workflow-actions.test.mjs` covering supported actions, invalid configuration, unknown actions, selected text fields, and input immutability.
+- Updated both authenticated and cron workers to import the shared dispatcher instead of maintaining duplicate action implementations.
+- Updated the Phase 4N.8B workflow to run the new Node regression suite.
+
+**Verification boundary:** repository writes are confirmed by GitHub commit responses. The new Node tests, Deno type checks, application build, and disposable database integration tests have not yet been executed in this session. The CI workflow has not yet been observed running for this branch.
+
+**Not implemented:** retry execution, a new recovery RPC, an outbox table, external integrations, or production migrations. These require additional schema/state-machine design and disposable-database evidence. The current retry gap is intentionally not papered over with unsafe same-generation retries.
