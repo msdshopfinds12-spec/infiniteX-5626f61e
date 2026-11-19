@@ -7,16 +7,16 @@ const CODE_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".ts", ".tsx"]);
 
 export function isForbiddenServerImport(specifier) {
   if (typeof specifier !== "string") return false;
-  const normalized = specifier.replaceAll("\\\\", "/");
-  return /(^|\\/)server\\//.test(normalized) || normalized.startsWith("@/server/");
+  const normalized = specifier.replace(/\\/g, "/");
+  return normalized.startsWith("server/") ||
+    normalized.startsWith("@/server/") ||
+    normalized.includes("/server/");
 }
 
 export function extractImportSpecifiers(source) {
   const matches = [];
-  const pattern = /\\b(?:from\\s*|import\\s*\\()\\s*["']([^"']+)["']|\\bimport\\s*["']([^"']+)["']/g;
-  for (const match of source.matchAll(pattern)) {
-    matches.push(match[1] || match[2]);
-  }
+  const pattern = /\b(?:from\s*|import\s*\()\s*["']([^"']+)["']|\bimport\s*["']([^"']+)["']/g;
+  for (const match of source.matchAll(pattern)) matches.push(match[1] || match[2]);
   return matches;
 }
 
@@ -46,17 +46,17 @@ export async function scanBrowserImports(sourceRoot = path.resolve("src")) {
 async function main() {
   const violations = await scanBrowserImports();
   if (violations.length) {
-    process.stderr.write("BLOCKED: browser source imports server-only modules.\\n");
-    for (const item of violations) process.stderr.write(`- ${item.file}: ${item.specifier}\\n`);
+    process.stderr.write("BLOCKED: browser source imports server-only modules.\n");
+    for (const item of violations) process.stderr.write(`- ${item.file}: ${item.specifier}\n`);
     process.exitCode = 1;
     return;
   }
-  process.stdout.write("PASS: no server-only imports found in browser source.\\n");
+  process.stdout.write("PASS: no server-only imports found in browser source.\n");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
-    process.stderr.write(`Browser boundary scan failed: ${error.message}\\n`);
+    process.stderr.write(`Browser boundary scan failed: ${error.message}\n`);
     process.exitCode = 2;
   });
 }
