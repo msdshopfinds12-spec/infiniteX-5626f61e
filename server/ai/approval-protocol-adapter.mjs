@@ -144,7 +144,7 @@ export function createApprovalProtocolAdapter({
     }
     const request = Object.freeze({
       taskId: requiredString(input.taskId, "task_id"),
-      principalSubject: subject(input.principal),
+      principalSubject: resolveIdentity(resolvePrincipalSubject, input.principal, "principal_subject"),
       expectedTaskVersion: requiredString(input.taskVersion, "task_version"),
       expectedPayloadHash: digest(input.payloadHash, "payload_hash"),
       expectedAgentId: requiredString(input.agentId, "agent_id"),
