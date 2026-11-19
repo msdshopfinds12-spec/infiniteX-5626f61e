@@ -50,7 +50,7 @@ export function createLocalCapabilityExecutor({
     if (auditEvents.length > maxAuditEvents) auditEvents.shift();
   }
 
-  function run({ agentId, capabilityId, input, signal } = {}) {
+  async function run({ agentId, capabilityId, input, signal } = {}) {
     if (typeof agentId !== "string" || typeof capabilityId !== "string") {
       throw new CapabilityExecutionError("INVALID_REQUEST", "Agent and capability identifiers are required.");
     }
@@ -86,7 +86,11 @@ export function createLocalCapabilityExecutor({
     }
 
     try {
-      const result = runtime.run({ capability: capabilityId, input, signal });
+      const result = await runtime.run({ capability: capabilityId, input, signal });
+      if (signal?.aborted) {
+        record({ agentId, capabilityId, event: "capability_failed", code: "ABORTED" });
+        throw new CapabilityExecutionError("ABORTED", "The local operation was cancelled.");
+      }
       record({ agentId, capabilityId, event: "capability_completed" });
       return Object.freeze({
         agentId,
@@ -96,7 +100,9 @@ export function createLocalCapabilityExecutor({
       });
     } catch (error) {
       const code = typeof error?.code === "string" ? error.code : "CAPABILITY_FAILED";
-      record({ agentId, capabilityId, event: "capability_failed", code });
+      if (!(error instanceof CapabilityExecutionError && error.code === "ABORTED")) {
+        record({ agentId, capabilityId, event: "capability_failed", code });
+      }
       throw new CapabilityExecutionError(code, "The local capability could not be completed.");
     }
   }
