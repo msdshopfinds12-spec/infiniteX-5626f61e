@@ -25,6 +25,7 @@ export function createOrchestrator({
   policy,
   providers = {},
   timeoutMs = 15_000,
+  maxConcurrentRuns = 4,
   maxAuditEvents = 500,
   idFactory = makeId,
   now = () => Date.now(),
@@ -38,6 +39,9 @@ export function createOrchestrator({
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 120_000) {
     throw new TypeError("timeoutMs must be between 100 and 120000.");
   }
+  if (!Number.isSafeInteger(maxConcurrentRuns) || maxConcurrentRuns < 1 || maxConcurrentRuns > 100) {
+    throw new TypeError("maxConcurrentRuns must be between 1 and 100.");
+  }
   if (!providers || typeof providers !== "object" || Array.isArray(providers)) {
     throw new TypeError("providers must be a provider adapter map.");
   }
@@ -46,6 +50,7 @@ export function createOrchestrator({
   }
 
   const auditEvents = [];
+  let activeRuns = 0;
 
   function record(event) {
     auditEvents.push(Object.freeze({ ...event }));
@@ -55,6 +60,10 @@ export function createOrchestrator({
   async function run({ agentId, input, signal } = {}) {
     const runId = idFactory();
     const startedAt = now();
+    if (signal !== undefined && (!signal || typeof signal.aborted !== "boolean" ||
+        typeof signal.addEventListener !== "function" || typeof signal.removeEventListener !== "function")) {
+      throw new OrchestrationError("INVALID_SIGNAL", "signal must be an AbortSignal.");
+    }
     const agent = registry.get(agentId);
     if (!agent) throw new OrchestrationError("AGENT_NOT_FOUND", "The requested agent is not registered.");
     if (agent.status !== "ready") {
@@ -99,15 +108,25 @@ export function createOrchestrator({
       if (controller.signal.aborted) {
         throw new OrchestrationError("ABORTED", "The agent execution was cancelled.");
       }
-      const result = await Promise.race([
-        Promise.resolve().then(() => provider.generate({
+      if (activeRuns >= maxConcurrentRuns) {
+        throw new OrchestrationError("RUN_CAPACITY_EXCEEDED", "The orchestrator is at its concurrent execution limit.");
+      }
+
+      // Reserve before invoking the provider. Keep the slot until the underlying
+      // provider promise actually settles, even if timeout/cancellation wins the
+      // race. A provider that ignores AbortSignal must not free capacity early.
+      activeRuns += 1;
+      const providerPromise = Promise.resolve()
+        .then(() => provider.generate({
           input,
           systemPrompt: agent.systemPrompt,
           signal: controller.signal,
           maxOutputChars: policy.limits.maxOutputChars,
-        })),
-        abortPromise,
-      ]);
+        }))
+        .finally(() => {
+          activeRuns -= 1;
+        });
+      const result = await Promise.race([providerPromise, abortPromise]);
       if (typeof result !== "string") {
         throw new OrchestrationError("INVALID_PROVIDER_OUTPUT", "The provider returned an invalid response.");
       }
