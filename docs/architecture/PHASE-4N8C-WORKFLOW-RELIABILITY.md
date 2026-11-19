@@ -144,3 +144,15 @@ The following repository changes have been committed to `feat/phase-4n8c-workflo
 **Verification boundary:** repository writes are confirmed by GitHub commit responses. The new Node tests, Deno type checks, application build, and disposable database integration tests have not yet been executed in this session. The CI workflow has not yet been observed running for this branch.
 
 **Not implemented:** retry execution, a new recovery RPC, an outbox table, external integrations, or production migrations. These require additional schema/state-machine design and disposable-database evidence. The current retry gap is intentionally not papered over with unsafe same-generation retries.
+
+## 10. Phase 4N.8C.2 — Pure retry-policy checkpoint
+
+A database-independent policy module is added at `supabase/functions/_shared/workflow-retry-policy.mjs`. It:
+- retries only an explicit allowlist of transient error codes;
+- treats unknown, validation, and authorization errors as terminal by default;
+- defines `retry_limit` as additional retries after the initial execution;
+- bounds exponential backoff with full jitter and a maximum elapsed-time budget;
+- accepts an injected random source and explicit timestamps for deterministic tests;
+- performs no I/O, sleeping, persistence, or worker-side retry loop.
+
+**Integration remains intentionally blocked.** The current schema does not persist an independent step execution attempt, lease token, retry schedule, or atomic retry claim. Do not call this policy from either worker until a reviewed database state model can safely advance a step attempt without weakening run-generation fencing. This checkpoint is policy logic only, not end-to-end retry support.
