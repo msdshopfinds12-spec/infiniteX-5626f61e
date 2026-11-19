@@ -92,6 +92,57 @@ test("rejects caller-supplied identity objects not recognized by trusted resolve
   assert.equal(calls, 0);
 });
 
+test("durable grant issuance binds the trusted owner, task snapshot, digest, TTL, and idempotency", async () => {
+  let received;
+  const adapter = createAdapter({
+    store: {
+      issueApprovalGrantV1: async (request) => {
+        received = request;
+        return {
+          outcome: "issued",
+          task: { id: "task-1", status: "approved", version: 13 },
+          expiresAt: "2026-11-20T12:05:00.000Z",
+        };
+      },
+      approveTaskWithGrantV1: async () => ({ outcome: "conflict" }),
+      claimApprovedTaskV1: async () => ({ outcome: "not_available" }),
+    },
+  });
+  const result = await adapter.issueApprovalGrantV1({
+    ...common,
+    ttlMs: 60_000,
+  });
+  assert.equal(result.outcome, "issued");
+  assert.equal(result.task.status, "approved");
+  assert.equal(received.principalSubject, principal.subject);
+  assert.equal(received.approvalTokenDigest, common.approvalTokenDigest);
+  assert.equal(received.ttlMs, 60_000);
+  assert.equal(received.idempotencyKey, common.idempotencyKey);
+  assert.equal("approvalToken" in received, false);
+  assert.equal("token" in received, false);
+  assert.equal(Object.isFrozen(received), true);
+});
+
+test("grant issuance rejects malformed digest and unsafe TTL before driver call", async () => {
+  let calls = 0;
+  const adapter = createAdapter({
+    store: {
+      issueApprovalGrantV1: async () => { calls += 1; return { outcome: "not_available" }; },
+      approveTaskWithGrantV1: async () => ({ outcome: "conflict" }),
+      claimApprovedTaskV1: async () => ({ outcome: "not_available" }),
+    },
+  });
+  await assert.rejects(
+    adapter.issueApprovalGrantV1({ ...common, approvalTokenDigest: "bad", ttlMs: 60_000 }),
+    (error) => error.code === "INVALID_APPROVAL_TOKEN_DIGEST",
+  );
+  await assert.rejects(
+    adapter.issueApprovalGrantV1({ ...common, ttlMs: 900_001 }),
+    (error) => error.code === "INVALID_GRANT_TTL",
+  );
+  assert.equal(calls, 0);
+});
+
 test("approval passes only validated, owner-scoped digests and idempotency metadata", async () => {
   let received;
   const adapter = createAdapter({
