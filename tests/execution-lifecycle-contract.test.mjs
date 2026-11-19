@@ -125,7 +125,7 @@ test("rejects unsafe versions, untrusted workers, and invalid settlement targets
   };
   await assert.rejects(f.adapter.renewExecutionLeaseV1({
     ...common, fencingToken: Number.MAX_SAFE_INTEGER + 1, leaseDurationMs: 30_000, idempotencyKey: "bad-fence",
-  }), (error) => error.code === "INVALID_EXPECTED_TASK_VERSION");
+  }), (error) => error.code === "INVALID_FENCING_TOKEN");
   await assert.rejects(f.adapter.settleExecutionV1({
     ...common, worker: { auth: "forged" }, targetStatus: "succeeded", idempotencyKey: "bad-worker",
   }), (error) => error.code === "UNTRUSTED_WORKER_SUBJECT");
