@@ -1,6 +1,6 @@
 # Phase 6 — Secure Agent Capability Integration
 
-**Status:** PLAN RECORDED — implementation not yet verified  
+**Status:** PARTIAL IMPLEMENTATION — automated verification pending  
 **Target branch:** `feat/infiniteX-zero-budget-implementation`  
 **Release state:** BLOCKED pending implementation, tests, audit, and human release approval  
 **Budget constraint:** ₱0-first; no paid provider, hosted worker, or new billable service by default
@@ -210,7 +210,20 @@ Do not combine repositories wholesale or treat multiple AI systems as one execut
 - Physical Android install/offline behavior is not yet verified.
 - Branch divergence from `main` must be reconciled in a separate review; do not force-push or merge as part of this phase.
 
-## 11. Change-control gates
+## 11. Phase 6C implementation note — approval primitive
+
+The branch now contains `server/ai/approval-authority.mjs`, with tests in `tests/approval-authority.test.mjs`.
+
+Implemented behavior:
+- opaque random tokens are returned once; only SHA-256 token digests are retained in memory;
+- each grant is bound to principal subject, task ID, action, capability ID, and capability version;
+- grants expire and are single-use;
+- forged, replayed, cross-principal, cross-task, cross-action, cross-capability, and cross-version attempts are rejected;
+- storage is bounded and does not evict live approvals to make room.
+
+**Critical limitation:** this is an in-memory approval primitive, not user authentication, not a deployed API, and not durable across process restarts. The principal MUST be derived by verified server authentication middleware. Never trust a subject or approval decision supplied directly by the browser. It is not yet wired into a production execution route or the Task Center.
+
+## 12. Change-control gates
 
 This plan authorizes implementation only on `feat/infiniteX-zero-budget-implementation`. It does not authorize:
 - changes to `main`;
