@@ -122,10 +122,15 @@ export function createLeaseFencedTaskStoreAdapter({ store, leaseDurationMs = 30_
       now: timestamp, leaseDurationMs,
     });
     if (result === null) return null;
-    return validateClaim(result, {
+    const renewed = validateClaim(result, {
       taskId: input.taskId, ownerId: input.ownerId,
       expectedVersion: input.expectedVersion, now: timestamp,
     }, leaseDurationMs);
+    if (renewed.lease.leaseId !== input.leaseId ||
+        renewed.lease.fencingToken !== input.fencingToken) {
+      throw new TaskLeaseError("INVALID_STORE_RESULT", "Lease renewal must preserve the active lease identity and fencing token.");
+    }
+    return renewed;
   }
 
   async function settle(kind, input = {}) {

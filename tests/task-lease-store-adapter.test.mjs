@@ -115,3 +115,19 @@ test("uses one consistent clock reading for each renew and settle operation", as
   assert.equal(calls, 1);
   assert.equal(received.now, now);
 });
+
+test("rejects renewal results that change the lease identity or fencing token", async () => {
+  for (const lease of [
+    { ...snapshot().lease, leaseId: "another_lease_identifier_123" },
+    { ...snapshot().lease, fencingToken: 8 },
+  ]) {
+    const adapter = createLeaseFencedTaskStoreAdapter({
+      store: storeWith({ renewTaskLease: async () => snapshot({ version: 6, lease }) }),
+      clock: () => now,
+    });
+    await assert.rejects(
+      adapter.renew({ ...claimedRequest, leaseId, fencingToken: 7 }),
+      (error) => error.code === "INVALID_STORE_RESULT",
+    );
+  }
+});
