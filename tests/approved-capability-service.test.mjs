@@ -176,6 +176,82 @@ test("rejects forged, cross-task, cross-capability, and replayed approvals", asy
   assert.equal(calls.length, 1);
 });
 
+
+test("awaits asynchronous approval consumption and rejects an unresolved/denied durable grant", async () => {
+  let executionCount = 0;
+  const authority = createApprovalAuthority({
+    now: () => 50_000,
+    tokenFactory: () => "async_consume_token_" + "z".repeat(32),
+  });
+  const service = createApprovedCapabilityService({
+    approvalAuthority: {
+      issue: async (args) => authority.issue(args),
+      consume: async (args) => {
+        await Promise.resolve();
+        return authority.consume(args);
+      },
+    },
+    capabilityExecutor: {
+      run: () => {
+        executionCount += 1;
+        return { status: "completed" };
+      },
+    },
+    authorize: async () => true,
+    isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({
+      taskId,
+      taskVersion: "3",
+      status: "awaiting_approval",
+      agentId: "local-helper",
+      agentVersion: "2.1.0",
+      capabilityId: "text.metrics",
+      capabilityVersion: "1.0.0",
+      input: { text: "safe local work" },
+    }),
+    claimTaskForExecution: async () => true,
+  });
+
+  const grant = await service.requestApproval(base);
+  await service.executeApproved({ ...base, approvalToken: grant.token });
+  assert.equal(executionCount, 1);
+
+  const deniedService = createApprovedCapabilityService({
+    approvalAuthority: {
+      issue: async () => ({ token: "async_denied_token_" + "d".repeat(32) }),
+      consume: async () => {
+        await Promise.resolve();
+        return false;
+      },
+    },
+    capabilityExecutor: {
+      run: () => {
+        executionCount += 1;
+        return { status: "must-not-run" };
+      },
+    },
+    authorize: async () => true,
+    isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({
+      taskId,
+      taskVersion: "3",
+      status: "awaiting_approval",
+      agentId: "local-helper",
+      agentVersion: "2.1.0",
+      capabilityId: "text.metrics",
+      capabilityVersion: "1.0.0",
+      input: { text: "safe local work" },
+    }),
+    claimTaskForExecution: async () => true,
+  });
+  const deniedGrant = await deniedService.requestApproval(base);
+  await assert.rejects(
+    deniedService.executeApproved({ ...base, approvalToken: deniedGrant.token }),
+    (error) => error.code === "APPROVAL_INVALID_OR_EXPIRED",
+  );
+  assert.equal(executionCount, 1);
+});
+
 test("requires execution permission even when an approval grant exists", async () => {
   const { service } = setup();
   const grant = await service.requestApproval(base);

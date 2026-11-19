@@ -168,7 +168,7 @@ export function createApprovedCapabilityService({
     activeExecutions += 1;
     try {
       const snapshot = await loadSnapshot(taskId, principal, capabilityId, capabilityVersion);
-      const consumed = approvalAuthority.consume({
+      const consumed = await approvalAuthority.consume({
         token: approvalToken, principal, taskId, action: "execute",
         capabilityId: snapshot.capabilityId,
         capabilityVersion: snapshot.capabilityVersion,
