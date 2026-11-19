@@ -71,8 +71,8 @@ test("rejects unknown tasks, malformed inputs and invalid repository limits", ()
     (error) => error.code === "TASK_NOT_FOUND");
 });
 
-test("enforces a per-task event bound without corrupting the last valid snapshot", () => {
-  const repository = createInMemoryTaskRepository({ maxEventsPerTask: 1 });
+test("reserves the final bounded event slot for a safe terminal transition", () => {
+  const repository = createInMemoryTaskRepository({ maxEventsPerTask: 2 });
   repository.create(taskInput());
   const first = transition(repository, "task_1", "begin_planning", "system", 0, 1);
   assert.equal(first.version, 1);
@@ -80,9 +80,11 @@ test("enforces a per-task event bound without corrupting the last valid snapshot
     (error) => error.code === "EVENT_CAPACITY_EXCEEDED");
   assert.equal(repository.get("task_1").state, "planning");
   assert.equal(repository.get("task_1").version, 1);
-  assert.equal(repository.listEvents("task_1").length, 1);
+  const cancelled = transition(repository, "task_1", "cancel", "user", 1, 2);
+  assert.equal(cancelled.state, "cancelled");
+  assert.equal(cancelled.version, 2);
+  assert.equal(repository.listEvents("task_1").length, 2);
 });
-
 test("keeps terminal states immutable and never deletes historical events", () => {
   const repository = createInMemoryTaskRepository();
   repository.create(taskInput());
