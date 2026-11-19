@@ -100,8 +100,9 @@ export function createApprovedCapabilityService({
     throw new TypeError("A valid capability executor is required.");
   }
   if (typeof authorize !== "function" || typeof isTaskAwaitingApproval !== "function" ||
-      typeof getTaskSnapshot !== "function" || typeof claimTaskForExecution !== "function") {
-    throw new TypeError("Server authorization, task snapshot, state, and atomic claim callbacks are required.");
+      typeof getTaskSnapshot !== "function" ||
+      (typeof claimTaskWithApproval !== "function" && typeof claimTaskForExecution !== "function")) {
+    throw new TypeError("Server authorization, task snapshot, state, and a supported claim callback are required.");
   }
   if (!Number.isSafeInteger(maxConcurrentExecutions) || maxConcurrentExecutions < 1 || maxConcurrentExecutions > 100) {
     throw new TypeError("maxConcurrentExecutions must be an integer between 1 and 100.");

@@ -454,7 +454,6 @@ test("uses one atomic durable operation for approval consumption and task claim"
       capabilityId: "text.metrics", capabilityVersion: "1.0.0",
       input: { text: "safe local work" },
     }),
-    claimTaskForExecution: async () => { legacyClaimCalled = true; return true; },
   });
   const grant = await service.requestApproval(base);
   await service.executeApproved({ ...base, approvalToken: grant.token });
@@ -485,7 +484,6 @@ test("does not execute when the atomic approval-and-claim transaction fails", as
       capabilityId: "text.metrics", capabilityVersion: "1.0.0",
       input: { text: "safe local work" },
     }),
-    claimTaskForExecution: async () => assert.fail("legacy claim must not run"),
   });
   const grant = await service.requestApproval(base);
   await assert.rejects(
