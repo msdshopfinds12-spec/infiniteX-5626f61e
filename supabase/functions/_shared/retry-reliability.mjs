@@ -51,7 +51,8 @@ export function computeRetryDelayMs(attempt, policy = {}, random = Math.random, 
   const jittered = Math.floor(sample * (ceiling + 1));
   if (retryAfterMs === undefined || retryAfterMs === null) return jittered;
   if (!Number.isFinite(retryAfterMs) || retryAfterMs < 0) throw new TypeError("invalid_retry_after_ms");
-  return Math.min(safe.maxDelayMs, Math.max(jittered, Math.ceil(retryAfterMs)));
+  if (retryAfterMs > safe.maxDelayMs) throw new RangeError("retry_after_exceeds_delay_cap");
+  return Math.max(jittered, Math.ceil(retryAfterMs));
 }
 
 export function getRetryAfterMs(error, wallClockNow = Date.now) {
@@ -120,14 +121,25 @@ export async function runWithRetry(operation, options = {}) {
       throw lastError ?? new Error("retry_elapsed_budget_exceeded");
     }
     try {
-      return await operation({ attempt, idempotencyKey, signal });
+      const result = await operation({ attempt, idempotencyKey, signal });
+      const completedAt = now();
+      if (!Number.isFinite(completedAt) || completedAt - startedAt > policy.maxElapsedMs) {
+        throw new Error("retry_elapsed_budget_exceeded");
+      }
+      return result;
     } catch (error) {
       lastError = error;
       if (attempt >= policy.maxAttempts || classifyRetryError(error) !== "retryable") throw error;
       const elapsed = now() - startedAt;
       const remaining = policy.maxElapsedMs - elapsed;
       if (!Number.isFinite(remaining) || remaining <= 0) throw error;
-      const delay = computeRetryDelayMs(attempt, policy, random, getRetryAfterMs(error));
+      let delay;
+      try {
+        delay = computeRetryDelayMs(attempt, policy, random, getRetryAfterMs(error));
+      } catch {
+        // Never retry earlier than a provider's Retry-After instruction.
+        throw error;
+      }
       if (delay > remaining) throw error;
       await wait(delay, signal);
     }

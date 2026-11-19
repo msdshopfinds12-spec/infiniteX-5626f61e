@@ -36,7 +36,8 @@ test("computes capped full jitter and honors bounded Retry-After", () => {
   assert.equal(computeRetryDelayMs(1, policy, () => 0.5), 50);
   assert.equal(computeRetryDelayMs(2, policy, () => 0.99), 198);
   assert.equal(computeRetryDelayMs(3, policy, () => 0.99), 248);
-  assert.equal(computeRetryDelayMs(1, policy, () => 0, 400), 250);
+  assert.equal(computeRetryDelayMs(1, policy, () => 0, 200), 200);
+  assert.throws(() => computeRetryDelayMs(1, policy, () => 0, 400), /retry_after_exceeds_delay_cap/);
   assert.throws(() => computeRetryDelayMs(4, policy));
   assert.throws(() => computeRetryDelayMs(1, policy, () => 1));
 });
@@ -121,4 +122,16 @@ test("elapsed budget and abort stop further attempts", async () => {
   await assert.rejects(runWithRetry(async () => assert.fail("must not execute"), {
     signal: controller.signal,
   }));
+});
+
+test("successful operations that exceed the elapsed budget are rejected", async () => {
+  let clock = 0;
+  await assert.rejects(runWithRetry(async () => {
+    clock = 11;
+    return "late";
+  }, {
+    policy: { maxAttempts: 2, baseDelayMs: 1, maxDelayMs: 2, maxElapsedMs: 10 },
+    monotonicNow: () => clock,
+    wait: async () => {},
+  }), /retry_elapsed_budget_exceeded/);
 });

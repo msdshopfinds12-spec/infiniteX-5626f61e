@@ -9,7 +9,7 @@
 1. Retry only known transient failures: HTTP 408, 425, 429, 500, 502, 503, 504 and a narrow allowlist of transport error codes.
 2. Treat validation, authorization, unsupported-action, abort, and all unclassified failures as permanent.
 3. Use capped exponential backoff with full jitter. Honor Retry-After only within the configured delay cap.
-4. Keep attempt count, delay, and total elapsed time bounded. Waits are asynchronous and abort-aware; they do not block the JavaScript event loop.
+4. Keep attempt count, delay, and elapsed retry window bounded. Waits are asynchronous and abort-aware; they do not block the JavaScript event loop. An operation that exceeds the elapsed budget is rejected after it returns; cancellation of in-flight I/O still depends on the adapter honoring the supplied AbortSignal.
 5. Side-effecting operations require a stable idempotency key. The same key is passed on every attempt.
 6. A generated key is not, by itself, an idempotency guarantee. A future adapter must pass it to a provider that enforces idempotency, or use a durable atomic idempotency store with a unique constraint. No such persistence schema is introduced in this phase.
 7. Existing worker actions are deterministic, local transformations. They have no transient I/O boundary, so retrying them immediately is incorrect and wasteful. Both workers now execute these local actions once. The persisted `retry_limit` is not used for these action types until an action adapter explicitly declares retry safety and provides idempotency enforcement.
@@ -44,6 +44,7 @@ An asynchronous timer does not block the event loop, but it does keep the curren
 ## Security and data-integrity boundaries
 
 - No automatic retry for 4xx validation/auth failures except the explicitly listed 408/425/429.
+- If Retry-After exceeds the configured delay cap, stop retrying rather than retrying earlier than the provider requested.
 - Abort is terminal.
 - Invalid policy, random source, clock, or idempotency key fails closed.
 - Idempotency identity uses run ID, step ID, and action version; raw payloads, user identifiers, and secrets are not included in the key material.
