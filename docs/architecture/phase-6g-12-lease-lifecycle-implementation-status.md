@@ -67,3 +67,13 @@ Verified workflow evidence for that commit:
 - npm audit: 0 vulnerabilities reported by the workflow.
 
 These checks validate the current repository test suite and browser workflow only. They do not validate PostgreSQL durability, production authentication, multi-tenant isolation, real worker concurrency, or production deployment. The initial failed run remains part of the engineering history and was fixed; do not erase it from the audit trail.
+
+
+## Follow-up contract and idempotency hardening — 2026-11-20
+
+- Added the design-only PostgreSQL lifecycle driver contract at `docs/architecture/PHASE_6G_13_POSTGRESQL_LIFECYCLE_DRIVER_CONTRACT.md`. It reconciles current domain states, opaque task/owner identifiers, independent task/event counters, persistent fencing, database-time expiry, operation idempotency, and cancellation/settlement race requirements.
+- Added three regression tests for renewal same-key/different-extension conflict, settlement same-key/different-result conflict, and cancellation replay/change conflict.
+- Latest code commit: `61624770c501eceb31846b54a8f53b6787f141e2`.
+- Frontend CI: SUCCESS — 145 tests passed, 0 failed; typecheck, browser/server boundary, production build, and npm audit passed (0 vulnerabilities reported). [Run 44572198443](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44572198443)
+- Browser and Accessibility CI: SUCCESS — Chromium install, production build, Playwright and WCAG workflow passed. [Run 44572198357](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44572198357)
+- The PostgreSQL contract remains documentation-only. No PostgreSQL service, SQL migration, production database, backend credential, or executor was created or changed.
