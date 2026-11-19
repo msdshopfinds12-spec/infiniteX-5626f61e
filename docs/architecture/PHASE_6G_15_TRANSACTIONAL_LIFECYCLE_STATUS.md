@@ -24,4 +24,4 @@ The functions accept `p_owner` and `p_worker` as explicit inputs for determinist
 - Cancellation and settlement serialize on the task row; only one terminal transition can win.
 
 ## Not yet proven
-No PostgreSQL execution, CI run, adapter integration, trusted identity derivation, database role isolation, RLS, production driver, or production compatibility is claimed. Phase 6G.16 must add role/tenant tests and a real server-side driver only after the security contract is reviewed.
+The source and test runner have been committed, but PostgreSQL execution and CI success are NOT yet verified. Adapter integration, trusted identity derivation, database role isolation, RLS, production driver, and production compatibility are also not claimed. Phase 6G.16 must add role/tenant tests and a real server-side driver only after the security contract is reviewed.
