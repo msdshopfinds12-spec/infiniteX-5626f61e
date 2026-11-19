@@ -37,6 +37,14 @@ function canonicalJson(value, seen = new Set()) {
   return result;
 }
 
+function deepFreeze(value) {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
 function snapshot(task, taskId, expectedStatus) {
   if (!task || task.taskId !== taskId || task.status !== expectedStatus) {
     throw new TwoStageApprovalError("TASK_SNAPSHOT_INVALID", "The trusted task snapshot is missing, stale, or in an unexpected state.");
@@ -53,7 +61,7 @@ function snapshot(task, taskId, expectedStatus) {
     capabilityId: task.capabilityId,
     capabilityVersion: task.capabilityVersion,
   });
-  const input = JSON.parse(canonicalJson(task.input));
+  const input = deepFreeze(JSON.parse(canonicalJson(task.input)));
   return Object.freeze({
     taskId: task.taskId,
     taskVersion: task.taskVersion,
