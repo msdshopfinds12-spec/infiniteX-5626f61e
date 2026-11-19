@@ -54,13 +54,13 @@ function validateOutcome(result, kind, expectedTaskId) {
   if (kind === "approval" && result.outcome === "approved") {
     return Object.freeze({ outcome: "approved", task: validateTask(result.task, "approved", expectedTaskId) });
   }
-  if (kind === "grant" && result.outcome === "issued") {
+  if (kind === "grant" && (result.outcome === "issued" || result.outcome === "already_issued")) {
     const task = validateTask(result.task, "approved", expectedTaskId);
     if (typeof result.expiresAt !== "string" || !Number.isFinite(Date.parse(result.expiresAt)) ||
         new Date(result.expiresAt).toISOString() !== result.expiresAt) {
       throw new ApprovalProtocolError("INVALID_STORE_RESULT", "The durable driver returned an invalid grant expiry.");
     }
-    return Object.freeze({ outcome: "issued", task, expiresAt: result.expiresAt });
+    return Object.freeze({ outcome: result.outcome, task, expiresAt: result.expiresAt });
   }
   if (kind === "claim" && result.outcome === "claimed") {
     const task = validateTask(result.task, "running", expectedTaskId);
