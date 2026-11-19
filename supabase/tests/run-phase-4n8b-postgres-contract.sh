@@ -2,13 +2,10 @@
 set -euo pipefail
 
 : "${DATABASE_URL:?DATABASE_URL must point to the disposable PostgreSQL service}"
-case "$DATABASE_URL" in
-  *localhost*|*127.0.0.1*) ;;
-  *)
-    echo "REFUSED: this destructive fixture runner only accepts localhost PostgreSQL." >&2
-    exit 64
-    ;;
-esac
+if [[ "$DATABASE_URL" != "postgresql://postgres:postgres@localhost:5432/postgres" ]]; then
+  echo "REFUSED: use only the exact disposable PostgreSQL service URL configured by this workflow." >&2
+  exit 64
+fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP_DIR="$(mktemp -d)"
@@ -67,7 +64,7 @@ select public.simula_transition_workflow_step(
 );
 SQL
 
-psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$TMP_DIR/session-a.sql" >"$TMP_DIR/session-a.log" 2>&1 &
+timeout 30s psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$TMP_DIR/session-a.sql" >"$TMP_DIR/session-a.log" 2>&1 &
 SESSION_A_PID=$!
 
 for _ in $(seq 1 200); do
@@ -86,7 +83,7 @@ if [[ ! -f "$READY_FILE" ]]; then
   exit 1
 fi
 
-psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$TMP_DIR/session-b.sql" >"$TMP_DIR/session-b.log" 2>&1 &
+timeout 30s psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$TMP_DIR/session-b.sql" >"$TMP_DIR/session-b.log" 2>&1 &
 SESSION_B_PID=$!
 if wait "$SESSION_B_PID"; then
   echo "FAIL: concurrent same-generation Session B unexpectedly succeeded." >&2
