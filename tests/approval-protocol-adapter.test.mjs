@@ -20,6 +20,20 @@ const common = {
 };
 const approvedTask = () => ({ id: "task-1", status: "approved", version: 13 });
 const runningTask = () => ({ id: "task-1", status: "running", version: 14 });
+function createAdapter({ store }) {
+  return createAdapter({
+    store,
+    resolvePrincipalSubject: (identity) => {
+      if (identity !== principal) throw new Error("untrusted principal");
+      return principal.subject;
+    },
+    resolveWorkerSubject: (identity) => {
+      if (identity !== worker) throw new Error("untrusted worker");
+      return worker.subject;
+    },
+  });
+}
+
 const lease = () => ({
   leaseId: "lease-001",
   workerSubject: worker.subject,
@@ -27,16 +41,49 @@ const lease = () => ({
   expiresAt: "2026-11-20T12:00:00.000Z",
 });
 
-test("requires both versioned durable operations", () => {
+test("requires durable operations and trusted identity resolvers", () => {
   assert.throws(() => createApprovalProtocolAdapter({ store: {} }), TypeError);
   assert.throws(() => createApprovalProtocolAdapter({
+    store: { approveTaskWithGrantV1() {}, claimApprovedTaskV1() {} },
+  }), TypeError);
+  assert.throws(() => createAdapter({ store: {} }), TypeError);
+  assert.throws(() => createAdapter({
     store: { approveTaskWithGrantV1() {} },
   }), TypeError);
 });
 
+
+test("rejects caller-supplied identity objects not recognized by trusted resolvers", async () => {
+  let calls = 0;
+  const adapter = createAdapter({
+    store: {
+      approveTaskWithGrantV1: async () => { calls += 1; return { outcome: "conflict" }; },
+      claimApprovedTaskV1: async () => { calls += 1; return { outcome: "not_available" }; },
+    },
+  });
+  await assert.rejects(
+    adapter.approveTaskWithGrantV1({
+      ...common,
+      principal: { subject: "verified-user-1" },
+      approvalTokenDigest: "f".repeat(64),
+    }),
+    (error) => error.code === "UNTRUSTED_PRINCIPAL_SUBJECT",
+  );
+  await assert.rejects(
+    adapter.claimApprovedTaskV1({
+      ...common,
+      worker: { subject: "verified-worker-1" },
+      leaseDurationMs: 60_000,
+      idempotencyKey: "claim-spoofed-worker",
+    }),
+    (error) => error.code === "UNTRUSTED_WORKER_SUBJECT",
+  );
+  assert.equal(calls, 0);
+});
+
 test("approval passes only validated, owner-scoped digests and idempotency metadata", async () => {
   let received;
-  const adapter = createApprovalProtocolAdapter({
+  const adapter = createAdapter({
     store: {
       approveTaskWithGrantV1: async (request) => {
         received = request;
@@ -61,7 +108,7 @@ test("approval passes only validated, owner-scoped digests and idempotency metad
 
 test("rejects malformed approval digests before calling the driver", async () => {
   let calls = 0;
-  const adapter = createApprovalProtocolAdapter({
+  const adapter = createAdapter({
     store: {
       approveTaskWithGrantV1: async () => { calls += 1; return { outcome: "conflict" }; },
       claimApprovedTaskV1: async () => ({ outcome: "not_available" }),
@@ -76,7 +123,7 @@ test("rejects malformed approval digests before calling the driver", async () =>
 
 test("maps approved conflicts and invalid grants to stable outcomes", async () => {
   for (const outcome of ["conflict", "approval_invalid", "not_available"]) {
-    const adapter = createApprovalProtocolAdapter({
+    const adapter = createAdapter({
       store: {
         approveTaskWithGrantV1: async () => ({ outcome }),
         claimApprovedTaskV1: async () => ({ outcome: "not_available" }),
@@ -89,7 +136,7 @@ test("maps approved conflicts and invalid grants to stable outcomes", async () =
 });
 
 test("rejects a driver claiming approval without the approved state", async () => {
-  const adapter = createApprovalProtocolAdapter({
+  const adapter = createAdapter({
     store: {
       approveTaskWithGrantV1: async () => ({ outcome: "approved", task: { status: "running" } }),
       claimApprovedTaskV1: async () => ({ outcome: "not_available" }),
@@ -103,7 +150,7 @@ test("rejects a driver claiming approval without the approved state", async () =
 
 test("worker claim requires authenticated worker identity and bounded lease duration", async () => {
   let received;
-  const adapter = createApprovalProtocolAdapter({
+  const adapter = createAdapter({
     store: {
       approveTaskWithGrantV1: async () => ({ outcome: "conflict" }),
       claimApprovedTaskV1: async (request) => {
@@ -128,7 +175,7 @@ test("worker claim requires authenticated worker identity and bounded lease dura
 
 test("rejects missing, invalid, or out-of-range lease durations before driver call", async () => {
   let calls = 0;
-  const adapter = createApprovalProtocolAdapter({
+  const adapter = createAdapter({
     store: {
       approveTaskWithGrantV1: async () => ({ outcome: "conflict" }),
       claimApprovedTaskV1: async () => { calls += 1; return { outcome: "not_available" }; },
@@ -152,7 +199,7 @@ test("rejects incomplete or mismatched lease tuples and never reports a successf
     { ...lease(), leaseId: "" },
   ];
   for (const invalidLease of invalidLeases) {
-    const adapter = createApprovalProtocolAdapter({
+    const adapter = createAdapter({
       store: {
         approveTaskWithGrantV1: async () => ({ outcome: "conflict" }),
         claimApprovedTaskV1: async () => ({
@@ -176,7 +223,7 @@ test("rejects claimed outcome without running task state or lease", async () => 
     { outcome: "unknown" },
     null,
   ]) {
-    const adapter = createApprovalProtocolAdapter({
+    const adapter = createAdapter({
       store: {
         approveTaskWithGrantV1: async () => ({ outcome: "conflict" }),
         claimApprovedTaskV1: async () => result,
@@ -192,7 +239,7 @@ test("rejects claimed outcome without running task state or lease", async () => 
 });
 
 test("normalizes durable driver errors without leaking internal messages", async () => {
-  const adapter = createApprovalProtocolAdapter({
+  const adapter = createAdapter({
     store: {
       approveTaskWithGrantV1: async () => { throw new Error("private SQL details"); },
       claimApprovedTaskV1: async () => { throw new Error("private worker store details"); },
