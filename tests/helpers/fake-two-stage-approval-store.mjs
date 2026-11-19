@@ -60,7 +60,9 @@ export function createFakeTwoStageApprovalStore({
     const key = request.principalSubject + ":" + request.taskId + ":issue:" + request.idempotencyKey;
     const fp = fingerprint(request);
     const previous = issueKeys.get(key);
-    if (previous) return previous.fingerprint === fp\n      ? { outcome: "already_issued", task: clone(previous.task), expiresAt: previous.expiresAt }\n      : { outcome: "conflict" };
+    if (previous) return previous.fingerprint === fp
+      ? { outcome: "already_issued", task: clone(previous.task), expiresAt: previous.expiresAt }
+      : { outcome: "conflict" };
 
     const task = tasks.get(request.taskId);
     if (!task || task.status !== "awaiting_approval" ||
