@@ -155,7 +155,7 @@ Deno.serve(async (req: Request) => {
           try {
             const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
             output = executeWithinStepBudget(
-              (input) => executeSafeAction(step.action_type, input, config),
+              (input: unknown) => executeSafeAction(step.action_type, input, config),
               payload,
               timeoutSeconds,
             );

@@ -100,7 +100,7 @@ Deno.test("Deno: detects cooperative deadline overruns", () => {
 Deno.test("Deno: bounds step input and output JSON payloads", () => {
   let inputRejected = false;
   try {
-    executeWithinStepBudget((value) => value, { payload: "x".repeat(100) }, 5, 32);
+    executeWithinStepBudget((value: unknown) => value, { payload: "x".repeat(100) }, 5, 32);
   } catch { inputRejected = true; }
   assert(inputRejected, "oversized input must fail");
   let outputRejected = false;
