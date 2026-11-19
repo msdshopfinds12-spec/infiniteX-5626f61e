@@ -13,6 +13,7 @@ This is a test-only contract smoke harness, not a production database driver.
 - Two independent PostgreSQL sessions racing on one expected version produce exactly one conditional-update winner and one event.
 - Phase 6G.15 test-only functions exercise approval, one-time grant consumption plus claim, idempotent replay/conflict, database-clock lease renewal, fenced settlement and owner-scoped cancellation.
 - Independent PostgreSQL sessions race identical claim requests and race owner cancellation against fenced settlement; each race must have exactly one committed logical outcome.
+- Phase 6G.16 creates NOLOGIN API, worker, and browser roles and proves they cannot access lifecycle tables or execute privileged functions.
 
 ## What it does not prove
 
@@ -36,7 +37,7 @@ The bootstrap drops and recreates only the infinitex_harness schema. Never point
 ## Next acceptance gates
 
 1. Add independent-session tests for duplicate-key claim races, expired leases, and cancellation-versus-settlement races.
-2. Prove least-privilege roles, RLS/authorization boundaries and append-only event permissions.
+2. Add trusted principal binding and tenant RLS tests; Phase 6G.16 currently proves deny-by-default only.
 3. Bind owner/worker identity to a verified server principal; never trust function arguments as authentication.
 4. Map a real server driver to the provider-neutral adapter and run contract tests against it.
 5. Keep executor disabled until all gates and a separate security review pass.

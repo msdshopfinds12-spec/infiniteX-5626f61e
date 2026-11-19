@@ -66,6 +66,7 @@ race_events="$(psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM infinite
 [[ "$race_events" == "1" ]] || { echo "Race event count mismatch: $race_events" >&2; exit 1; }
 psql -X -v ON_ERROR_STOP=1 -f tests/postgres/lifecycle_contract.sql
 psql -X -v ON_ERROR_STOP=1 -f tests/postgres/lifecycle_races.sql
+psql -X -v ON_ERROR_STOP=1 -f tests/postgres/security_roles.sql
 
 claim_race() {
   psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT infinitex_harness.claim_with_approval(
