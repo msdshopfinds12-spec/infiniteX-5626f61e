@@ -7,12 +7,12 @@ Branch: feat/infiniteX-zero-budget-implementation
 
 - `server/ai/approval-protocol-adapter.mjs`: worker claims now require and forward `approvalTokenDigest`. The durable driver can bind the claim to the same one-time grant digest that was persisted during approval.
 - `tests/approval-protocol-adapter.test.mjs`: claim contract fixture and assertion now verify the digest is forwarded.
-- `server/ai/two-stage-approval-service.mjs`: adds a separate trusted-server composition boundary for approval-grant issuance and worker claiming. It loads canonical task snapshots, derives principal identity through a trusted resolver, authorizes approval, hashes the raw token, persists only the digest, and returns the raw token only for a newly issued grant.
+- `server/ai/two-stage-approval-service.mjs`: adds a separate trusted-server composition boundary for approval-grant issuance and worker claiming. It loads canonical task snapshots, delegates trusted principal resolution to the protocol adapter, authorizes approval, hashes the raw token, persists only the digest through the shared durable driver, and returns the raw token only for a newly issued grant.
 - `tests/two-stage-approval-service.test.mjs`: adds service-level contract tests for digest-only persistence, claim binding, authorization denial, identity spoofing, malformed tokens, and task-state validation.
 
 ## Required grant-store contract
 
-The injected `grantStore.issueApprovalGrantV1(request)` must be implemented by a durable store. It must atomically:
+The adapter's `issueApprovalGrantV1(request)` and `claimApprovedTaskV1(request)` must use the same durable driver/database. The driver's issuance operation must atomically:
 1. Verify the task is awaiting approval under the owner-scoped predicate.
 2. Compare task version, payload hash, agent, and capability bindings.
 3. Insert the approval grant digest, expiry, and idempotency record.
@@ -21,7 +21,7 @@ The injected `grantStore.issueApprovalGrantV1(request)` must be implemented by a
 
 The raw token must never be persisted or logged. The service returns it only when the store reports a newly issued grant. An idempotent retry may return `already_issued` without the raw token; this is intentional because the raw token is not recoverable from a digest. The caller must securely retain the first response.
 
-The existing `claimApprovedTaskV1` driver operation must atomically validate and consume the matching grant digest while claiming the approved task and creating its lease.
+The `claimApprovedTaskV1` driver operation must atomically validate and consume the matching grant digest while claiming the approved task and creating its lease. Both operations must share the same transactional grant records.
 
 ## Deliberate execution safety boundary
 
