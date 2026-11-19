@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { ApprovalAuthorityError } from "./approval-authority.mjs";
 
 export class ApprovedExecutionError extends Error {
@@ -8,28 +9,81 @@ export class ApprovedExecutionError extends Error {
   }
 }
 
+function canonicalJson(value, seen = new Set()) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return JSON.stringify(value);
+  if (typeof value === "number" && Number.isFinite(value)) return JSON.stringify(value);
+  if (typeof value !== "object" || value === undefined) {
+    throw new ApprovedExecutionError("INVALID_TASK_PAYLOAD", "The server-owned task payload must be finite JSON data.");
+  }
+  if (seen.has(value)) throw new ApprovedExecutionError("INVALID_TASK_PAYLOAD", "The task payload must not contain cycles.");
+  const prototype = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+    throw new ApprovedExecutionError("INVALID_TASK_PAYLOAD", "The task payload must contain only plain JSON objects.");
+  }
+  seen.add(value);
+  let result;
+  if (Array.isArray(value)) {
+    result = "[" + value.map((item) => canonicalJson(item, seen)).join(",") + "]";
+  } else {
+    const keys = Object.keys(value).sort();
+    result = "{" + keys.map((key) => JSON.stringify(key) + ":" + canonicalJson(value[key], seen)).join(",") + "}";
+  }
+  seen.delete(value);
+  return result;
+}
+
+function hashPayload(task) {
+  const boundPayload = {
+    input: task.input,
+    taskId: task.taskId,
+    taskVersion: task.taskVersion,
+    agentId: task.agentId,
+    agentVersion: task.agentVersion,
+    capabilityId: task.capabilityId,
+    capabilityVersion: task.capabilityVersion,
+  };
+  return createHash("sha256").update(canonicalJson(boundPayload), "utf8").digest("hex");
+}
+
+function validateTaskSnapshot(task, taskId, capabilityId, capabilityVersion) {
+  if (!task || task.taskId !== taskId || task.status !== "awaiting_approval" ||
+      task.capabilityId !== capabilityId || task.capabilityVersion !== capabilityVersion) {
+    throw new ApprovedExecutionError("TASK_SNAPSHOT_INVALID", "The trusted task snapshot is missing, stale, or inconsistent.");
+  }
+  for (const field of ["taskVersion", "agentId", "agentVersion", "capabilityId", "capabilityVersion"]) {
+    if (typeof task[field] !== "string" || task[field].trim() === "") {
+      throw new ApprovedExecutionError("TASK_SNAPSHOT_INVALID", "The trusted task snapshot is incomplete.");
+    }
+  }
+  return Object.freeze({
+    taskId: task.taskId,
+    taskVersion: task.taskVersion,
+    agentId: task.agentId,
+    agentVersion: task.agentVersion,
+    capabilityId: task.capabilityId,
+    capabilityVersion: task.capabilityVersion,
+    input: task.input,
+    payloadHash: hashPayload(task),
+  });
+}
+
 /**
- * Composes approval grants with the local capability executor.
- *
- * This service is NOT authentication middleware or an HTTP route. The caller
- * must supply a principal produced by trusted authentication middleware and
- * server-owned task state. authorize() must enforce the caller's permission
- * for the requested operation. isTaskAwaitingApproval() must read trusted
- * server-side task state. Never pass browser-supplied principal/role/task state.
- *
- * Approval is consumed before execution. If execution fails, the grant remains
- * spent; this deliberately favors fail-closed behavior over automatic replay.
+ * Trusted-server-only approval composition.
+ * getTaskSnapshot must load the canonical task from server-owned storage.
+ * Browser-supplied input, agent IDs, versions, and task state are never executed.
+ * claimTaskForExecution must atomically compare the supplied version/hash and
+ * transition the task to running in the same durable transaction.
  */
 export function createApprovedCapabilityService({
   approvalAuthority,
   capabilityExecutor,
   authorize,
   isTaskAwaitingApproval,
+  getTaskSnapshot,
   claimTaskForExecution,
   maxConcurrentExecutions = 4,
 } = {}) {
-  if (!approvalAuthority ||
-      typeof approvalAuthority.issue !== "function" ||
+  if (!approvalAuthority || typeof approvalAuthority.issue !== "function" ||
       typeof approvalAuthority.consume !== "function") {
     throw new TypeError("A valid approval authority is required.");
   }
@@ -37,10 +91,9 @@ export function createApprovedCapabilityService({
     throw new TypeError("A valid capability executor is required.");
   }
   if (typeof authorize !== "function" || typeof isTaskAwaitingApproval !== "function" ||
-      typeof claimTaskForExecution !== "function") {
-    throw new TypeError("Server-side authorization, task-state, and atomic claim callbacks are required.");
+      typeof getTaskSnapshot !== "function" || typeof claimTaskForExecution !== "function") {
+    throw new TypeError("Server authorization, task snapshot, state, and atomic claim callbacks are required.");
   }
-
   if (!Number.isSafeInteger(maxConcurrentExecutions) || maxConcurrentExecutions < 1 || maxConcurrentExecutions > 100) {
     throw new TypeError("maxConcurrentExecutions must be an integer between 1 and 100.");
   }
@@ -49,41 +102,40 @@ export function createApprovedCapabilityService({
 
   async function isAllowed(principal, operation, taskId, capabilityId) {
     try {
-      return await authorize(principal, Object.freeze({
-        operation,
-        taskId,
-        capabilityId,
-      })) === true;
+      return await authorize(principal, Object.freeze({ operation, taskId, capabilityId })) === true;
     } catch {
       return false;
     }
   }
 
-  async function requestApproval({
-    principal,
-    taskId,
-    capabilityId,
-    capabilityVersion,
-  } = {}) {
+  async function loadSnapshot(taskId, principal, capabilityId, capabilityVersion) {
+    let task;
+    try {
+      task = await getTaskSnapshot(Object.freeze({ taskId, principal }));
+    } catch {
+      throw new ApprovedExecutionError("TASK_SNAPSHOT_UNAVAILABLE", "The trusted task snapshot could not be loaded.");
+    }
+    return validateTaskSnapshot(task, taskId, capabilityId, capabilityVersion);
+  }
+
+  async function requestApproval({ principal, taskId, capabilityId, capabilityVersion } = {}) {
     if (!await isAllowed(principal, "approve", taskId, capabilityId)) {
       throw new ApprovedExecutionError("APPROVAL_FORBIDDEN", "The principal is not authorized to approve this task.");
     }
     let awaiting = false;
-    try {
-      awaiting = await isTaskAwaitingApproval(taskId, principal) === true;
-    } catch {
-      awaiting = false;
-    }
-    if (!awaiting) {
-      throw new ApprovedExecutionError("TASK_NOT_AWAITING_APPROVAL", "The task is not awaiting approval.");
-    }
+    try { awaiting = await isTaskAwaitingApproval(taskId, principal) === true; } catch { awaiting = false; }
+    if (!awaiting) throw new ApprovedExecutionError("TASK_NOT_AWAITING_APPROVAL", "The task is not awaiting approval.");
+
+    const snapshot = await loadSnapshot(taskId, principal, capabilityId, capabilityVersion);
     try {
       return approvalAuthority.issue({
-        principal,
-        taskId,
-        action: "execute",
-        capabilityId,
-        capabilityVersion,
+        principal, taskId, action: "execute",
+        capabilityId: snapshot.capabilityId,
+        capabilityVersion: snapshot.capabilityVersion,
+        taskVersion: snapshot.taskVersion,
+        agentId: snapshot.agentId,
+        agentVersion: snapshot.agentVersion,
+        payloadHash: snapshot.payloadHash,
       });
     } catch (error) {
       if (error instanceof ApprovalAuthorityError) {
@@ -93,70 +145,57 @@ export function createApprovedCapabilityService({
     }
   }
 
-  async function executeApproved({
-    principal,
-    taskId,
-    agentId,
-    capabilityId,
-    capabilityVersion,
-    approvalToken,
-    input,
-    signal,
-  } = {}) {
+  async function executeApproved({ principal, taskId, capabilityId, capabilityVersion, approvalToken, signal } = {}) {
     if (!await isAllowed(principal, "execute", taskId, capabilityId)) {
       throw new ApprovedExecutionError("EXECUTION_FORBIDDEN", "The principal is not authorized to execute this task.");
     }
     let awaiting = false;
-    try {
-      awaiting = await isTaskAwaitingApproval(taskId, principal) === true;
-    } catch {
-      awaiting = false;
-    }
-    if (!awaiting) {
-      throw new ApprovedExecutionError("TASK_NOT_AWAITING_APPROVAL", "The task is not awaiting approval.");
-    }
-
+    try { awaiting = await isTaskAwaitingApproval(taskId, principal) === true; } catch { awaiting = false; }
+    if (!awaiting) throw new ApprovedExecutionError("TASK_NOT_AWAITING_APPROVAL", "The task is not awaiting approval.");
     if (signal !== undefined && (!signal || typeof signal.aborted !== "boolean")) {
       throw new ApprovedExecutionError("INVALID_SIGNAL", "signal must be an AbortSignal.");
     }
-    if (signal?.aborted) {
-      throw new ApprovedExecutionError("ABORTED", "The approved execution was cancelled before it started.");
-    }
+    if (signal?.aborted) throw new ApprovedExecutionError("ABORTED", "The approved execution was cancelled before it started.");
     if (activeExecutions >= maxConcurrentExecutions) {
       throw new ApprovedExecutionError("EXECUTION_CAPACITY_EXCEEDED", "The local execution capacity is full; retry after an active task finishes.");
     }
 
-    // JavaScript executes this reservation synchronously, so concurrent callers
-    // cannot pass the capacity check before the counter is incremented.
     activeExecutions += 1;
     try {
+      const snapshot = await loadSnapshot(taskId, principal, capabilityId, capabilityVersion);
       const consumed = approvalAuthority.consume({
-        token: approvalToken,
-        principal,
-        taskId,
-        action: "execute",
-        capabilityId,
-        capabilityVersion,
+        token: approvalToken, principal, taskId, action: "execute",
+        capabilityId: snapshot.capabilityId,
+        capabilityVersion: snapshot.capabilityVersion,
+        taskVersion: snapshot.taskVersion,
+        agentId: snapshot.agentId,
+        agentVersion: snapshot.agentVersion,
+        payloadHash: snapshot.payloadHash,
       });
       if (!consumed) {
-        throw new ApprovedExecutionError("APPROVAL_INVALID_OR_EXPIRED", "The approval is invalid, expired, or already used.");
+        throw new ApprovedExecutionError("APPROVAL_INVALID_OR_EXPIRED", "The approval is invalid, expired, stale, or already used.");
       }
 
       let claimed = false;
       try {
-        claimed = await claimTaskForExecution(Object.freeze({ taskId, principal, capabilityId })) === true;
-      } catch {
-        claimed = false;
-      }
-      if (!claimed) {
-        throw new ApprovedExecutionError("TASK_CLAIM_FAILED", "The task could not be atomically claimed; the approval has been consumed.");
-      }
+        claimed = await claimTaskForExecution(Object.freeze({
+          taskId: snapshot.taskId,
+          taskVersion: snapshot.taskVersion,
+          payloadHash: snapshot.payloadHash,
+          principal,
+          agentId: snapshot.agentId,
+          agentVersion: snapshot.agentVersion,
+          capabilityId: snapshot.capabilityId,
+          capabilityVersion: snapshot.capabilityVersion,
+        })) === true;
+      } catch { claimed = false; }
+      if (!claimed) throw new ApprovedExecutionError("TASK_CLAIM_FAILED", "The task could not be atomically claimed; the approval has been consumed.");
 
       try {
         return await capabilityExecutor.run({
-          agentId,
-          capabilityId,
-          input,
+          agentId: snapshot.agentId,
+          capabilityId: snapshot.capabilityId,
+          input: snapshot.input,
           signal,
         });
       } catch {

@@ -11,6 +11,10 @@ const binding = {
   action: "execute",
   capabilityId: "text.metrics",
   capabilityVersion: "1.0.0",
+  taskVersion: "3",
+  agentId: "local-helper",
+  agentVersion: "2.1.0",
+  payloadHash: "a".repeat(64),
 };
 
 function setup({ ttlMs = 5_000, maxRecords = 10, initialTime = 10_000 } = {}) {
@@ -50,6 +54,10 @@ test("rejects grants bound to another principal, task, action, capability, or ve
     { ...binding, action: "delete" },
     { ...binding, capabilityId: "task.preview" },
     { ...binding, capabilityVersion: "2.0.0" },
+    { ...binding, taskVersion: "4" },
+    { ...binding, agentId: "other-agent" },
+    { ...binding, agentVersion: "3.0.0" },
+    { ...binding, payloadHash: "b".repeat(64) },
   ];
   for (const attempt of attempts) {
     assert.equal(authority.consume({ ...attempt, token: grant.token }), false);

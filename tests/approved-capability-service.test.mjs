@@ -34,10 +34,74 @@ function setup({ authorized = true, awaiting = true, failExecution = false } = {
       return authorized && ["approve", "execute"].includes(request.operation);
     },
     isTaskAwaitingApproval: async () => awaiting,
+    getTaskSnapshot: async ({ taskId }) => ({
+      taskId, taskVersion: "3", status: "awaiting_approval",
+      agentId: "local-helper", agentVersion: "2.1.0",
+      capabilityId: "text.metrics", capabilityVersion: "1.0.0",
+      input: { text: "safe local work" },
+    }),
     claimTaskForExecution: async () => true,
   });
   return { service, calls };
 }
+
+
+test("binds approval to immutable server-owned task payload and ignores browser replacement input", async () => {
+  let serverInput = { text: "approved original payload" };
+  const authority = createApprovalAuthority({
+    now: () => 50_000,
+    tokenFactory: () => "payload_binding_token_" + "p".repeat(32),
+  });
+  const calls = [];
+  const service = createApprovedCapabilityService({
+    approvalAuthority: authority,
+    capabilityExecutor: { run: (request) => { calls.push(request); return { status: "completed" }; } },
+    authorize: async () => true,
+    isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({
+      taskId, taskVersion: "9", status: "awaiting_approval",
+      agentId: "trusted-agent", agentVersion: "4.2.0",
+      capabilityId: "text.metrics", capabilityVersion: "1.0.0",
+      input: serverInput,
+    }),
+    claimTaskForExecution: async () => true,
+  });
+  const grant = await service.requestApproval(base);
+  await service.executeApproved({
+    principal, taskId: base.taskId, capabilityId: base.capabilityId,
+    capabilityVersion: base.capabilityVersion, approvalToken: grant.token,
+    agentId: "attacker-agent", input: { text: "replacement payload" },
+  });
+  assert.equal(calls[0].agentId, "trusted-agent");
+  assert.deepEqual(calls[0].input, { text: "approved original payload" });
+});
+
+test("rejects approval when server-owned payload changes after approval", async () => {
+  let serverInput = { text: "approved payload" };
+  const authority = createApprovalAuthority({
+    now: () => 50_000,
+    tokenFactory: () => "changed_payload_token_" + "c".repeat(32),
+  });
+  const service = createApprovedCapabilityService({
+    approvalAuthority: authority,
+    capabilityExecutor: { run: () => assert.fail("must not execute changed payload") },
+    authorize: async () => true,
+    isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({
+      taskId, taskVersion: "9", status: "awaiting_approval",
+      agentId: "trusted-agent", agentVersion: "4.2.0",
+      capabilityId: "text.metrics", capabilityVersion: "1.0.0",
+      input: serverInput,
+    }),
+    claimTaskForExecution: async () => true,
+  });
+  const grant = await service.requestApproval(base);
+  serverInput = { text: "changed after approval" };
+  await assert.rejects(
+    service.executeApproved({ principal, taskId: base.taskId, capabilityId: base.capabilityId, capabilityVersion: base.capabilityVersion, approvalToken: grant.token }),
+    (error) => error.code === "APPROVAL_INVALID_OR_EXPIRED",
+  );
+});
 
 test("requires authorized principal and trusted task state before issuing approval", async () => {
   const denied = setup({ authorized: false });
@@ -88,6 +152,7 @@ test("requires execution permission even when an approval grant exists", async (
     capabilityExecutor: { run: () => assert.fail("must not execute") },
     authorize: async () => false,
     isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({ taskId, taskVersion: "3", status: "awaiting_approval", agentId: "local-helper", agentVersion: "2.1.0", capabilityId: "text.metrics", capabilityVersion: "1.0.0", input: { text: "safe local work" } }),
     claimTaskForExecution: async () => true,
   });
   await assert.rejects(
@@ -163,6 +228,7 @@ test("bounds concurrent approved executions and releases capacity after completi
     },
     authorize: async () => true,
     isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({ taskId, taskVersion: "3", status: "awaiting_approval", agentId: "local-helper", agentVersion: "2.1.0", capabilityId: "text.metrics", capabilityVersion: "1.0.0", input: { text: "safe local work" } }),
     claimTaskForExecution: async () => true,
     maxConcurrentExecutions: 1,
   });
@@ -210,6 +276,7 @@ test("fails closed when authorization or task-state callbacks throw", async () =
     capabilityExecutor: { run: () => assert.fail("must not execute") },
     authorize: async () => { throw new Error("auth backend down"); },
     isTaskAwaitingApproval: async () => { throw new Error("task store down"); },
+    getTaskSnapshot: async () => null,
     claimTaskForExecution: async () => false,
   });
   await assert.rejects(
@@ -230,6 +297,7 @@ test("requires an atomic task claim and rejects duplicate execution attempts", a
     capabilityExecutor: { run: () => { executionCount += 1; return { status: "completed" }; } },
     authorize: async () => true,
     isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({ taskId, taskVersion: "3", status: "awaiting_approval", agentId: "local-helper", agentVersion: "2.1.0", capabilityId: "text.metrics", capabilityVersion: "1.0.0", input: { text: "safe local work" } }),
     claimTaskForExecution: async () => {
       if (claimed) return false;
       claimed = true;

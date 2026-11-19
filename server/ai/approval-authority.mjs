@@ -69,12 +69,23 @@ export function createApprovalAuthority({
     action,
     capabilityId,
     capabilityVersion,
+    taskVersion,
+    agentId,
+    agentVersion,
+    payloadHash,
   } = {}) {
     const subject = requiredString(principal?.subject, "principal_subject");
     const task = requiredString(taskId, "task_id");
     const actionName = requiredString(action, "action");
     const capability = requiredString(capabilityId, "capability_id");
     const version = requiredString(capabilityVersion, "capability_version");
+    const taskVer = requiredString(taskVersion, "task_version");
+    const agent = requiredString(agentId, "agent_id");
+    const agentVer = requiredString(agentVersion, "agent_version");
+    const payloadDigest = requiredString(payloadHash, "payload_hash");
+    if (!/^[a-f0-9]{64}$/u.test(payloadDigest)) {
+      throw new ApprovalAuthorityError("INVALID_PAYLOAD_HASH", "payloadHash must be a SHA-256 hex digest.");
+    }
     const issuedAt = currentTime();
     pruneExpired(issuedAt);
     if (records.size >= maxRecords) {
@@ -96,6 +107,10 @@ export function createApprovalAuthority({
       action: actionName,
       capabilityId: capability,
       capabilityVersion: version,
+      taskVersion: taskVer,
+      agentId: agent,
+      agentVersion: agentVer,
+      payloadHash: payloadDigest,
       issuedAt,
       expiresAt,
     }));
@@ -109,6 +124,10 @@ export function createApprovalAuthority({
     action,
     capabilityId,
     capabilityVersion,
+    taskVersion,
+    agentId,
+    agentVersion,
+    payloadHash,
   } = {}) {
     if (typeof token !== "string" || !TOKEN_PATTERN.test(token)) return false;
     const subject = principal?.subject;
@@ -127,7 +146,11 @@ export function createApprovalAuthority({
       grant.taskId === taskId &&
       grant.action === action &&
       grant.capabilityId === capabilityId &&
-      grant.capabilityVersion === capabilityVersion;
+      grant.capabilityVersion === capabilityVersion &&
+      grant.taskVersion === taskVersion &&
+      grant.agentId === agentId &&
+      grant.agentVersion === agentVersion &&
+      grant.payloadHash === payloadHash;
     if (!matches) return false;
 
     records.delete(key);
