@@ -12,10 +12,11 @@ This is a test-only contract smoke harness, not a production database driver.
 - Transaction rollback leaves no partial task mutation or event.
 - Two independent PostgreSQL sessions racing on one expected version produce exactly one conditional-update winner and one event.
 - Phase 6G.15 test-only functions exercise approval, one-time grant consumption plus claim, idempotent replay/conflict, database-clock lease renewal, fenced settlement and owner-scoped cancellation.
+- Independent PostgreSQL sessions race identical claim requests and race owner cancellation against fenced settlement; each race must have exactly one committed logical outcome.
 
 ## What it does not prove
 
-The Phase 6G.15 functions remain disposable test contracts, not production RPCs. They accept owner and worker identifiers as explicit arguments and do not authenticate them. They do not prove RLS, browser-role isolation, tenant authorization, worker credential authentication, production adapter wiring, or a production driver. Stale-worker checks are covered for mismatched worker identity, but lease-recovery and cancellation/settlement races still require independent-session tests. Do not describe this harness as production readiness.
+The Phase 6G.15 functions remain disposable test contracts, not production RPCs. They accept owner and worker identifiers as explicit arguments and do not authenticate them. They do not prove RLS, browser-role isolation, tenant authorization, worker credential authentication, production adapter wiring, or a production driver. Stale-worker checks are covered for mismatched worker identity. The harness also exercises same-key concurrent claim replay and cancellation-versus-settlement serialization; lease-recovery after expiry remains unimplemented. Do not describe this harness as production readiness.
 
 ## Safety and execution
 
