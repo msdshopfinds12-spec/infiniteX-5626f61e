@@ -134,3 +134,53 @@ test("rejects unsafe versions, untrusted workers, and invalid settlement targets
   }), (error) => error.code === "INVALID_SETTLEMENT_STATUS");
   assert.equal(f.store.snapshotTask(f.base.taskId).status, "running");
 });
+
+
+test("renewal idempotency key conflicts when the requested extension changes", async () => {
+  const f = fixture();
+  const claimed = await claim(f);
+  const common = {
+    taskId: f.base.taskId, principal, worker, leaseId: claimed.lease.leaseId,
+    fencingToken: claimed.lease.fencingToken, expectedTaskVersion: claimed.task.version,
+    idempotencyKey: "renew-conflict",
+  };
+  const first = await f.adapter.renewExecutionLeaseV1({ ...common, leaseDurationMs: 30_000 });
+  const changed = await f.adapter.renewExecutionLeaseV1({ ...common, leaseDurationMs: 60_000 });
+  assert.equal(first.outcome, "renewed");
+  assert.deepEqual(changed, { outcome: "conflict" });
+  assert.equal(f.store.snapshotTask(f.base.taskId).version, first.task.version);
+  assert.equal(f.store.getEvents().filter((event) => event.type === "lease_renewed").length, 1);
+});
+
+test("settlement idempotency key conflicts when the result digest changes", async () => {
+  const f = fixture();
+  const claimed = await claim(f);
+  const common = {
+    taskId: f.base.taskId, principal, worker, leaseId: claimed.lease.leaseId,
+    fencingToken: claimed.lease.fencingToken, expectedTaskVersion: claimed.task.version,
+    targetStatus: "succeeded", idempotencyKey: "settle-conflict",
+  };
+  const first = await f.adapter.settleExecutionV1({ ...common, resultDigest: "d".repeat(64) });
+  const changed = await f.adapter.settleExecutionV1({ ...common, resultDigest: "e".repeat(64) });
+  assert.equal(first.outcome, "settled");
+  assert.deepEqual(changed, { outcome: "conflict" });
+  assert.equal(f.store.snapshotTask(f.base.taskId).status, "succeeded");
+  assert.equal(f.store.getEvents().filter((event) => event.type === "succeeded").length, 1);
+});
+
+test("cancellation idempotently replays its result and rejects changed same-key requests", async () => {
+  const f = fixture();
+  const claimed = await claim(f);
+  const request = {
+    taskId: f.base.taskId, principal, expectedTaskVersion: claimed.task.version,
+    idempotencyKey: "cancel-replay",
+  };
+  const first = await f.adapter.cancelApprovedOrRunningTaskV1(request);
+  const replay = await f.adapter.cancelApprovedOrRunningTaskV1(request);
+  const changed = await f.adapter.cancelApprovedOrRunningTaskV1({
+    ...request, expectedTaskVersion: claimed.task.version + 1,
+  });
+  assert.deepEqual(replay, first);
+  assert.deepEqual(changed, { outcome: "conflict" });
+  assert.equal(f.store.getEvents().filter((event) => event.type === "cancelled").length, 1);
+});
