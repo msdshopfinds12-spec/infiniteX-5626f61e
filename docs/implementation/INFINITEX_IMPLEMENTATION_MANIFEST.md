@@ -140,3 +140,12 @@ Status: BUILD COMPLETE FOR THE CURRENT FRONTEND/PWA + PROVIDER-NEUTRAL AI FOUNDA
 - IQ Core repository tree contained no LICENSE/COPYING file and README-referenced `docs/IQ_ARCHITECTURE.md` was absent. Therefore no IQ Core code was copied or executed. A future local Python worker remains blocked pending explicit license/reuse authorization and additional security/testing.
 - IQ Core's current plugin manager trusts caller-supplied permission sets and does not sandbox handlers; event bus is synchronous and shallow-copies payloads; feedback loop is in-memory and unbounded. These are not production-ready integration guarantees.
 - Current adapter contract is a metadata registry only; it is not a Python bridge and does not execute third-party code.
+
+## Phase 3 — Repository intelligence and task lifecycle (2026-11-19)
+
+- Added `docs/architecture/AI_REPOSITORY_REUSE_AUDIT.md` after account inventory and targeted inspection of candidate repositories, selected manifests, READMEs, trees, and license files.
+- The audit rejects whole-repository merges. It distinguishes license evidence from dependency/runtime cost and records candidates that have no root license or are only placeholders.
+- Added `server/integrations/task-lifecycle.mjs`: deterministic task-state transitions, human approval gate, actor restrictions, optimistic version checks, monotonic timestamps, immutable event history, and terminal-state protection. It does not execute tools or perform external side effects.
+- Added `tests/task-lifecycle.test.mjs` for lifecycle transitions, approval, actor authorization, stale versions, terminal states, timestamp validation, and event sequencing.
+- Current CI is running for this phase; do not mark this phase TESTED until completed workflow evidence is inspected.
+- No external repository source has been copied or executed. No external service or AI provider was configured.
