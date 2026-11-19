@@ -75,7 +75,9 @@ test("grant issuance idempotency does not create a second digest after a lost re
     idempotencyKey: "stable-approval-key",
   });
   assert.equal(first.outcome, "issued");
-  assert.deepEqual(replay, { outcome: "already_issued" });
+  assert.equal(replay.outcome, "already_issued");
+  assert.equal(replay.task.status, "approved");
+  assert.equal(replay.expiresAt, first.expiresAt);
   assert.equal(store.getGrantCount(), 1);
   assert.equal(store.snapshotTask(common.taskId).status, "approved");
 });
