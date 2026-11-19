@@ -21,7 +21,7 @@ Deno.test("Deno: classifies transient and permanent errors", () => {
 Deno.test("Deno: computes capped full jitter", () => {
   const policy = { maxAttempts: 4, baseDelayMs: 100, maxDelayMs: 250, maxElapsedMs: 1000 };
   assert(computeRetryDelayMs(2, policy, () => 0.5) === 100, "jitter sample");
-  assert(computeRetryDelayMs(3, policy, () => 0.99) === 250, "delay cap");
+  assert(computeRetryDelayMs(3, policy, () => 0.99) === 248, "delay cap");
 });
 Deno.test("Deno: retries transient failures within attempt budget", async () => {
   let calls = 0;

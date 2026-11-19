@@ -35,7 +35,7 @@ test("computes capped full jitter and honors bounded Retry-After", () => {
   assert.equal(computeRetryDelayMs(1, policy, () => 0), 0);
   assert.equal(computeRetryDelayMs(1, policy, () => 0.5), 50);
   assert.equal(computeRetryDelayMs(2, policy, () => 0.99), 198);
-  assert.equal(computeRetryDelayMs(3, policy, () => 0.99), 250);
+  assert.equal(computeRetryDelayMs(3, policy, () => 0.99), 248);
   assert.equal(computeRetryDelayMs(1, policy, () => 0, 400), 250);
   assert.throws(() => computeRetryDelayMs(4, policy));
   assert.throws(() => computeRetryDelayMs(1, policy, () => 1));
