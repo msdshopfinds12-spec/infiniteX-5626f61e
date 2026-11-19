@@ -209,5 +209,5 @@ export function createApprovalProtocolAdapter({
     return validated;
   }
 
-  return Object.freeze({ approveTaskWithGrantV1, claimApprovedTaskV1 });
+  return Object.freeze({ issueApprovalGrantV1, approveTaskWithGrantV1, claimApprovedTaskV1 });
 }
