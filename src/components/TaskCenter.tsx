@@ -56,7 +56,7 @@ export default function TaskCenter() {
         <div className="task-center-banner-icon"><ShieldCheck size={18} aria-hidden="true" /></div>
         <div>
           <strong>Approval-gated task simulation</strong>
-          <p>Practice the task lifecycle safely. These controls only change local in-memory demo state.</p>
+          <p>Practice the task lifecycle. Approval is a UX demonstration, not authenticated authorization; controls only change local in-memory demo state.</p>
         </div>
         <span className="badge badge-neutral">NO EXECUTION</span>
       </div>
@@ -109,7 +109,7 @@ export default function TaskCenter() {
                     {action.label}
                   </button>
                 ) : null}
-                {!terminal && task.state !== "awaiting_approval" && task.state !== "running" ? (
+                {!terminal && task.state !== "awaiting_approval" ? (
                   <button className="btn btn-ghost" type="button" onClick={() => apply(task.id, "cancel", "user")}>Cancel demo task</button>
                 ) : null}
                 <button className="btn btn-ghost" type="button" aria-expanded={historyTaskId === task.id} onClick={() => setHistoryTaskId((current) => current === task.id ? null : task.id)}>
