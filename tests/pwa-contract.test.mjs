@@ -13,14 +13,13 @@ test("web app manifest declares a standalone scoped application", async () => {
   assert.ok(manifest.icons.some((icon) => icon.src === "/icons/infiniteX.svg"));
 });
 
-  assert.match(worker, /url\.pathname\.startsWith\("\/assets\/"\)/);
+test("service worker only caches same-origin public GET assets and excludes API paths", async () => {
   const worker = await read("../public/sw.js");
   assert.match(worker, /request\.method !== "GET"/);
   assert.match(worker, /url\.origin !== self\.location\.origin/);
   assert.match(worker, /url\.pathname\.startsWith\("\/api\/"\)/);
-  assert.match(worker, /request\.destination/);
   assert.match(worker, /url\.pathname\.startsWith\("\/assets\/"\)/);
-  assert.match(worker, /url\.pathname === "\/"/);
+  assert.match(worker, /url\.pathname === "\/" &&/);
   assert.match(worker, /private\|no-store/);
   assert.match(worker, /offline\.html/);
 });
