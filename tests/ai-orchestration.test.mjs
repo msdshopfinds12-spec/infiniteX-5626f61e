@@ -236,6 +236,67 @@ test("orchestrator distinguishes timeout from caller cancellation", async () => 
   );
 });
 
+
+test("retains concurrency capacity after timeout until an uncooperative provider actually settles", async () => {
+  let releaseFirst;
+  let calls = 0;
+  const firstPending = new Promise((resolve) => { releaseFirst = resolve; });
+  const orchestrator = createOrchestrator({
+    registry: makeRegistry(),
+    policy: makePolicy(),
+    timeoutMs: 100,
+    maxConcurrentRuns: 1,
+    providers: {
+      "local-test": {
+        enabled: true,
+        estimatedCostUsd: 0,
+        generate: async () => {
+          calls += 1;
+          if (calls === 1) return firstPending; // deliberately ignores AbortSignal
+          return "completed";
+        },
+      },
+    },
+  });
+
+  await assert.rejects(
+    orchestrator.run({ agentId: "planner", input: "first request" }),
+    (error) => error.code === "TIMEOUT",
+  );
+  await assert.rejects(
+    orchestrator.run({ agentId: "planner", input: "second request" }),
+    (error) => error.code === "RUN_CAPACITY_EXCEEDED",
+  );
+  assert.equal(calls, 1, "capacity rejection must happen before another provider call");
+
+  releaseFirst("late completion");
+  await Promise.resolve();
+  await Promise.resolve();
+  const recovered = await orchestrator.run({ agentId: "planner", input: "third request" });
+  assert.equal(recovered.status, "completed");
+  assert.equal(recovered.output, "completed");
+  assert.equal(calls, 2);
+});
+
+test("validates AbortSignal shape and orchestrator concurrency configuration", async () => {
+  assert.throws(() => createOrchestrator({
+    registry: makeRegistry(),
+    policy: makePolicy(),
+    maxConcurrentRuns: 0,
+  }), /maxConcurrentRuns/);
+  const orchestrator = createOrchestrator({
+    registry: makeRegistry(),
+    policy: makePolicy(),
+    providers: {
+      "local-test": { enabled: true, estimatedCostUsd: 0, generate: async () => "ok" },
+    },
+  });
+  await assert.rejects(
+    orchestrator.run({ agentId: "planner", input: "hello", signal: { aborted: false } }),
+    (error) => error.code === "INVALID_SIGNAL",
+  );
+});
+
 test("provider failures are normalized without leaking provider error messages", async () => {
   const orchestrator = createOrchestrator({
     registry: makeRegistry(),
