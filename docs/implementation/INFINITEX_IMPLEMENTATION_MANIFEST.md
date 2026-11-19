@@ -157,3 +157,12 @@ Status: BUILD COMPLETE FOR THE CURRENT FRONTEND/PWA + PROVIDER-NEUTRAL AI FOUNDA
 - Workflow evidence: [Frontend CI run 44541507729](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44541507729); [Browser CI run 44541507741](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44541507741).
 - Task lifecycle is deterministic state management only. It is not a queue worker, durable event store, authenticated authorization service, or tool executor. The `actor` argument must be derived by trusted server-side code from a verified principal; it must never be accepted directly from an untrusted client.
 - Repository reuse review is targeted, not a full legal/dependency audit. Candidates without verified root license remain excluded.
+
+## Phase 4 — Local approval-gated task workspace (2026-11-19)
+
+- Added `src/lib/task-lifecycle.mjs` as the shared browser-safe deterministic lifecycle implementation and `src/lib/task-lifecycle.d.mts` as its TypeScript contract.
+- Kept `server/integrations/task-lifecycle.mjs` as a server-facing re-export so existing server tests and callers retain a stable import path.
+- Added `src/components/TaskCenter.tsx` and a Task Center navigation entry. It demonstrates planning, approval/rejection, and simulated state transitions with visible local-only/no-execution messaging.
+- Added responsive task cards, per-task history disclosure, state summaries, and browser tests for approval gating, rejection, and isolated history disclosure.
+- This UI is in-memory demo state only. It is not authenticated, persistent, connected to a real worker, or allowed to invoke external tools.
+- A failed CI run exposed an ESM declaration-resolution issue; the UI import was corrected to explicitly reference `task-lifecycle.mjs`. The corrected branch-head CI result must be checked before marking this phase verified.
