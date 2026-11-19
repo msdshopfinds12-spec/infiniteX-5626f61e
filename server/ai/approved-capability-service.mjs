@@ -86,11 +86,15 @@ export function createApprovedCapabilityService({
   isTaskAwaitingApproval,
   getTaskSnapshot,
   claimTaskForExecution,
+  claimTaskWithApproval,
   maxConcurrentExecutions = 4,
 } = {}) {
   if (!approvalAuthority || typeof approvalAuthority.issue !== "function" ||
-      typeof approvalAuthority.consume !== "function") {
-    throw new TypeError("A valid approval authority is required.");
+      (typeof approvalAuthority.consume !== "function" && typeof claimTaskWithApproval !== "function")) {
+    throw new TypeError("An approval issuer and either a consumer or atomic claim callback are required.");
+  }
+  if (claimTaskWithApproval !== undefined && typeof claimTaskWithApproval !== "function") {
+    throw new TypeError("claimTaskWithApproval must be a function when provided.");
   }
   if (!capabilityExecutor || typeof capabilityExecutor.run !== "function") {
     throw new TypeError("A valid capability executor is required.");
@@ -133,7 +137,7 @@ export function createApprovedCapabilityService({
 
     const snapshot = await loadSnapshot(taskId, principal, capabilityId, capabilityVersion);
     try {
-      return approvalAuthority.issue({
+      return await approvalAuthority.issue({
         principal, taskId, action: "execute",
         capabilityId: snapshot.capabilityId,
         capabilityVersion: snapshot.capabilityVersion,
@@ -168,33 +172,57 @@ export function createApprovedCapabilityService({
     activeExecutions += 1;
     try {
       const snapshot = await loadSnapshot(taskId, principal, capabilityId, capabilityVersion);
-      const consumed = await approvalAuthority.consume({
-        token: approvalToken, principal, taskId, action: "execute",
-        capabilityId: snapshot.capabilityId,
-        capabilityVersion: snapshot.capabilityVersion,
-        taskVersion: snapshot.taskVersion,
-        agentId: snapshot.agentId,
-        agentVersion: snapshot.agentVersion,
-        payloadHash: snapshot.payloadHash,
-      });
-      if (!consumed) {
-        throw new ApprovedExecutionError("APPROVAL_INVALID_OR_EXPIRED", "The approval is invalid, expired, stale, or already used.");
-      }
-
       let claimed = false;
-      try {
-        claimed = await claimTaskForExecution(Object.freeze({
-          taskId: snapshot.taskId,
-          taskVersion: snapshot.taskVersion,
-          payloadHash: snapshot.payloadHash,
-          principal,
-          agentId: snapshot.agentId,
-          agentVersion: snapshot.agentVersion,
+      if (claimTaskWithApproval) {
+        if (typeof approvalToken !== "string" || !/^[A-Za-z0-9_-]{40,128}$/u.test(approvalToken)) {
+          throw new ApprovedExecutionError("APPROVAL_INVALID_OR_EXPIRED", "The approval is invalid, expired, stale, or already used.");
+        }
+        const tokenDigest = createHash("sha256").update(approvalToken, "utf8").digest("hex");
+        try {
+          claimed = await claimTaskWithApproval(Object.freeze({
+            tokenDigest,
+            principal,
+            taskId: snapshot.taskId,
+            taskVersion: snapshot.taskVersion,
+            payloadHash: snapshot.payloadHash,
+            agentId: snapshot.agentId,
+            agentVersion: snapshot.agentVersion,
+            capabilityId: snapshot.capabilityId,
+            capabilityVersion: snapshot.capabilityVersion,
+            fromStatus: "awaiting_approval",
+            toStatus: "running",
+          })) === true;
+        } catch { claimed = false; }
+        if (!claimed) {
+          throw new ApprovedExecutionError("APPROVAL_OR_CLAIM_FAILED", "The approval is invalid or the task could not be atomically claimed.");
+        }
+      } else {
+        const consumed = await approvalAuthority.consume({
+          token: approvalToken, principal, taskId, action: "execute",
           capabilityId: snapshot.capabilityId,
           capabilityVersion: snapshot.capabilityVersion,
-        })) === true;
-      } catch { claimed = false; }
-      if (!claimed) throw new ApprovedExecutionError("TASK_CLAIM_FAILED", "The task could not be atomically claimed; the approval has been consumed.");
+          taskVersion: snapshot.taskVersion,
+          agentId: snapshot.agentId,
+          agentVersion: snapshot.agentVersion,
+          payloadHash: snapshot.payloadHash,
+        });
+        if (!consumed) {
+          throw new ApprovedExecutionError("APPROVAL_INVALID_OR_EXPIRED", "The approval is invalid, expired, stale, or already used.");
+        }
+        try {
+          claimed = await claimTaskForExecution(Object.freeze({
+            taskId: snapshot.taskId,
+            taskVersion: snapshot.taskVersion,
+            payloadHash: snapshot.payloadHash,
+            principal,
+            agentId: snapshot.agentId,
+            agentVersion: snapshot.agentVersion,
+            capabilityId: snapshot.capabilityId,
+            capabilityVersion: snapshot.capabilityVersion,
+          })) === true;
+        } catch { claimed = false; }
+        if (!claimed) throw new ApprovedExecutionError("TASK_CLAIM_FAILED", "The task could not be atomically claimed; the approval has been consumed.");
+      }
 
       try {
         return await capabilityExecutor.run({

@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { createApprovalAuthority } from "../server/ai/approval-authority.mjs";
 import { createApprovedCapabilityService, ApprovedExecutionError } from "../server/ai/approved-capability-service.mjs";
 
 const principal = Object.freeze({ subject: "verified-user-7" });
+const createHashForTest = (token) => createHash("sha256").update(token, "utf8").digest("hex");
 const base = {
   principal,
   taskId: "task-100",
@@ -422,4 +424,73 @@ test("requires an atomic task claim and rejects duplicate execution attempts", a
     (error) => error.code === "TASK_CLAIM_FAILED",
   );
   assert.equal(executionCount, 1);
+});
+
+
+test("uses one atomic durable operation for approval consumption and task claim", async () => {
+  const authority = createApprovalAuthority({
+    now: () => 50_000,
+    tokenFactory: () => "atomic_claim_token_" + "a".repeat(32),
+  });
+  let atomicRequest;
+  let legacyConsumeCalled = false;
+  let legacyClaimCalled = false;
+  let executionCount = 0;
+  const service = createApprovedCapabilityService({
+    approvalAuthority: {
+      issue: (args) => authority.issue(args),
+      consume: async (args) => { legacyConsumeCalled = true; return authority.consume(args); },
+    },
+    claimTaskWithApproval: async (request) => {
+      atomicRequest = request;
+      return true;
+    },
+    capabilityExecutor: { run: async () => { executionCount += 1; return { status: "completed" }; } },
+    authorize: async () => true,
+    isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({
+      taskId, taskVersion: "3", status: "awaiting_approval",
+      agentId: "local-helper", agentVersion: "2.1.0",
+      capabilityId: "text.metrics", capabilityVersion: "1.0.0",
+      input: { text: "safe local work" },
+    }),
+    claimTaskForExecution: async () => { legacyClaimCalled = true; return true; },
+  });
+  const grant = await service.requestApproval(base);
+  await service.executeApproved({ ...base, approvalToken: grant.token });
+  assert.equal(legacyConsumeCalled, false);
+  assert.equal(legacyClaimCalled, false);
+  assert.equal(atomicRequest.tokenDigest, createHashForTest(grant.token));
+  assert.equal("token" in atomicRequest, false);
+  assert.equal(atomicRequest.fromStatus, "awaiting_approval");
+  assert.equal(atomicRequest.toStatus, "running");
+  assert.equal(executionCount, 1);
+});
+
+test("does not execute when the atomic approval-and-claim transaction fails", async () => {
+  const authority = createApprovalAuthority({
+    now: () => 50_000,
+    tokenFactory: () => "atomic_fail_token_" + "f".repeat(32),
+  });
+  let executionCount = 0;
+  const service = createApprovedCapabilityService({
+    approvalAuthority: authority,
+    claimTaskWithApproval: async () => false,
+    capabilityExecutor: { run: async () => { executionCount += 1; } },
+    authorize: async () => true,
+    isTaskAwaitingApproval: async () => true,
+    getTaskSnapshot: async ({ taskId }) => ({
+      taskId, taskVersion: "3", status: "awaiting_approval",
+      agentId: "local-helper", agentVersion: "2.1.0",
+      capabilityId: "text.metrics", capabilityVersion: "1.0.0",
+      input: { text: "safe local work" },
+    }),
+    claimTaskForExecution: async () => assert.fail("legacy claim must not run"),
+  });
+  const grant = await service.requestApproval(base);
+  await assert.rejects(
+    service.executeApproved({ ...base, approvalToken: grant.token }),
+    (error) => error.code === "APPROVAL_OR_CLAIM_FAILED",
+  );
+  assert.equal(executionCount, 0);
 });

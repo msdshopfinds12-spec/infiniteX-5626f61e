@@ -125,3 +125,46 @@ test("does not treat false, thrown, or malformed claims as successful", async ()
 test("requires the complete store contract at construction", () => {
   assert.throws(() => createApprovalTaskStoreAdapter({ store: {} }), TypeError);
 });
+
+
+test("passes only a validated approval digest into the atomic durable claim driver", async () => {
+  let received;
+  const adapter = createApprovalTaskStoreAdapter({
+    store: {
+      getApprovalSnapshot: async () => row(),
+      claimApprovedTask: async () => true,
+      claimApprovedTaskWithApproval: async (claim) => { received = claim; return true; },
+    },
+  });
+  const result = await adapter.claimTaskWithApproval({
+    taskId: "task-1",
+    taskVersion: "7",
+    payloadHash: "c".repeat(64),
+    tokenDigest: "d".repeat(64),
+    principal,
+    agentId: "local-agent",
+    agentVersion: "1.2.0",
+    capabilityId: "text.metrics",
+    capabilityVersion: "1.0.0",
+  });
+  assert.equal(result, true);
+  assert.equal(received.approvalTokenDigest, "d".repeat(64));
+  assert.equal("token" in received, false);
+  assert.equal(received.fromStatus, "awaiting_approval");
+  assert.equal(received.toStatus, "running");
+});
+
+test("fails closed when the durable driver does not implement atomic approval claim", async () => {
+  const adapter = createApprovalTaskStoreAdapter({
+    store: {
+      getApprovalSnapshot: async () => row(),
+      claimApprovedTask: async () => true,
+    },
+  });
+  assert.equal(await adapter.claimTaskWithApproval({
+    taskId: "task-1", taskVersion: "7",
+    payloadHash: "e".repeat(64), tokenDigest: "f".repeat(64),
+    principal, agentId: "local-agent", agentVersion: "1.2.0",
+    capabilityId: "text.metrics", capabilityVersion: "1.0.0",
+  }), false);
+});

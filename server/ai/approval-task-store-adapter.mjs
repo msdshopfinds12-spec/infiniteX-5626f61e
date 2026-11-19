@@ -127,9 +127,41 @@ export function createApprovalTaskStoreAdapter({ store } = {}) {
     }
   }
 
+  async function claimTaskWithApproval(claim = {}) {
+    if (typeof store.claimApprovedTaskWithApproval !== "function") return false;
+    const taskId = requiredString(claim.taskId, "task_id");
+    const principalSubject = verifiedSubject(claim.principal);
+    const expectedTaskVersion = requiredString(claim.taskVersion, "task_version");
+    const expectedPayloadHash = requiredString(claim.payloadHash, "payload_hash");
+    const tokenDigest = requiredString(claim.tokenDigest, "token_digest");
+    if (!/^[a-f0-9]{64}$/u.test(expectedPayloadHash) || !/^[a-f0-9]{64}$/u.test(tokenDigest)) return false;
+    const expectedAgentId = requiredString(claim.agentId, "agent_id");
+    const expectedAgentVersion = requiredString(claim.agentVersion, "agent_version");
+    const expectedCapabilityId = requiredString(claim.capabilityId, "capability_id");
+    const expectedCapabilityVersion = requiredString(claim.capabilityVersion, "capability_version");
+    try {
+      return await store.claimApprovedTaskWithApproval(Object.freeze({
+        taskId,
+        principalSubject,
+        expectedTaskVersion,
+        expectedPayloadHash,
+        expectedAgentId,
+        expectedAgentVersion,
+        expectedCapabilityId,
+        expectedCapabilityVersion,
+        approvalTokenDigest: tokenDigest,
+        fromStatus: "awaiting_approval",
+        toStatus: "running",
+      })) === true;
+    } catch {
+      return false;
+    }
+  }
+
   return Object.freeze({
     getTaskSnapshot,
     isTaskAwaitingApproval,
     claimTaskForExecution,
+    claimTaskWithApproval,
   });
 }
