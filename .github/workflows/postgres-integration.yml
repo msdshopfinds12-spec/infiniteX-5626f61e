@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feat/infiniteX-zero-budget-implementation
+      - feat/phase-6g15-transactional-lifecycle
   pull_request:
     branches:
       - main
