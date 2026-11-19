@@ -61,8 +61,8 @@ function executeBuiltIn(capability, input) {
     const trimmed = text.trim();
     return Object.freeze({
       characters: text.length,
-      words: trimmed ? trimmed.split(/\\s+/u).length : 0,
-      lines: text.length ? text.split(/\\r\\n|\\r|\\n/u).length : 0,
+      words: trimmed ? trimmed.split(/\s+/u).length : 0,
+      lines: text.length ? text.split(/\r\n|\r|\n/u).length : 0,
     });
   }
   if (capability === "task.preview") {
