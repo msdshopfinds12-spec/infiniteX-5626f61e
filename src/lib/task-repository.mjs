@@ -1,5 +1,7 @@
 import { createTask, transitionTask, TaskLifecycleError } from "../../src/lib/task-lifecycle.mjs";
 
+const TERMINAL_COMMANDS = new Set(["cancel", "reject", "complete", "fail"]);
+
 export class TaskRepositoryError extends Error {
   constructor(code, message) {
     super(message);
@@ -72,8 +74,9 @@ export function createInMemoryTaskRepository({
     if (!current) {
       throw new TaskRepositoryError("TASK_NOT_FOUND", "The requested task does not exist.");
     }
-    if (current.events.length >= maxEventsPerTask) {
-      throw new TaskRepositoryError("EVENT_CAPACITY_EXCEEDED", "The task event history reached its configured limit.");
+    if (current.events.length >= maxEventsPerTask ||
+        (current.events.length >= maxEventsPerTask - 1 && !TERMINAL_COMMANDS.has(command))) {
+      throw new TaskRepositoryError("EVENT_CAPACITY_EXCEEDED", "The task event history reached its configured limit; only a terminal transition may use the reserved final event slot.");
     }
 
     let next;
