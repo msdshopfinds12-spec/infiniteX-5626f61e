@@ -217,8 +217,6 @@ Deno.serve(async (req: Request) => {
 
         let actionOutput: JsonRecord | null = null;
         let actionError = "";
-        let actionOutput: JsonRecord | null = null;
-        let actionError = "";
         try {
           const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
           actionOutput = executeWithinStepBudget(
