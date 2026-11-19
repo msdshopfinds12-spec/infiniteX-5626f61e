@@ -65,6 +65,38 @@ race_events="$(psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM infinite
 [[ "$race_state" == "running:2:1:1" ]] || { echo "Race state mismatch: $race_state" >&2; exit 1; }
 [[ "$race_events" == "1" ]] || { echo "Race event count mismatch: $race_events" >&2; exit 1; }
 psql -X -v ON_ERROR_STOP=1 -f tests/postgres/lifecycle_contract.sql
+psql -X -v ON_ERROR_STOP=1 -f tests/postgres/lifecycle_races.sql
+
+claim_race() {
+  psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT infinitex_harness.claim_with_approval(
+    'owner-race','claim-race','66666666-6666-4666-8666-666666666666',
+    repeat('e',64),'worker-race','77777777-7777-4777-8777-777777777777',30000,
+    'same-race-key',repeat('f',64));"
+}
+claim_a="$(mktemp)"; claim_b="$(mktemp)"
+cancel_out="$(mktemp)"; settle_out="$(mktemp)"
+trap 'rm -f "$tmp_a" "$tmp_b" "$claim_a" "$claim_b" "$cancel_out" "$settle_out"' EXIT
+claim_race >"$claim_a" & claim_pid_a=$!
+claim_race >"$claim_b" & claim_pid_b=$!
+wait "$claim_pid_a"; wait "$claim_pid_b"
+claim_records="$(psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM infinitex_harness.operation_idempotency WHERE owner_subject='owner-race' AND task_id='claim-race' AND operation='claim' AND idempotency_key='same-race-key'")"
+claim_events="$(psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM infinitex_harness.task_events WHERE owner_subject='owner-race' AND task_id='claim-race' AND event_type='claimed'")"
+[[ "$claim_records" == "1" && "$claim_events" == "1" ]] || { echo "Concurrent idempotent claim invariant failed." >&2; exit 1; }
+
+psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT infinitex_harness.cancel_task('owner-race','claim-race',2)" >"$cancel_out" &
+cancel_pid=$!
+psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT infinitex_harness.settle_lease(
+ 'owner-race','claim-race','77777777-7777-4777-8777-777777777777',
+ 'worker-race',1,2,'succeeded')" >"$settle_out" &
+settle_pid=$!
+wait "$cancel_pid"; wait "$settle_pid"
+terminal_winners="$(cat "$cancel_out" "$settle_out" | grep -c '^techo "Verified by harness: constraints, append-only events, rollback, CAS claim race, approval/grant/claim, replay/conflict, renewal, fenced settlement, cancellation."
+echo "Not verified: authenticated principal binding, database role isolation, RLS, production driver, or production wiring."
+ || true)"
+terminal_state="$(psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT status FROM infinitex_harness.tasks WHERE owner_subject='owner-race' AND task_id='claim-race'")"
+[[ "$terminal_winners" == "1" ]] || { echo "Expected exactly one cancellation/settlement winner; got $terminal_winners." >&2; exit 1; }
+[[ "$terminal_state" == "cancelled" || "$terminal_state" == "succeeded" ]] || { echo "Invalid terminal race state: $terminal_state" >&2; exit 1; }
+
 echo "PostgreSQL 17 disposable Phase 6G.14 + 6G.15 contract tests passed."
 echo "Verified by harness: constraints, append-only events, rollback, CAS claim race, approval/grant/claim, replay/conflict, renewal, fenced settlement, cancellation."
 echo "Not verified: authenticated principal binding, database role isolation, RLS, production driver, or production wiring."
