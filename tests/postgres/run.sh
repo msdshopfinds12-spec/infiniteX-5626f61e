@@ -13,6 +13,7 @@ esac
 command -v psql >/dev/null 2>&1 || { echo "psql client is required." >&2; exit 2; }
 psql -X -v ON_ERROR_STOP=1 -f tests/postgres/bootstrap.sql
 psql -X -v ON_ERROR_STOP=1 -f tests/postgres/contract.sql
+psql -X -v ON_ERROR_STOP=1 -f tests/postgres/lifecycle.sql
 
 psql -X -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
@@ -63,6 +64,7 @@ race_state="$(psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT status||':'||task_versi
 race_events="$(psql -X -Atq -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM infinitex_harness.task_events WHERE task_id='race-task'")"
 [[ "$race_state" == "running:2:1:1" ]] || { echo "Race state mismatch: $race_state" >&2; exit 1; }
 [[ "$race_events" == "1" ]] || { echo "Race event count mismatch: $race_events" >&2; exit 1; }
-echo "PostgreSQL 17 disposable contract smoke tests passed."
-echo "Verified: schema constraints, idempotency uniqueness, append-only events, rollback, one-winner CAS race."
-echo "Not verified: production RPCs, end-to-end driver, RLS, tenant-role isolation, or production wiring."
+psql -X -v ON_ERROR_STOP=1 -f tests/postgres/lifecycle_contract.sql
+echo "PostgreSQL 17 disposable Phase 6G.14 + 6G.15 contract tests passed."
+echo "Verified by harness: constraints, append-only events, rollback, CAS claim race, approval/grant/claim, replay/conflict, renewal, fenced settlement, cancellation."
+echo "Not verified: authenticated principal binding, database role isolation, RLS, production driver, or production wiring."
