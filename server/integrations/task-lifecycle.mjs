@@ -4,6 +4,8 @@
  */
 const STATES = new Set(["queued", "planning", "awaiting_approval", "approved", "running", "succeeded", "failed", "cancelled"]);
 const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
+const ISO_UTC = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?Z$/;
+const isIsoUtc = (value) => typeof value === "string" && ISO_UTC.test(value) && !Number.isNaN(Date.parse(value));
 const COMMANDS = Object.freeze({
   begin_planning: { from: "queued", to: "planning", actor: "system" },
   request_approval: { from: "planning", to: "awaiting_approval", actor: "system" },
@@ -30,7 +32,7 @@ export function createTask({ id, title, createdAt }) {
   if (typeof title !== "string" || title.trim().length < 1 || title.trim().length > 160) {
     throw new TaskLifecycleError("INVALID_TITLE", "Task title must contain 1–160 characters.");
   }
-  if (typeof createdAt !== "string" || Number.isNaN(Date.parse(createdAt))) {
+  if (!isIsoUtc(createdAt)) {
     throw new TaskLifecycleError("INVALID_TIMESTAMP", "createdAt must be a valid ISO-compatible timestamp.");
   }
   return Object.freeze({
@@ -46,7 +48,9 @@ export function createTask({ id, title, createdAt }) {
 }
 
 export function transitionTask(task, command, { expectedVersion, actor, at } = {}) {
-  if (!task || typeof task !== "object" || !STATES.has(task.state)) {
+  if (!task || typeof task !== "object" || !STATES.has(task.state) ||
+      !Number.isInteger(task.version) || task.version < 0 || !Array.isArray(task.events) ||
+      !isIsoUtc(task.updatedAt) || typeof task.id !== "string") {
     throw new TaskLifecycleError("INVALID_TASK", "A valid task state is required.");
   }
   if (TERMINAL.has(task.state)) {
@@ -55,7 +59,9 @@ export function transitionTask(task, command, { expectedVersion, actor, at } = {
   if (!Number.isInteger(expectedVersion) || expectedVersion !== task.version) {
     throw new TaskLifecycleError("VERSION_CONFLICT", "Task version is stale; reload before retrying.");
   }
-  const rule = COMMANDS[command];
+  const rule = command === "cancel"
+    ? { from: task.state, to: "cancelled", actor: "user" }
+    : COMMANDS[command];
   if (!rule) throw new TaskLifecycleError("UNKNOWN_COMMAND", "Task command is not supported.");
   if (task.state !== rule.from) {
     throw new TaskLifecycleError("INVALID_TRANSITION", "Command is not valid for the current task state.");
@@ -63,7 +69,7 @@ export function transitionTask(task, command, { expectedVersion, actor, at } = {
   if (actor !== rule.actor) {
     throw new TaskLifecycleError("ACTOR_NOT_ALLOWED", "This command requires a different actor.");
   }
-  if (typeof at !== "string" || Number.isNaN(Date.parse(at)) || Date.parse(at) < Date.parse(task.updatedAt)) {
+  if (!isIsoUtc(at) || Date.parse(at) < Date.parse(task.updatedAt)) {
     throw new TaskLifecycleError("INVALID_TIMESTAMP", "Transition timestamp must be valid and non-decreasing.");
   }
 
