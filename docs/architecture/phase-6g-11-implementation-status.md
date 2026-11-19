@@ -167,3 +167,19 @@ A preliminary, milestone-weighted project estimate is approximately 65%. This is
 - Source and test files were fetched back from the feature branch and verified. Tests have NOT been executed; the new test is not marked passing.
 - Latest observed branch comparison: 207 commits ahead, 2 behind `main`, status `diverged`. No merge or rebase was performed.
 - Latest combined statuses are Vercel `build-rate-limit` failures across six project contexts. These are platform quota signals, not passing/failing test assertions. No PR-triggered workflow run was returned.
+
+
+### Deterministic approval-token recovery and CI evidence — 2026-11-20
+
+- Identified and corrected an idempotency contract gap: random token generation could not reproduce the original raw approval token after a lost response, even when the durable store correctly recognized the same idempotency request.
+- Added `createHmacApprovalTokenFactory` using Node's built-in HMAC-SHA-256. Token derivation is domain-separated and bound to trusted principal subject, task ID, canonical payload hash, and idempotency key. The server-only secret must be at least 32 bytes. The service now requires an explicitly injected token factory; it no longer silently defaults to a non-replayable random token generator.
+- The service accepts an already-approved snapshot only to attempt the same idempotent grant request. The store must return the original approved snapshot and expiry for an exact replay; a different request with the same key returns conflict. Raw tokens remain absent from persistence requests; only their SHA-256 digest is persisted.
+- Updated the deterministic fake to retain replay metadata, and added regression tests for same-request token replay, different-digest conflict, and HMAC scope separation.
+- The token factory helper and tests are source-level implementation only. No production secret is configured or verified, and no production service composition or durable PostgreSQL driver has been connected.
+- CI initially caught two implementation issues (comment syntax and an outdated wrong-state assertion). Both were corrected before the final passing run.
+- Frontend CI for commit `d62c1036b308316fad667bd7a57b304cae62eaf4` completed successfully: 136 tests passed, 0 failed; typecheck, browser/server boundary check, and production build passed; `npm audit` reported 0 vulnerabilities. Workflow run: https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44569821768
+- Browser/Playwright/WCAG workflow run `44569821776` had not completed at the time of this record; no browser pass is claimed.
+- Latest observed branch comparison after the documentation update: 221 commits ahead, 2 behind `main`, status `diverged`. No merge or rebase was performed. The two main-only commits add and then revert a test file; no production source change was observed in those two commits.
+- Vercel combined status still reports six project contexts failing with `build-rate-limit`; the separate Vercel deployment integration context reports success. No Vercel build log or new deployment artifact was verified, so this is not classified as a source-code failure or a verified release.
+- Repository reuse remains constrained by the existing audit: no external AI repository code was copied. Private access alone does not establish a license or cross-repository reuse authorization.
+- Executor remains disabled. Lease renewal, settlement, cancellation, PostgreSQL transaction semantics, production identity/tenant isolation, and release readiness remain incomplete.
