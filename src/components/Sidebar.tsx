@@ -10,7 +10,7 @@ export default function Sidebar({ view, onChange }: { view: ViewKey; onChange: (
     <div className="brand"><div className="brand-mark"><Zap size={18} /></div><div className="brand-text"><span className="brand-title">InfiniteX</span><span className="brand-sub">AI Engineering</span></div></div>
     <nav className="nav" aria-label="Main navigation">{nav.map((item) => {
       const Icon = item.icon; const active = view === item.key;
-      return <button key={item.key} type="button" className={"nav-item" + (active ? " active" : "")} aria-current={active ? "page" : undefined} onClick={() => onChange(item.key)}><Icon size={18} /><span>{item.label}</span></button>;
+      return <button key={item.key} type="button" className={"nav-item" + (active ? " active" : "")} aria-label={item.label} title={item.label} aria-current={active ? "page" : undefined} onClick={() => onChange(item.key)}><Icon size={18} aria-hidden="true" /><span>{item.label}</span></button>;
     })}</nav>
     <div className="sidebar-foot"><div className="user-chip"><div className="avatar">IX</div><div className="user-meta"><span className="user-name">Local workspace</span><span className="user-role">Demo environment</span></div></div></div>
   </aside>;
