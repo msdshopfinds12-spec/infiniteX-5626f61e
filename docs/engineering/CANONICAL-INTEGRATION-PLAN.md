@@ -44,6 +44,25 @@ PR #99 adds lint/test scripts and changes TypeScript configuration. These change
 
 PR documentation includes CI observations for earlier commit SHAs. Those records must not be represented as CI for this integration branch. New checks must run on the exact resulting head SHA.
 
+## 3.5 Exact-head package compatibility matrix
+
+The package manifests and lockfiles were fetched directly from the three source branches and this candidate:
+
+| Branch | Vite manifest | Vite lockfile | React plugin manifest | Plugin lockfile | Supabase SDK |
+|---|---:|---:|---:|---:|---:|
+| PR #60 | ^8.3.8 | 8.3.8 | ^6.1.2 | 6.3.0 | 2.119.2 |
+| PR #99 | ^5.4.10 | 5.4.21 | ^4.3.3 | 4.7.0 | not present in inspected manifest |
+| PR #100 | ^6.4.6 | 6.4.6 | ^4.3.3 | 4.7.0 | not present in inspected manifest |
+| Candidate base | ^8.3.8 | 8.3.8 | ^6.1.2 | 6.3.0 | 2.119.2 |
+
+PR #100 is a Vite 6 remediation branch based on PR #99's Vite 5 lineage. It is not a drop-in lockfile update for PR #60's Vite 8 / plugin-react 6 lineage. The inspected PR #100 manifest requests plugin-react ^4.3.3 while its lockfile resolves 4.7.0. PR #60 requests plugin-react ^6.1.2 while its lockfile resolves 6.3.0. Preserve these manifest/lockfile distinctions; do not quote the resolved lock version as the declared manifest version.
+
+**Dependency decision:** retain PR #60's coherent Vite 8 / plugin-react 6 / Supabase SDK 2.119.2 baseline for the first integration candidate. Do not import PR #100's package.json or package-lock.json. Run a fresh exact-head `npm ci`, `npm audit`, typecheck, tests and production build before making a final dependency-security claim. If Vite 8 introduces compatibility regressions or unresolved advisories, evaluate a separately tested compatible alternative on this branch with an explicit migration review.
+
+## 3.6 Low-risk security hardening ported
+
+The candidate's `vite.config.ts` was updated to bind the development server to `127.0.0.1` by default, selectively porting the loopback-only safeguard present in the PR #99 lineage. This does not alter the dependency manifest or lockfile. LAN access, if needed for device testing, must be an explicit opt-in on a trusted private network.
+
 ## 4. Integration sequence
 
 1. **Baseline freeze:** record this branch's package.json, package-lock.json, tsconfig, Vite config, source tree and PR #60 exact-head checks.
