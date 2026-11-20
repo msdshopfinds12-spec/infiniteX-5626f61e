@@ -3,7 +3,7 @@ name: Phase 62 PostgreSQL contract verification
 on:
   pull_request:
     branches:
-      - feat/phase-51-durable-workflow-engine
+      - feat/phase-60-transactional-retry-orchestration
   workflow_dispatch:
 
 permissions:
