@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Activity, Bot, Cpu, GitBranch, LogOut, Play, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
+import { Activity, Bot, BriefcaseBusiness, Cpu, GitBranch, LogOut, Play, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -17,6 +17,8 @@ import WorkflowList from "./features/workflows/workflow-list";
 import type { WorkflowReadService } from "./features/workflows/workflow-read-service";
 import ProfileSummary from "./features/profile/profile-summary";
 import type { ProfileReadService } from "./features/profile/profile-read-service";
+import ProjectList from "./features/projects/project-list";
+import type { ProjectReadService } from "./features/projects/project-read-service";
 
 type AppProps = Readonly<{
   authState?: AuthState;
@@ -24,6 +26,7 @@ type AppProps = Readonly<{
   recoveryMode?: boolean;
   workflowReadService?: WorkflowReadService | null;
   profileReadService?: ProfileReadService | null;
+  projectReadService?: ProjectReadService | null;
 }>;
 
 export default function App({
@@ -32,6 +35,7 @@ export default function App({
   recoveryMode = false,
   workflowReadService = null,
   profileReadService = null,
+  projectReadService = null,
 }: AppProps) {
   const [view, setView] = useState<ViewKey>("overview");
   const [searchTerm, setSearchTerm] = useState("");
@@ -97,6 +101,7 @@ export default function App({
     view === "overview" ? "Overview" :
     view === "agents" ? "AI Agents" :
     view === "pipelines" ? "Pipelines" :
+    view === "projects" ? "Projects" :
     view === "logs" ? "Log Stream" :
     view === "security" ? "Security Posture" : "Settings";
 
@@ -163,6 +168,24 @@ export default function App({
                   <span className="badge badge-neutral">LOCAL DATA</span>
                 </div>
                 <AgentList searchTerm={query} />
+              </div>
+            )}
+            {view === "projects" && (
+              <div className="panel">
+                <div className="panel-head">
+                  <h2><BriefcaseBusiness size={18} /> Your Saved Projects</h2>
+                  <span className="badge badge-neutral">READ ONLY</span>
+                </div>
+                {authState.status === "authenticated" ? (
+                  <ProjectList
+                    service={projectReadService}
+                    userId={authState.userId}
+                    identityEpoch={authState.identityEpoch}
+                    searchTerm={query}
+                  />
+                ) : (
+                  <p className="muted" role="status">Sign in to view your saved projects.</p>
+                )}
               </div>
             )}
             {view === "pipelines" && (
