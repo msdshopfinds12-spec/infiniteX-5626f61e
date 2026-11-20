@@ -9,6 +9,7 @@ import {
   heartbeatStepAttempt,
   planNextStepAttempt,
   StepAttemptDomainError,
+  snapshotJsonOutput,
 } from "./attempt-ledger.ts";
 
 function queued(overrides: Record<string, unknown> = {}) {
@@ -359,4 +360,25 @@ test("failure outcome rejects unknown runtime failure classes and invalid outcom
     }),
     /outcome_invalid/,
   );
+});
+
+
+test("JSON snapshots accept repeated shared references while still rejecting cycles", () => {
+  const shared = { label: "shared-value" };
+  const input = { left: shared, right: shared };
+  const snapshot = snapshotJsonOutput(input);
+  assert.deepEqual(snapshot, {
+    left: { label: "shared-value" },
+    right: { label: "shared-value" },
+  });
+  assert.notEqual(
+    (snapshot as { left: object; right: object }).left,
+    (snapshot as { left: object; right: object }).right,
+  );
+  assert.equal(Object.isFrozen(snapshot), true);
+  assert.equal(Object.isFrozen((snapshot as { left: object }).left), true);
+
+  const cyclic: { self?: unknown } = {};
+  cyclic.self = cyclic;
+  assert.throws(() => snapshotJsonOutput(cyclic), /output_cycle_detected/);
 });
