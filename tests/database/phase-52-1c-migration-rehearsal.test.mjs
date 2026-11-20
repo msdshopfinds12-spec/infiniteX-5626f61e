@@ -18,18 +18,27 @@ test('unexpected SQL execution errors remain FAIL', () => {
 });
 
 test('candidate migration cannot be represented as part of recovered applied history', () => {
-  const manifest = { ledger_entry_count: 19, applied_migrations: [{ path: 'supabase/migrations/001_base.sql' }] };
-  const classification = { schemaVersion: 1, candidateMigrations: [{ path: 'supabase/migrations/002_candidate.sql' }] };
-  assert.deepEqual(validateProvenance({
-    manifest,
-    classification,
-    files: ['supabase/migrations/001_base.sql', 'supabase/migrations/002_candidate.sql'],
-  }), []);
-  classification.candidateMigrations[0].path = 'supabase/migrations/001_base.sql';
+  const appliedMigrations = Array.from({ length: 19 }, (_, index) => ({
+    path: 'supabase/migrations/' + String(index + 1).padStart(14, '0') + '_base.sql',
+  }));
+  const candidatePath = 'supabase/migrations/00000000000020_candidate.sql';
+  const manifest = { ledger_entry_count: 19, applied_migrations: appliedMigrations };
+  const classification = {
+    schemaVersion: 1,
+    candidateMigrations: [{
+      path: candidatePath,
+      classification: 'PROPOSED_NOT_APPLIED',
+      sourceStatus: 'NOT_VERIFIED_LIVE',
+      productionApproval: 'NOT_GRANTED',
+    }],
+  };
+  const files = [...appliedMigrations.map((entry) => entry.path), candidatePath];
+  assert.deepEqual(validateProvenance({ manifest, classification, files }), []);
+  classification.candidateMigrations[0].path = appliedMigrations[0].path;
   assert.ok(validateProvenance({
     manifest,
     classification,
-    files: ['supabase/migrations/001_base.sql'],
+    files: appliedMigrations.map((entry) => entry.path),
   }).some((error) => error.includes('overlaps')));
 });
 
