@@ -7,7 +7,7 @@ const sqlPath = new URL('../../supabase/contracts/capture-database-contract.read
 test('catalog capture is one read-only SELECT statement', async () => {
   const sql = await readFile(sqlPath, 'utf8');
   const trimmed = sql.trim();
-  assert.match(trimmed, /^--[^\\n]*\\nWITH\\nscope_schemas AS \\(/, 'catalog capture must begin with scoped schema CTE');
+  assert.match(trimmed, /^--[^\n]*\nWITH\nscope_schemas AS \(/, 'catalog capture must begin with scoped schema CTE');
   assert.ok(trimmed.endsWith(';'));
   assert.equal(sql.split('SELECT jsonb_build_object(').length - 1, 1);
   const mutationWords = new Set(['CREATE', 'ALTER', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'GRANT', 'REVOKE', 'CALL', 'DO']);
@@ -33,10 +33,10 @@ test('ACL aggregation uses explicit deterministic catalog fields', async () => {
   const sql = await readFile(sqlPath, 'utf8');
   assert.ok(sql.includes('ORDER BY a.grantee,a.privilege_type,a.is_grantable'), 'relation/schema ACLs must sort by explicit ACL fields');
   assert.ok(sql.includes('ORDER BY a.attnum,x.grantee,x.privilege_type,x.is_grantable'), 'column ACLs must sort by ordinal and explicit ACL fields');
-  assert.equal(/ORDER BY\\s+1\\s*,\\s*2\\s*,\\s*3/.test(sql), false, 'positional ACL ordering is forbidden');
+  assert.equal(/ORDER BY\s+1\s*,\s*2\s*,\s*3/.test(sql), false, 'positional ACL ordering is forbidden');
 });
 
 test('sequence and relation ACL default object types remain PostgreSQL char values', async () => {
   const sql = await readFile(sqlPath, 'utf8');
-  assert.ok(sql.includes("CASE WHEN t.relkind='S' THEN 'S'::\\\"char\\\" ELSE 'r'::\\\"char\\\" END"), 'acldefault CASE must be explicitly cast to PostgreSQL internal char');
+  assert.ok(sql.includes("CASE WHEN t.relkind='S' THEN 'S'::\"char\" ELSE 'r'::\"char\" END"), 'acldefault CASE must be explicitly cast to PostgreSQL internal char');
 });
