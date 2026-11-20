@@ -239,3 +239,25 @@ The read-only live schema baseline still governs feature implementation:
 The new regression tests cover ready, missing, and invalid auth bootstrap states; authenticated capability allow; unauthenticated denial; missing snapshot; subject mismatch; expired/invalid expiry; and missing capability.
 
 Exact-head CI verification completed at commit `cc8cee43a7d6e2da6ecc37ba505bfbad349ff875` (run [44701040596](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44701040596)): SUCCESS. Results: 109/109 unit/regression tests, 8/8 Edge Function CORS tests, 10/10 worker security tests, npm audit 0 vulnerabilities, lint PASS, and production build PASS (1,618 modules). A final documentation commit will require another exact-head run.
+
+
+### Phase 49 final verification after runtime payload hardening
+
+The permission snapshot validator was hardened to reject malformed runtime payloads without throwing. A first regression run correctly caught a test expectation mismatch: non-finite expiry is classified as a malformed/unavailable snapshot, not an expired valid snapshot. The assertion was corrected to match the explicit decision contract.
+
+Exact tested source commit: `0b93b80dad912c7dbb488363351f7251542939e6`.
+
+- [InfiniteX Quality Gates](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44701342559): SUCCESS.
+- [Dependency and production build verification](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44701342475): SUCCESS.
+- [SDK lockfile verification](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44701342587): SUCCESS.
+
+Measured results at this exact source commit:
+- `npm ci`: PASS — 43 packages installed; 44 audited.
+- `npm audit`: PASS — zero vulnerabilities.
+- `npm run lint`: PASS.
+- `npm test`: PASS — 110 passed, 0 failed.
+- Edge Function CORS tests: PASS — 8 passed.
+- Worker security tests: PASS — 10 passed.
+- `npm run build`: PASS — 1,618 modules transformed.
+
+A subsequent documentation-only update requires its own exact-head CI run. The build artifact from the verification workflow was stored in GitHub Actions only and was not deployed.
