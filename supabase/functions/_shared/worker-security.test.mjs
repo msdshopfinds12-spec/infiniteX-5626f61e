@@ -6,12 +6,15 @@ import {
   clampBatchLimit,
   createStepDeadline,
   executeWithinStepBudget,
+  executeWithRetry,
+  isRetryableStepError,
   isClaimedRunOwnedBy,
   isClaimedRunValid,
   isValidAttempt,
   isWorkflowOwnedBy,
   readJsonBodyLimited,
   validateStepTimeoutSeconds,
+  validateRetryLimit,
 } from "./worker-security.mjs";
 
 const validRun = { id: "run-a", workflow_id: "workflow-a", owner_id: "user-a", attempt: 1 };
@@ -118,4 +121,64 @@ test("rejects oversized action inputs before invoking the action", () => {
   let invoked = false;
   assert.throws(() => executeWithinStepBudget(() => { invoked = true; return {}; }, { text: "x".repeat(100) }, 2, 16), /payload_too_large/);
   assert.equal(invoked, false);
+});
+
+
+test("validates retry limits as additional attempts with a hard upper bound", () => {
+  assert.equal(validateRetryLimit(undefined), 0);
+  assert.equal(validateRetryLimit(null), 0);
+  assert.equal(validateRetryLimit(0), 0);
+  assert.equal(validateRetryLimit(5), 5);
+  for (const value of [-1, 1.5, 6, "2"]) {
+    assert.throws(() => validateRetryLimit(value), /step_retry_limit_invalid/);
+  }
+});
+
+test("retries only explicitly classified transient failures", async () => {
+  let calls = 0;
+  const delays = [];
+  const result = await executeWithRetry(async () => {
+    calls++;
+    if (calls < 3) throw Object.assign(new Error("temporary"), { code: "UPSTREAM_UNAVAILABLE" });
+    return "ok";
+  }, 2, {
+    baseDelayMs: 100,
+    maxDelayMs: 500,
+    random: () => 1,
+    sleep: async (ms) => { delays.push(ms); },
+  });
+  assert.equal(result, "ok");
+  assert.equal(calls, 3);
+  assert.deepEqual(delays, [100, 200]);
+});
+
+test("does not retry deterministic validation or unsupported-action failures", async () => {
+  let calls = 0;
+  await assert.rejects(() => executeWithRetry(async () => {
+    calls++;
+    throw new Error("unsupported_action_type");
+  }, 5, { sleep: async () => { throw new Error("sleep_must_not_run"); } }), /unsupported_action_type/);
+  assert.equal(calls, 1);
+  assert.equal(isRetryableStepError(new Error("invalid_input")), false);
+});
+
+test("stops after initial attempt plus configured retries", async () => {
+  let calls = 0;
+  await assert.rejects(() => executeWithRetry(async () => {
+    calls++;
+    throw Object.assign(new Error("temporary"), { code: "NETWORK_ERROR" });
+  }, 2, { random: () => 0, sleep: async () => {} }), /temporary/);
+  assert.equal(calls, 3);
+});
+
+test("rejects invalid retry configuration and never exceeds delay cap", async () => {
+  await assert.rejects(() => executeWithRetry(async () => "ok", 6), /step_retry_limit_invalid/);
+  const delays = [];
+  let calls = 0;
+  await executeWithRetry(async () => {
+    calls++;
+    if (calls <= 3) throw Object.assign(new Error("temporary"), { code: "RATE_LIMITED" });
+    return true;
+  }, 3, { baseDelayMs: 100, maxDelayMs: 150, random: () => 1, sleep: async (ms) => delays.push(ms) });
+  assert.deepEqual(delays, [100, 150, 150]);
 });
