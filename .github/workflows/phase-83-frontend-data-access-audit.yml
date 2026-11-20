@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - phase-83-frontend-data-access-audit
+      - phase-85-workflow-queue-ui
     paths:
       - ".github/workflows/phase-83-frontend-data-access-audit.yml"
       - "src/**"
       - "supabase/functions/ashaa-api-key-manager/**"
       - "tests/security/phase-83-frontend-data-access-contract.test.mjs"
       - "tests/security/phase-85-workflow-run-ui-contract.test.mjs"
+      - "tests/browser-secret-boundary.test.mjs"
       - "package.json"
       - "package-lock.json"
       - "tsconfig*.json"
@@ -20,6 +22,7 @@ on:
       - "supabase/functions/ashaa-api-key-manager/**"
       - "tests/security/phase-83-frontend-data-access-contract.test.mjs"
       - "tests/security/phase-85-workflow-run-ui-contract.test.mjs"
+      - "tests/browser-secret-boundary.test.mjs"
       - "package.json"
       - "package-lock.json"
       - "tsconfig*.json"
