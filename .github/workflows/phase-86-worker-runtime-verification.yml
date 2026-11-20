@@ -1,0 +1,59 @@
+name: InfiniteX Phase 86 Worker Runtime Verification
+
+on:
+  push:
+    branches:
+      - phase-86-worker-runtime-verification
+    paths:
+      - ".github/workflows/phase-86-worker-runtime-verification.yml"
+      - "supabase/functions/simula-workflow-worker/**"
+      - "supabase/functions/simula-workflow-cron-worker/**"
+      - "supabase/functions/_shared/**"
+      - "tests/workers/**"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    paths:
+      - ".github/workflows/phase-86-worker-runtime-verification.yml"
+      - "supabase/functions/simula-workflow-worker/**"
+      - "supabase/functions/simula-workflow-cron-worker/**"
+      - "supabase/functions/_shared/**"
+      - "tests/workers/**"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-phase-86-worker-runtime-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker-runtime:
+    name: Deno 2 / Authenticated and Cron Worker Runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Configure Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Configure Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.2.12
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run worker source/runtime parity contracts
+        run: npm run test:worker-runtime-parity
+      - name: Type-check authenticated and cron worker handlers
+        run: deno check --no-lock --node-modules-dir=auto supabase/functions/simula-workflow-worker/index.deno.ts
+      - name: Execute authenticated and cron worker handler tests
+        run: deno test --no-check --allow-env supabase/functions/simula-workflow-worker/index.deno.ts
+      - name: Run full Node regression suite
+        run: npm test
