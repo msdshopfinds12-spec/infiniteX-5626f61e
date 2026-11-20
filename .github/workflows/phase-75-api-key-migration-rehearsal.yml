@@ -1,0 +1,43 @@
+name: Phase 75 API-key Migration Rehearsal
+on:
+  push:
+    branches:
+      - phase-75/api-key-migration-rehearsal
+    paths:
+      - 'supabase/migrations/20261120120000_harden_platform_api_key_column_access.sql'
+      - 'tests/database/phase-75-api-key-permissions-rehearsal.sql'
+      - '.github/workflows/phase-75-api-key-migration-rehearsal.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  postgres-rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: infinitex_rehearsal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d infinitex_rehearsal"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGPASSWORD: test-only-password
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Confirm isolated PostgreSQL 17 fixture
+        run: psql --host localhost --username postgres --dbname infinitex_rehearsal --tuples-only --command "SHOW server_version;"
+      - name: Rehearse exact migration and verify effective grants
+        run: |
+          psql --host localhost --username postgres --dbname infinitex_rehearsal --set ON_ERROR_STOP=1 --file tests/database/phase-75-api-key-permissions-rehearsal.sql
