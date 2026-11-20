@@ -1,0 +1,102 @@
+name: InfiniteX Phase 79 Authenticated Session E2E
+
+on:
+  push:
+    branches:
+      - phase-79/authenticated-session-e2e
+    paths:
+      - ".github/workflows/phase-79-authenticated-session-e2e.yml"
+      - "src/**"
+      - "tests/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "vite.config.*"
+      - "supabase/functions/**"
+  pull_request:
+    branches:
+      - main
+      - eng/infinitex-unified-ui-backend-2026-11-20
+    paths:
+      - ".github/workflows/phase-79-authenticated-session-e2e.yml"
+      - "src/**"
+      - "tests/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "vite.config.*"
+      - "supabase/functions/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-phase-79-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authenticated-session-e2e:
+    name: Node 22 / Authenticated session and account switching
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configure Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install reproducibly from lockfile
+        run: npm ci
+
+      - name: TypeScript and project lint
+        run: npm run lint
+
+      - name: Unit and regression suites
+        run: npm test
+
+      - name: Authentication lifecycle regression
+        run: node --experimental-strip-types --test src/features/auth/*.test.ts
+
+      - name: Worker security regression suite
+        run: npx --yes deno@2.2.12 test --no-lock supabase/functions/_shared/worker-security.deno.ts
+
+      - name: Type-check authenticated workflow worker
+        run: npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-worker/index.ts
+
+      - name: Type-check cron workflow worker
+        run: npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
+
+      - name: Install ephemeral Playwright runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      - name: Production build
+        env:
+          # Synthetic browser-only configuration. Playwright intercepts all Auth requests.
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_phase79_synthetic_test_key
+        run: npm run build
+
+      - name: Start isolated production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4175 --strictPort > /tmp/infinitex-phase79-preview.log 2>&1 &
+          echo $! > /tmp/infinitex-phase79-preview.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4175/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/infinitex-phase79-preview.log
+          exit 1
+
+      - name: Chromium authenticated session and account-switch E2E
+        env:
+          INFINITEX_AUTH_BASE_URL: http://127.0.0.1:4175
+        run: node scripts/phase-79-authenticated-session-e2e.mjs

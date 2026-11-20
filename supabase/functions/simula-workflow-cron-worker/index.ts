@@ -63,7 +63,8 @@ export function createCronWorkerHandler(deps: CronWorkerDependencies) {
   });
   if (!authentication.ok) {
     if (authentication.status === 500) console.error("worker_environment_incomplete");
-    return respond(authentication.status, { ok: false, error: authentication.error });
+    const authStatus = typeof authentication.status === "number" ? authentication.status : 401;
+    return respond(authStatus, { ok: false, error: authentication.error });
   }
   const { admin } = authentication;
 
