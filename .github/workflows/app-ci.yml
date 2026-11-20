@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "src/**"
+      - "tests/**"
       - "public/**"
       - "index.html"
       - "package.json"
@@ -54,6 +55,9 @@ jobs:
 
       - name: TypeScript validation
         run: npm run lint
+
+      - name: Run application regression tests
+        run: npm run test:app
 
       - name: Build production assets
         run: npm run build
