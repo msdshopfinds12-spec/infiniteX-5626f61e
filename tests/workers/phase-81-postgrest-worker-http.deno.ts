@@ -21,6 +21,15 @@ const postgrestFetch: typeof fetch = (input, init) => {
   return fetch(target, init);
 };
 
+const createPostgrestClient = ((
+  projectUrl: string,
+  apiKey: string,
+  options?: Parameters<typeof createClient>[2],
+) => createClient(projectUrl, apiKey, {
+  ...(options ?? {}),
+  global: { ...(options?.global ?? {}), fetch: postgrestFetch },
+})) as typeof createClient;
+
 Deno.test({
   name: "Phase 81: real worker HTTP request persists through PostgREST into disposable PostgreSQL",
   sanitizeOps: false,
@@ -34,7 +43,7 @@ Deno.test({
     const anonKey = "phase81-disposable-anon-key";
 
     const handler = createAuthenticatedWorkerHandler({
-      createClient: createClient as never,
+      createClient: createPostgrestClient as never,
       env: {
         get(name: string) {
           if (name === "SUPABASE_URL") return url;
@@ -78,7 +87,7 @@ Deno.test({
       assert(response.status === 200, "worker HTTP endpoint must return 200; got " + response.status);
       assert(body.claimed === 1 && body.succeeded === 1 && body.failed === 0, "worker must claim and execute exactly one owner-A workflow; summary=" + JSON.stringify(body));
 
-      const admin = createClient(url, serviceJwt, {
+      const admin = createPostgrestClient(url, serviceJwt, {
         auth: { persistSession: false, autoRefreshToken: false },
         global: { headers: { Authorization: "Bearer " + serviceJwt }, fetch: postgrestFetch },
       });
