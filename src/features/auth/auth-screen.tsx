@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Eye, EyeOff, Fingerprint, LockKeyhole, Mail, ShieldCheck, Zap } from "lucide-react";
 import type { AuthActions, AuthActionResult } from "./auth-actions.ts";
-import { normalizeEmail, validateCredentials } from "./auth-actions.ts";
+import { normalizeEmail, validateEmail, validatePassword } from "./auth-actions.ts";
 
 type AuthScreenProps = Readonly<{
   actions: AuthActions;
@@ -28,7 +28,9 @@ export default function AuthScreen({ actions }: AuthScreenProps) {
     if (busy) return;
 
     const normalizedEmail = normalizeEmail(email);
-    const validationError = validateCredentials(normalizedEmail, password);
+    const emailError = validateEmail(normalizedEmail);
+    const passwordError = validatePassword(password, mode === "sign-up" ? 8 : 1);
+    const validationError = emailError ?? passwordError;
     if (validationError) {
       setFeedback({ kind: "error", message: validationError });
       return;
