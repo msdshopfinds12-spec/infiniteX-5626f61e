@@ -19,6 +19,7 @@ on:
       - "engineering/**"
     paths:
       - "src/**"
+      - "tests/**"
       - "public/**"
       - "index.html"
       - "package.json"
