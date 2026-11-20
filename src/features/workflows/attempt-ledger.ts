@@ -143,7 +143,8 @@ export function snapshotJsonOutput(value: unknown): JsonValue {
       }
       const ownKeys = Reflect.ownKeys(current);
       if (ownKeys.some((key) => key !== "length" &&
-          (typeof key !== "string" || !/^(0|[1-9][0-9]*)$/.test(key)))) {
+          (typeof key !== "string" || !/^(0|[1-9][0-9]*)$/.test(key) ||
+            !Number.isSafeInteger(Number(key)) || Number(key) >= current.length))) {
         throw new StepAttemptDomainError("output_array_property_invalid");
       }
       const copy: JsonValue[] = [];
@@ -171,6 +172,7 @@ export function snapshotJsonOutput(value: unknown): JsonValue {
     }
     const copy: { [key: string]: JsonValue } = {};
     for (const key of keys as string[]) {
+      if (key.length > MAX_OUTPUT_CHARS) throw new StepAttemptDomainError("output_size_limit_exceeded");
       const descriptor = Object.getOwnPropertyDescriptor(current, key);
       if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
         throw new StepAttemptDomainError("output_accessor_invalid");
@@ -196,6 +198,10 @@ export function snapshotJsonOutput(value: unknown): JsonValue {
     throw new StepAttemptDomainError("output_size_limit_exceeded");
   }
   return snapshot;
+}
+
+function freezeAttempt(attempt: StepAttempt): StepAttempt {
+  return Object.freeze(attempt);
 }
 
 function assertActiveLease(attempt: StepAttempt, input: LeaseFenceInput): void {
@@ -237,7 +243,7 @@ export function createQueuedStepAttempt(input: CreateQueuedAttemptInput): StepAt
   const leaseGeneration = input.leaseGeneration ?? 0;
   requireSafeInteger(leaseGeneration, "lease_generation", 0);
 
-  return {
+  return freezeAttempt({
     id: input.id,
     runId: input.runId,
     stepId: input.stepId,
@@ -255,7 +261,7 @@ export function createQueuedStepAttempt(input: CreateQueuedAttemptInput): StepAt
     failureKind: null,
     errorCode: null,
     output: null,
-  };
+  });
 }
 
 /**
@@ -281,14 +287,14 @@ export function claimStepAttempt(
   if (!Number.isSafeInteger(leaseExpiresAtMs)) {
     throw new StepAttemptDomainError("lease_expiry_overflow");
   }
-  return {
+  return freezeAttempt({
     ...attempt,
     status: "running",
     leaseGeneration: input.nextLeaseGeneration,
     startedAtMs: input.nowMs,
     heartbeatAtMs: input.nowMs,
     leaseExpiresAtMs,
-  };
+  });
 }
 
 /** Extends only the currently active lease; heartbeat time cannot move backwards. */
@@ -306,7 +312,7 @@ export function heartbeatStepAttempt(
   if (!Number.isSafeInteger(leaseExpiresAtMs)) {
     throw new StepAttemptDomainError("lease_expiry_overflow");
   }
-  return { ...attempt, heartbeatAtMs: input.nowMs, leaseExpiresAtMs };
+  return freezeAttempt({ ...attempt, heartbeatAtMs: input.nowMs, leaseExpiresAtMs });
 }
 
 export type FinishAttemptInput = LeaseFenceInput & Readonly<{
@@ -339,7 +345,7 @@ export function finishStepAttempt(
   const output = input.outcome === "succeeded"
     ? snapshotJsonOutput(input.output ?? null)
     : null;
-  return {
+  return freezeAttempt({
     ...attempt,
     status: input.outcome,
     finishedAtMs: input.nowMs,
@@ -347,7 +353,7 @@ export function finishStepAttempt(
     failureKind: input.outcome === "failed" ? input.failureKind! : null,
     errorCode: input.outcome === "failed" ? errorCode : null,
     output,
-  };
+  });
 }
 
 /** Owner authorization and completion/cancellation arbitration belong to persistence/API. */
@@ -370,7 +376,7 @@ export function cancelStepAttempt(
   if (input.nowMs < lastLifecycleTime) {
     throw new StepAttemptDomainError("timestamp_regression");
   }
-  return {
+  return freezeAttempt({
     ...attempt,
     status: "cancelled",
     finishedAtMs: input.nowMs,
@@ -378,7 +384,7 @@ export function cancelStepAttempt(
     failureKind: "cancelled",
     errorCode: "cancelled",
     output: null,
-  };
+  });
 }
 
 export type RetryPlan =
