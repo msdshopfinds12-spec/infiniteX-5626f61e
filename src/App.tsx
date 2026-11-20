@@ -124,8 +124,8 @@ export default function App({
             <div className="demo-notice" role="status">
               <strong>{authState.status === "authenticated" && (workflowReadService || projectReadService || profileReadService) ? "READ-ONLY INTEGRATION" : "DEMO MODE"}</strong>
               <span>
-                {authState.status === "authenticated" && workflowReadService
-                  ? "Workflows, projects, and profile use authenticated read-only Supabase queries protected by database RLS. Project content is not loaded; overview metrics, agents, sample logs, and security posture remain demo or unverified."
+                {authState.status === "authenticated" && (workflowReadService || projectReadService || profileReadService)
+                  ? "Available workflow, project, and profile services use authenticated read-only Supabase queries protected by database RLS. Project content is not loaded; overview metrics, agents, sample logs, and security posture remain demo or unverified."
                   : "Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified."}
               </span>
             </div>
