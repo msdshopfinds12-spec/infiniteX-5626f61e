@@ -116,6 +116,17 @@ test("request input rejects symbol keys", () => {
   );
 });
 
+test("request input preserves __proto__ as data without changing object prototypes", () => {
+  const input = JSON.parse('{"__proto__":{"polluted":true},"safe":true}') as Json;
+  const request = createWorkflowRunRequest("workflow-123", input);
+  const cloned = request.input as Record<string, Json>;
+
+  assert.equal(Object.getPrototypeOf(cloned), Object.prototype);
+  assert.equal(Object.hasOwn(cloned, "__proto__"), true);
+  assert.deepEqual(cloned.__proto__, { polluted: true });
+  assert.equal(({} as { polluted?: boolean }).polluted, undefined);
+});
+
 test("request input rejects sparse arrays and array accessors", () => {
   const sparse = new Array(2);
   const accessorArray: unknown[] = [];
