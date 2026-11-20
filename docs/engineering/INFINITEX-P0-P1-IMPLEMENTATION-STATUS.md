@@ -23,19 +23,21 @@
 
 ## Verification evidence
 
-Exact PR head SHA: `01baa4b4bf8c863918014ed8abe5c1227934d434`
+Last successful full CI head SHA: `9a25e1b044713c3cf478e569f2c6fb740b311d20`
 
-GitHub Actions run #27: [44681599314](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44681599314)
+GitHub Actions run #28: [44681684392](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44681684392)
 
-- Node.js: v22.23.4; npm: 10.9.9.
+- Node.js: v22.23.5; npm: 10.9.9.
 - `npm ci`: PASS.
 - `npm audit`: PASS — 0 vulnerabilities reported.
-- `npm run lint`: PASS after excluding Node-run `.test.ts` modules from the browser TypeScript project.
+- `npm run lint`: PASS.
 - `npm test`: PASS — 58 tests, 58 passed, 0 failed.
 - `npm run build`: PASS — Vite production bundle generated.
 - Build artifact uploaded to GitHub Actions artifact storage; it was not deployed.
 
-A first CI run (#26) exposed that Node test modules were being included in the browser TypeScript project without Node type declarations. The fix was to exclude `src/**/*.test.ts` from the application tsconfig while leaving those tests under the Node test runner. The subsequent exact-head run #27 passed all workflow steps.
+A first CI run exposed that Node test modules were included in the browser TypeScript project without Node type declarations. The application tsconfig now excludes `src/**/*.test.ts`, leaving those tests under the Node test runner.
+
+The latest branch also contains a documentation refresh and a formatting-only cleanup to keep the tsconfig diff minimal. Those later commits have not yet been represented by the successful run above; a fresh exact-head CI run is required before treating the current branch head as verified.
 
 ## P1 integration blocker
 
