@@ -1,6 +1,6 @@
 # Phase 51 — Worker State Machine and Test Matrix
 
-**Status:** Test specification; tests not yet implemented or executed.
+**Status:** Partial implementation. Pure retry-policy unit tests are implemented and covered by passing CI on commit 684d174a8806411e50268066753542b46514c581. Database/worker integration, concurrency, and recovery tests remain unimplemented.
 
 ## 1. Deterministic retry contract
 
