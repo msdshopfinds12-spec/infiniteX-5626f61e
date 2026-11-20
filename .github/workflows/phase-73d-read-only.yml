@@ -1,0 +1,27 @@
+name: Phase 73D Read-only Audit Contract
+on:
+  push:
+    branches:
+      - phase-73d/live-schema-runtime-verification
+    paths:
+      - 'docs/database/PHASE-73D-LIVE-SCHEMA-RUNTIME-VERIFICATION.md'
+      - 'supabase/diagnostics/phase-73d-read-only-catalog-audit.sql'
+      - 'scripts/verify-phase-73d-read-only.mjs'
+      - 'package.json'
+      - '.github/workflows/phase-73d-read-only.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  read-only-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify audit SQL is read-only and report is complete
+        run: npm run verify:phase-73d
