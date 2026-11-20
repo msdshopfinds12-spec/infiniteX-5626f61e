@@ -14,6 +14,7 @@
     "test:edge-function-security": "npm run test:edge-function-cors && npm run test:edge-worker-security"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.119.2",
     "@vercel/analytics": "^2.0.1",
     "lucide-react": "^0.456.0",
     "react": "^18.3.1",
