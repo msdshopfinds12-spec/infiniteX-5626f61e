@@ -141,10 +141,18 @@ const STEP_TRANSITIONS: Readonly<Record<StepSummaryStatus, readonly StepSummaryS
   skipped: [],
 };
 
+function isStepSummaryStatus(value: unknown): value is StepSummaryStatus {
+  return typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(STEP_TRANSITIONS, value);
+}
+
 export function canTransitionStepStatus(
   current: StepSummaryStatus,
   next: StepSummaryStatus,
 ): boolean {
+  // Persisted values and API payloads are runtime input, even when callers
+  // provide compile-time TypeScript types. Unknown states must fail closed.
+  if (!isStepSummaryStatus(current) || !isStepSummaryStatus(next)) return false;
   return STEP_TRANSITIONS[current].includes(next);
 }
 

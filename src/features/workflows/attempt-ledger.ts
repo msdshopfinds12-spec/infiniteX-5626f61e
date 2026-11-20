@@ -113,10 +113,12 @@ export function canonicalStepAttemptIdempotencyKey(
 /**
  * Copies JSON-compatible output into a detached, deeply frozen snapshot.
  * Rejects executable values, accessors, cycles, sparse arrays, exotic prototypes,
- * non-finite numbers, excessive nesting, and oversized payloads.
+ * non-finite numbers, excessive nesting, and oversized payloads. Repeated
+ * references are copied independently; only references on the active traversal
+ * path are cycles.
  */
 export function snapshotJsonOutput(value: unknown): JsonValue {
-  const seen = new WeakSet<object>();
+  const active = new WeakSet<object>();
   let nodes = 0;
 
   const visit = (current: unknown, depth: number): JsonValue => {
@@ -138,8 +140,8 @@ export function snapshotJsonOutput(value: unknown): JsonValue {
     }
 
     const objectValue = current as object;
-    if (seen.has(objectValue)) throw new StepAttemptDomainError("output_cycle_detected");
-    seen.add(objectValue);
+    if (active.has(objectValue)) throw new StepAttemptDomainError("output_cycle_detected");
+    active.add(objectValue);
 
     if (Array.isArray(current)) {
       if (Object.getPrototypeOf(current) !== Array.prototype) {
@@ -162,6 +164,7 @@ export function snapshotJsonOutput(value: unknown): JsonValue {
         }
         copy.push(visit(descriptor.value, depth + 1));
       }
+      active.delete(objectValue);
       return Object.freeze(copy);
     }
 
@@ -188,6 +191,7 @@ export function snapshotJsonOutput(value: unknown): JsonValue {
         writable: false,
       });
     }
+    active.delete(objectValue);
     return Object.freeze(copy);
   };
 
@@ -211,12 +215,21 @@ function freezeAttempt(attempt: StepAttempt): StepAttempt {
 function assertActiveLease(attempt: StepAttempt, input: LeaseFenceInput): void {
   requireSafeInteger(input.nowMs, "now_ms", 0);
   requireSafeInteger(input.expectedLeaseGeneration, "lease_generation", 1);
+  const startedAtMs = attempt.startedAtMs;
+  const heartbeatAtMs = attempt.heartbeatAtMs;
+  const leaseExpiresAtMs = attempt.leaseExpiresAtMs;
   if (attempt.status !== "running" ||
       attempt.leaseGeneration !== input.expectedLeaseGeneration ||
-      attempt.startedAtMs === null ||
-      attempt.heartbeatAtMs === null ||
-      attempt.leaseExpiresAtMs === null ||
-      input.nowMs >= attempt.leaseExpiresAtMs) {
+      startedAtMs === null ||
+      heartbeatAtMs === null ||
+      leaseExpiresAtMs === null ||
+      !Number.isSafeInteger(startedAtMs) ||
+      !Number.isSafeInteger(heartbeatAtMs) ||
+      !Number.isSafeInteger(leaseExpiresAtMs) ||
+      startedAtMs < 0 ||
+      heartbeatAtMs < startedAtMs ||
+      leaseExpiresAtMs <= heartbeatAtMs ||
+      input.nowMs >= leaseExpiresAtMs) {
     throw new StepAttemptDomainError("stale_or_expired_lease");
   }
 }

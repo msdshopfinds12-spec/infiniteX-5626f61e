@@ -147,6 +147,8 @@ test("invalid attempt, retry, clock, delay and jitter values fail closed", () =>
     { baseDelayMs: 2_000, maxDelayMs: 1_000 },
     { jitterRatio: -0.1 },
     { jitterRatio: 1.1 },
+    { random: "not-a-function" },
+    { failureKind: "unknown" },
     { random: () => Number.NaN },
     { random: () => 1.1 },
   ]) {
@@ -172,6 +174,8 @@ test("step summary state machine allows only documented transitions", () => {
   assert.equal(canTransitionStepStatus("succeeded", "queued"), false);
   assert.equal(canTransitionStepStatus("skipped", "running"), false);
   assert.equal(canTransitionStepStatus("queued", "succeeded"), false);
+  assert.equal(canTransitionStepStatus("unknown" as StepSummaryStatus, "running"), false);
+  assert.equal(canTransitionStepStatus("queued", "unknown" as StepSummaryStatus), false);
 
   assert.throws(
     () => assertStepStatusTransition("succeeded", "queued"),

@@ -9,6 +9,7 @@ import {
   heartbeatStepAttempt,
   planNextStepAttempt,
   StepAttemptDomainError,
+  snapshotJsonOutput,
 } from "./attempt-ledger.ts";
 
 function queued(overrides: Record<string, unknown> = {}) {
@@ -97,6 +98,32 @@ test("stale generation and expired lease cannot heartbeat or complete", () => {
     () => finishStepAttempt(active, { nowMs: 1_500, expectedLeaseGeneration: 1, outcome: "succeeded" }),
     /stale_or_expired_lease/,
   );
+});
+
+test("malformed persisted lease timestamps fail closed for heartbeat and completion", () => {
+  const active = claimed();
+  const malformedAttempts = [
+    { ...active, leaseExpiresAtMs: Number.NaN },
+    { ...active, leaseExpiresAtMs: Number.POSITIVE_INFINITY },
+    { ...active, startedAtMs: Number.NaN },
+    { ...active, heartbeatAtMs: active.startedAtMs! - 1 },
+    { ...active, leaseExpiresAtMs: active.heartbeatAtMs },
+  ] as StepAttempt[];
+
+  for (const malformed of malformedAttempts) {
+    assert.throws(
+      () => heartbeatStepAttempt(malformed, {
+        nowMs: 1_100, expectedLeaseGeneration: 1, leaseDurationMs: 500,
+      }),
+      /stale_or_expired_lease/,
+    );
+    assert.throws(
+      () => finishStepAttempt(malformed, {
+        nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "succeeded",
+      }),
+      /stale_or_expired_lease/,
+    );
+  }
 });
 
 test("successful completion stores a detached deeply immutable JSON snapshot", () => {
@@ -359,4 +386,25 @@ test("failure outcome rejects unknown runtime failure classes and invalid outcom
     }),
     /outcome_invalid/,
   );
+});
+
+
+test("JSON snapshots accept repeated shared references while still rejecting cycles", () => {
+  const shared = { label: "shared-value" };
+  const input = { left: shared, right: shared };
+  const snapshot = snapshotJsonOutput(input);
+  assert.deepEqual(snapshot, {
+    left: { label: "shared-value" },
+    right: { label: "shared-value" },
+  });
+  assert.notEqual(
+    (snapshot as { left: object; right: object }).left,
+    (snapshot as { left: object; right: object }).right,
+  );
+  assert.equal(Object.isFrozen(snapshot), true);
+  assert.equal(Object.isFrozen((snapshot as { left: object }).left), true);
+
+  const cyclic: { self?: unknown } = {};
+  cyclic.self = cyclic;
+  assert.throws(() => snapshotJsonOutput(cyclic), /output_cycle_detected/);
 });
