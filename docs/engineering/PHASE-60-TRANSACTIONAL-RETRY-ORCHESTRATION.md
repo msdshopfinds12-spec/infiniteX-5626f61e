@@ -21,7 +21,7 @@ For a running attempt, one adapter transaction must:
 6. Insert a uniquely identified outbox event.
 7. Commit all operations together or roll all of them back.
 
-For exhausted or non-retryable failures, persist the terminal failed attempt and update the projection to failed, without creating a next attempt or outbox event.
+Cancellation is a separate authorized terminal transition and must use the canonical cancellation operation; it must never be represented as a failed retry attempt. For exhausted or non-retryable failures, persist the terminal failed attempt and update the projection to failed, without creating a next attempt or outbox event.
 
 A replay after a committed retry looks up the next attempt by its database-enforced scoped idempotency key and returns it rather than creating another execution.
 
@@ -52,7 +52,7 @@ The deterministic event ID is \`workflow-step-attempt-due:v1:<attempt-id>\`. Dat
 
 The Node test file uses an in-memory transactional fake to verify orchestration and rollback behavior. It is not evidence of PostgreSQL locking, isolation, durable commits, concurrent worker exclusion, RLS, grants, or production schema compatibility.
 
-Coverage includes retry limit zero, transient retry, permanent/cancelled failures, stale fencing generation, rollback on outbox failure, duplicate-delivery replay, owner mismatch and stable outbox identity.
+Coverage includes retry limit zero, transient retry, permanent failures, cancellation-path rejection, stale fencing generation, rollback on outbox failure, duplicate-delivery replay, owner mismatch and stable outbox identity.
 
 ## 6. Explicit non-claims and release gates
 
