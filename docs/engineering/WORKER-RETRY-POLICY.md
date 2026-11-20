@@ -7,7 +7,7 @@
 ## Contract
 
 - `retry_limit` means the number of additional attempts after the initial action attempt.
-- The runtime accepts integer values from 0 through 5. Missing/null values default to 0. Invalid values fail closed.
+- The runtime accepts integer values from 0 through 10. Missing/null values default to 0. Invalid values fail closed.
 - Retries are allowed only for explicitly tagged errors with one of these codes:
   - `NETWORK_ERROR`
   - `UPSTREAM_TIMEOUT`
