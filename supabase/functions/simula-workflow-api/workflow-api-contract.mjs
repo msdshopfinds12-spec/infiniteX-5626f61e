@@ -10,10 +10,7 @@ function inspectJson(value, depth, budget) {
   budget.nodes += 1;
   if (budget.nodes > WORKFLOW_API_MAX_JSON_NODES) return "input_too_complex";
   if (depth > WORKFLOW_API_MAX_JSON_DEPTH) return "input_too_deep";
-
-  if (value === null || typeof value === "string" || typeof value === "boolean") {
-    return null;
-  }
+  if (value === null || typeof value === "string" || typeof value === "boolean") return null;
   if (typeof value === "number") return Number.isFinite(value) ? null : "input_invalid_number";
   if (Array.isArray(value)) {
     if (value.length > 100) return "input_array_too_large";
@@ -24,7 +21,6 @@ function inspectJson(value, depth, budget) {
     return null;
   }
   if (!isRecord(value)) return "input_must_be_json";
-
   const keys = Object.keys(value);
   if (keys.length > 100) return "input_object_too_large";
   for (const key of keys) {
@@ -41,28 +37,20 @@ export function validateIdempotencyKey(value) {
   return typeof value === "string" && IDEMPOTENCY_KEY_PATTERN.test(value);
 }
 
-/**
- * Validates the browser-facing enqueue DTO only.
- * Ownership and lifecycle fields are intentionally not accepted from clients.
- */
+/** Validate only browser-owned business fields; ownership and lifecycle are server-derived. */
 export function validateEnqueueWorkflowRequest(value) {
   if (!isRecord(value)) return { ok: false, code: "invalid_request_body" };
-
-  const keys = Object.keys(value);
-  if (keys.some((key) => key !== "workflow_id" && key !== "input")) {
+  if (Object.keys(value).some((key) => key !== "workflow_id" && key !== "input")) {
     return { ok: false, code: "unknown_or_forbidden_field" };
   }
-
   if (typeof value.workflow_id !== "string" ||
       value.workflow_id.trim().length === 0 ||
       value.workflow_id.length > 128) {
     return { ok: false, code: "invalid_workflow_id" };
   }
-
   const input = value.input === undefined ? {} : value.input;
   const inputError = inspectJson(input, 0, { nodes: 0 });
   if (inputError) return { ok: false, code: inputError };
-
   let serialized;
   try {
     serialized = JSON.stringify(input);
@@ -73,25 +61,23 @@ export function validateEnqueueWorkflowRequest(value) {
   if (new TextEncoder().encode(serialized).byteLength > WORKFLOW_API_MAX_BODY_BYTES) {
     return { ok: false, code: "input_too_large" };
   }
-
   return {
     ok: true,
-    value: Object.freeze({
-      workflow_id: value.workflow_id.trim(),
-      input,
-    }),
+    value: Object.freeze({ workflow_id: value.workflow_id.trim(), input }),
   };
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/** Parse only the public API routes; reject extra path segments and malformed IDs. */
+/** Strictly parse collection, status, and queued-cancel routes. */
 export function parseWorkflowApiRoute(pathname) {
   if (typeof pathname !== "string") return null;
-  const path = pathname.replace(/\\/+$/, "") || "/";
-  const match = path.match(/(?:^|\\/)runs(?:\\/([0-9a-f-]+))?$/i);
+  const path = pathname.replace(/\/+$/, "") || "/";
+  const match = path.match(/(?:^|\/)runs(?:\/([0-9a-f-]+)(?:\/(cancel))?)?$/i);
   if (!match) return null;
   if (!match[1]) return { resource: "runs" };
   if (!UUID_PATTERN.test(match[1])) return null;
-  return { resource: "run", runId: match[1].toLowerCase() };
+  return match[2]
+    ? { resource: "cancel", runId: match[1].toLowerCase() }
+    : { resource: "run", runId: match[1].toLowerCase() };
 }
