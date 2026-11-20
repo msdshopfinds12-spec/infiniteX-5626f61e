@@ -5,6 +5,7 @@ import {
   WORKFLOW_API_MAX_BODY_BYTES,
   validateEnqueueWorkflowRequest,
   validateIdempotencyKey,
+  parseBearerToken,
   toWorkflowRunStatusDto,
   parseWorkflowApiRoute,
 } from "./workflow-api-contract.mjs";
@@ -60,6 +61,14 @@ test("enforces serialized UTF-8 input byte budget", () => {
   const tooLarge = { text: "x".repeat(WORKFLOW_API_MAX_BODY_BYTES) };
   assert.equal(validateEnqueueWorkflowRequest({ workflow_id: WORKFLOW_ID, input: tooLarge }).code, "input_too_large");
   assert.equal(validateEnqueueWorkflowRequest({ workflow_id: WORKFLOW_ID, input: { text: "é" } }).ok, true);
+});
+
+test("parses bearer tokens and rejects malformed authorization headers", () => {
+  assert.equal(parseBearerToken("Bearer eyJhbGciOiJub25lIn0.payload.sig"), "eyJhbGciOiJub25lIn0.payload.sig");
+  assert.equal(parseBearerToken("bearer token-value"), "token-value");
+  for (const value of [null, "", "token-value", "Basic token-value", "Bearer ", "Bearer a b"]) {
+    assert.equal(parseBearerToken(value), null);
+  }
 });
 
 test("accepts only bounded opaque idempotency keys", () => {
