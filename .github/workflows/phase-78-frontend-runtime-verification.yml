@@ -65,10 +65,10 @@ jobs:
         run: npm test
 
       - name: Auth lifecycle regression
-        run: node --experimental-strip-types --test src/features/auth
+        run: node --experimental-strip-types --test src/features/auth/*.test.ts
 
       - name: Authenticated read-service regression
-        run: node --experimental-strip-types --test src/features/profile src/features/projects src/features/workflows
+        run: node --experimental-strip-types --test src/features/profile/*.test.ts src/features/projects/*.test.ts src/features/workflows/*.test.ts
 
       - name: Browser secret boundary regression
         run: node --test tests/browser-secret-boundary.test.mjs
