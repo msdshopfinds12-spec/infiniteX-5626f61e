@@ -1,0 +1,116 @@
+name: Phase 77 Worker PostgreSQL Integration
+on:
+  push:
+    branches:
+      - phase-77/worker-postgres-integration
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/functions/simula-workflow-worker/**'
+      - 'supabase/functions/simula-workflow-cron-worker/**'
+      - 'supabase/functions/_shared/**'
+      - 'tests/workers/**'
+      - 'tests/database/phase-52-1*'
+      - 'tests/database/phase-75-api-key-permissions-rehearsal.sql'
+      - 'scripts/rehearse-migration-chain.mjs'
+      - 'scripts/test-workflow-claim-concurrency.sh'
+      - 'scripts/test-workflow-claim-stress.sh'
+      - 'scripts/test-phase-77-worker-state-machine.sh'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/phase-77-worker-postgres-integration.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: infinitex-phase-77-worker-postgres-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  worker-postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+      - name: Verify worker source contracts
+        run: |
+          npm run test:edge-worker-security
+          npm run test:edge-function-cors
+          npm run test:worker-http-boundary
+          npm run test:worker-runtime-parity
+      - name: Start isolated Supabase PostgreSQL 17 container
+        shell: bash
+        run: |
+          docker run -d --name infinitex-phase77-postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_USER=supabase_admin \
+            -e POSTGRES_DB=infinitex_rehearsal \
+            -p 5432:5432 \
+            supabase/postgres:17.6.1.136 \
+            postgres -c config_file=/etc/postgresql/postgresql.conf \
+              -c shared_preload_libraries=pg_stat_statements,pgaudit,plpgsql,plpgsql_check,pg_cron,pg_net,pgsodium,auto_explain,pg_tle,plan_filter,supabase_vault \
+              -c pgsodium.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
+              -c vault.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
+              -c cron.database_name=infinitex_rehearsal \
+              -c cron.launch_active_jobs=off
+          for attempt in $(seq 1 60); do
+            if pg_isready -h 127.0.0.1 -p 5432 -U supabase_admin -d infinitex_rehearsal; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs infinitex-phase77-postgres
+          exit 1
+      - name: Replay recovered migrations and separate candidate in disposable PostgreSQL
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: node scripts/rehearse-migration-chain.mjs
+      - name: Verify SKIP LOCKED, stale lease recovery and generation fencing
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: bash scripts/test-workflow-claim-concurrency.sh
+      - name: Stress 16 parallel claimers and duplicate step inserts
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: bash scripts/test-workflow-claim-stress.sh
+      - name: Verify stale worker cannot overwrite newer run or step generation
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: bash scripts/test-phase-77-worker-state-machine.sh
+      - name: Run tenant and API-key PostgreSQL security regression suite
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_security_test
+        run: |
+          createdb --maintenance-db=postgres infinitex_security_test
+          psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-52-1b-postgres-security.sql
+      - name: Collect disposable PostgreSQL logs
+        if: always()
+        run: docker logs infinitex-phase77-postgres 2>&1 | tail -n 200 || true
+      - name: Remove disposable PostgreSQL container
+        if: always()
+        run: docker rm -f infinitex-phase77-postgres || true
