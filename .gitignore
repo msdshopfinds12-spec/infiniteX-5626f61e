@@ -1,5 +1,10 @@
 node_modules/
-.env
+
+# Local environment files (Vite loads .env.local and mode-specific variants).
+.env*
+!.env.example
+
+# Vite temporary files
 vite.config.js.timestamp-*.mjs
 vite.config.mjs.timestamp-*.mjs
 vite.config.cjs.timestamp-*.mjs
