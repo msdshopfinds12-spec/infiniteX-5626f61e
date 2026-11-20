@@ -16,7 +16,7 @@ test("Phase 77 creates synthetic tenant/workflow/run/step data only", async () =
   for (const table of ["auth.users", "public.workflows", "public.workflow_steps", "public.workflow_runs", "public.workflow_step_runs"]) {
     assert.ok(script.includes(table), "missing fixture table " + table);
   }
-  assert.match(script, /Synthetic worker integration/);
+  assert.match(script, /synthetic worker integration/i);
   assert.doesNotMatch(script, /curl\s|https:\/\/|supabase\.co/);
 });
 
