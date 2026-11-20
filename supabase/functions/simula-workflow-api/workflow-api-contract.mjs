@@ -1,7 +1,7 @@
 export const WORKFLOW_API_MAX_BODY_BYTES = 16 * 1024;
 export const WORKFLOW_API_MAX_JSON_DEPTH = 12;
 export const WORKFLOW_API_MAX_JSON_NODES = 1_000;
-export const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;
+export const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;\nconst UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const isRecord = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
