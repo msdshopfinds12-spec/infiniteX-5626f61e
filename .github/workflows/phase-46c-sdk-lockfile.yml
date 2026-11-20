@@ -1,6 +1,12 @@
 name: InfiniteX Phase 46C SDK lockfile candidate
 
 on:
+  push:
+    branches: [eng/infinitex-p0-p1-auth-2026-11-20]
+    paths:
+      - ".github/workflows/phase-46c-sdk-lockfile.yml"
+      - "package.json"
+      - "package-lock.json"
   pull_request:
     branches: [main]
     paths:
