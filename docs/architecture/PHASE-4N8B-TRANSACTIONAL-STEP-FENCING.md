@@ -83,3 +83,20 @@ therefore, a plain PostgreSQL service container cannot execute that Deno
 The current PR does not yet meet either tier. CI provisioning remains BLOCKED,
 not passed. The next implementation must first establish the authoritative schema
 source and migration order, then add a deterministic fixture lifecycle and cleanup.
+
+
+## CI execution policy (isolated fixture gate)
+
+The workflow now separates source/build verification from database integration
+execution. The integration test runs only when the repository variable
+`PHASE_4N8B_FIXTURE_READY` is explicitly set to `true`. At that point, all
+`PHASE_4N8B_*` fixture values and the Supabase URL/service-role key must be
+provided through dedicated GitHub Actions secrets. Missing values cause the
+Deno test to fail closed.
+
+When the readiness variable is absent or false, CI records **NOT RUN** in the
+GitHub Actions step summary. A successful source/build job in that mode is not
+evidence of database concurrency correctness. The configured endpoint must be a
+dedicated disposable test project, never the production Supabase project.
+Fixture provisioning, teardown automation, and proof that the endpoint is isolated
+remain release gates.
