@@ -190,7 +190,7 @@ INSERT INTO workflow_step_attempts(
    'failed', clock_timestamp() - interval '2 seconds', clock_timestamp(), 'transient'),
   ('attempt-conflict-fp-2', 'owner-a', 'run-conflict-fp', 'step-g', 2,
    'step-attempt:v1:run-conflict-fp:step-g:2', 'fingerprint-different',
-   'queued', clock_timestamp());
+   'queued', clock_timestamp(), NULL, NULL);
 DO $phase62$
 BEGIN
   BEGIN
@@ -215,7 +215,7 @@ INSERT INTO workflow_step_attempts(
    'failed', clock_timestamp() - interval '2 seconds', clock_timestamp(), 'transient'),
   ('attempt-conflict-run-2', 'owner-a', 'different-run', 'step-h', 2,
    'step-attempt:v1:run-conflict-run:step-h:2', 'fingerprint-h',
-   'queued', clock_timestamp());
+   'queued', clock_timestamp(), NULL, NULL);
 DO $phase62$
 BEGIN
   BEGIN
