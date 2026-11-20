@@ -4,10 +4,12 @@ import { corsHeadersForRequest } from "../_shared/cors.ts";
 import {
   clampBatchLimit,
   executeWithinStepBudget,
+  executeWithRetry,
   isClaimedRunOwnedBy,
   isWorkflowOwnedBy,
   readJsonBodyLimited,
   validateStepTimeoutSeconds,
+  validateRetryLimit,
 } from "../_shared/worker-security.mjs";
 
 type JsonRecord = Record<string, unknown>;
@@ -255,11 +257,15 @@ Deno.serve(async (req: Request) => {
         let actionError = "";
         try {
           const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
-          actionOutput = executeWithinStepBudget(
-            () => executeSafeAction(step.action_type, payload, config),
-            { input: payload, config },
-            timeoutSeconds,
-            64 * 1024,
+          const retryLimit = validateRetryLimit(step.retry_limit);
+          actionOutput = await executeWithRetry(
+            () => executeWithinStepBudget(
+              () => executeSafeAction(step.action_type, payload, config),
+              { input: payload, config },
+              timeoutSeconds,
+              64 * 1024,
+            ),
+            retryLimit,
           );
         } catch (error) {
           actionError = error instanceof Error ? error.message : "action_failed";
