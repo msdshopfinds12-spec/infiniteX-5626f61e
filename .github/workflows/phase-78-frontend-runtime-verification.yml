@@ -84,8 +84,27 @@ jobs:
       - name: Deno worker runtime unit and HTTP-handler regression
         run: deno test --no-check --allow-env supabase/functions/_shared/worker-security.deno.ts supabase/functions/simula-workflow-worker/index.deno.ts
 
+      - name: Install ephemeral Playwright browser runner
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+
       - name: Production bundle compilation
         run: npm run build
+
+      - name: Start isolated production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/infinitex-preview.log 2>&1 &
+          echo $! > /tmp/infinitex-preview.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/infinitex-preview.log
+          exit 1
+
+      - name: Chromium browser smoke and responsive regression
+        run: node tests/browser/phase-78-browser-smoke.test.mjs
 
       - name: Upload build artifact for inspection
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
