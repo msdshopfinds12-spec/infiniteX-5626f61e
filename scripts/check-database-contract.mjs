@@ -38,7 +38,7 @@ else{
  for(const f of ['applicationRowsRead','functionBodiesRead','secretsRead','writeStatementsExecuted']){
   bool(s.capture[f],'capture.'+f);if(s.capture[f]===true)errors.push('capture.'+f+' must be false.');
  }
- const categories=['schemas','tables','columns','constraints','indexes','table_grants','column_grants','rls_policies','triggers','functions','extensions','custom_types','role_attributes','role_memberships'];
+ const categories=['schemas','tables','columns','constraints','indexes','table_grants','column_grants','rls_policies','triggers','functions','extensions','custom_types','role_attributes','role_memberships','default_privileges','partition_dependencies'];
  if(Array.isArray(s.capture.metadataCategories))for(const x of categories)if(!s.capture.metadataCategories.includes(x))errors.push('capture.metadataCategories missing '+x+'.');
  if(Array.isArray(s.capture.scopeSchemas))for(const x of ['public','private'])if(!s.capture.scopeSchemas.includes(x))errors.push('capture.scopeSchemas missing '+x+'.');
 }
@@ -67,6 +67,22 @@ if(arr(s.schemas,'schemas'))for(const [i,schema] of s.schemas.entries()){
   for(const field of ['grantor','grantee','privilege'])str(g[field],'schemas['+i+'].grants['+j+'].'+field);
   bool(g.grantable,'schemas['+i+'].grants['+j+'].grantable');
  }
+}
+if(arr(s.defaultPrivileges,'defaultPrivileges'))for(const [i,d] of s.defaultPrivileges.entries()){
+ if(!obj(d)){errors.push('defaultPrivileges['+i+'] must be an object.');continue;}
+ str(d.owner,'defaultPrivileges['+i+'].owner');str(d.objectType,'defaultPrivileges['+i+'].objectType');
+ if(d.schema!==null&&typeof d.schema!=='string')errors.push('defaultPrivileges['+i+'].schema must be string or null.');
+ if(arr(d.grants,'defaultPrivileges['+i+'].grants'))for(const [j,g] of d.grants.entries()){
+  if(!obj(g)){errors.push('defaultPrivileges['+i+'].grants['+j+'] must be an object.');continue;}
+  for(const f of ['grantor','grantee','privilege'])str(g[f],'defaultPrivileges['+i+'].grants['+j+'].'+f);
+  bool(g.grantable,'defaultPrivileges['+i+'].grants['+j+'].grantable');
+ }
+}
+if(arr(s.partitionDependencies,'partitionDependencies'))for(const [i,p] of s.partitionDependencies.entries()){
+ if(!obj(p)){errors.push('partitionDependencies['+i+'] must be an object.');continue;}
+ for(const f of ['parentSchema','parentTable','childSchema','childTable'])str(p[f],'partitionDependencies['+i+'].'+f);
+ if(!Number.isInteger(p.sequence)||p.sequence<1)errors.push('partitionDependencies['+i+'].sequence must be a positive integer.');
+ for(const f of ['parentSchema','childSchema'])if(typeof p[f]==='string'&&!declaredScopeSchemas.has(p[f]))errors.push('partitionDependencies['+i+'].'+f+' is outside capture.scopeSchemas.');
 }
 named(s.extensions,'extensions',['name'],[['schema','string'],['version','string']]);
 named(s.types,'types',['schema_name','name'],[['kind','string'],['formatted_type','string'],['not_null','boolean']]);
