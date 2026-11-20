@@ -33,7 +33,10 @@ test("partial configuration reports the missing public field", () => {
 test("accepts HTTPS URL and publishable key", () => {
   assert.deepEqual(readPublicSupabaseConfig(validEnvironment), {
     status: "ready",
-    config: validEnvironment,
+    config: {
+      url: validEnvironment.VITE_SUPABASE_URL,
+      publishableKey: validEnvironment.VITE_SUPABASE_PUBLISHABLE_KEY,
+    },
   });
 });
 
