@@ -116,7 +116,7 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  if (!(req.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) {
+  const mediaType = (req.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();\n  if (mediaType !== "application/json") {
     return reply(req, 415, { ok: false, error: "unsupported_media_type" });
   }
 
