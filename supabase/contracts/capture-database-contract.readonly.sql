@@ -38,7 +38,7 @@ table_contract AS (
   'privilege',a.privilege_type,'grantable',a.is_grantable
  ) ORDER BY a.grantee,a.privilege_type,a.is_grantable) FROM pg_catalog.aclexplode(COALESCE(
   (SELECT c.relacl FROM pg_catalog.pg_class c WHERE c.oid=t.oid),
-  pg_catalog.acldefault(CASE WHEN t.relkind='S' THEN 'S' ELSE 'r' END,
+  pg_catalog.acldefault(CASE WHEN t.relkind='S' THEN 'S'::\"char\" ELSE 'r'::\"char\" END,
     (SELECT c.relowner FROM pg_catalog.pg_class c WHERE c.oid=t.oid))
  )) a LEFT JOIN pg_catalog.pg_roles r ON r.oid=a.grantee),'[]'::jsonb) AS grants,
  COALESCE((SELECT jsonb_agg(jsonb_build_object(
