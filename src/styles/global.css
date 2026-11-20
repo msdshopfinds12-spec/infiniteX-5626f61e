@@ -1511,6 +1511,69 @@ input:disabled {
   font-size: 13px;
 }
 
+.workflow-run-queue {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-1);
+}
+
+.workflow-run-input-label {
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.workflow-run-input {
+  width: 100%;
+  min-height: 76px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-0);
+  color: var(--text-0);
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  resize: vertical;
+}
+
+.workflow-run-input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.workflow-queue-help {
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.workflow-queue-message {
+  color: var(--text-1);
+  font-size: 12px;
+}
+
+.workflow-queue-error {
+  color: var(--error);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.workflow-queue-success {
+  color: var(--success);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.workflow-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 @media (max-width: 640px) {
   .workflow-row {
     align-items: flex-start;
