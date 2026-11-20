@@ -51,6 +51,16 @@ jobs:
           node-version: "22"
           cache: npm
 
+      - name: Generate candidate lockfile for Vite security patch (temporary CI bootstrap)
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Export generated lockfile for exact review
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-64d-vite-security-lockfile
+          path: package-lock.json
+          if-no-files-found: error
+
       - name: Install locked dependencies
         run: npm ci
 
