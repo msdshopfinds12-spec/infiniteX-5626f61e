@@ -1,6 +1,9 @@
 # Phase 77 — Worker/PostgreSQL Integration
 
-**Status:** IMPLEMENTED — isolated PostgreSQL integration gate added; GitHub Actions execution pending.  
+**Status:** VERIFIED — exact-head GitHub Actions PostgreSQL integration passed.  
+**Verified commit:** `2cbd351108bbe7c8dc3d777e43e0c1f2fffcf1e6`  
+**Workflow run:** [44821811273](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44821811273) — SUCCESS  
+**Job:** `worker-postgres-integration` (`136584286181`) — SUCCESS  
 **Base:** `phase-76/api-key-frontend-contract`  
 **Database target:** Disposable Supabase PostgreSQL 17.6.1.136 container only.
 
@@ -37,7 +40,20 @@ Workflow: `.github/workflows/phase-77-worker-postgres-integration.yml`
 
 Static contract tests live in `tests/database/phase-77-worker-postgres-integration.test.mjs`.
 
-## What this proves if CI passes
+## Verified execution results
+
+The exact-head job completed all execution and cleanup steps successfully:
+
+- Source and harness contract checks.
+- Disposable PostgreSQL 17 container startup.
+- Recovered migration replay and separately classified candidate replay.
+- `SKIP LOCKED`, stale lease recovery, and generation fencing.
+- Stress test with 16 parallel claimers and duplicate step inserts.
+- Stale worker generation protection.
+- Tenant and API-key PostgreSQL security regression suite.
+- Log collection and disposable container cleanup.
+
+## What this proves
 
 - The checked-in migration chain is replayable in the pinned disposable Supabase PostgreSQL environment under the existing provenance rules.
 - Database queue claim concurrency and stale lease recovery behave as asserted by the existing SQL shell harnesses.
