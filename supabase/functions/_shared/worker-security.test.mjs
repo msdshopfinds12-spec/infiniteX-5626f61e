@@ -182,3 +182,23 @@ test("rejects invalid retry configuration and never exceeds delay cap", async ()
   }, 3, { baseDelayMs: 100, maxDelayMs: 150, random: () => 1, sleep: async (ms) => delays.push(ms) });
   assert.deepEqual(delays, [100, 150, 150]);
 });
+
+test("enforces one aggregate elapsed budget across attempts and backoff", async () => {
+  let clock = 0;
+  let calls = 0;
+  const delays = [];
+  await assert.rejects(() => executeWithRetry(async () => {
+    calls++;
+    clock += 40;
+    throw Object.assign(new Error("temporary"), { code: "NETWORK_ERROR" });
+  }, 5, {
+    baseDelayMs: 30,
+    maxDelayMs: 30,
+    maxElapsedMs: 100,
+    random: () => 1,
+    now: () => clock,
+    sleep: async (ms) => { delays.push(ms); clock += ms; },
+  }), /step_timeout_exceeded/);
+  assert.equal(calls, 2);
+  assert.deepEqual(delays, [30, 20]);
+});
