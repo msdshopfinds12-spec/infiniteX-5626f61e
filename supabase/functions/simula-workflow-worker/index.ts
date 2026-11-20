@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { executeSafeAction } from "../_shared/workflow-actions.mjs";
+import { authenticateBearerRequest } from "../_shared/worker-auth-boundary.mjs";
 import { corsHeadersForRequest } from "../_shared/cors.ts";
 import {
   clampBatchLimit,
@@ -72,26 +73,16 @@ Deno.serve(async (req: Request) => {
   }
   if (req.method !== "POST") return reply(req, 405, { ok: false, error: "method_not_allowed" });
 
-  const authorization = req.headers.get("Authorization") ?? "";
-  const tokenMatch = authorization.match(/^Bearer\s+(.+)$/i);
-  if (!tokenMatch) return reply(req, 401, { ok: false, error: "missing_bearer_token" });
-  const token = tokenMatch[1];
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const publishableKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !publishableKey || !serviceRoleKey) {
-    console.error("worker_environment_incomplete");
-    return reply(req, 500, { ok: false, error: "worker_environment_incomplete" });
-  }
-
-  const userClient = createClient(supabaseUrl, publishableKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: "Bearer " + token } },
+  const authentication = await authenticateBearerRequest({
+    request: req,
+    env: { get: (key: string) => Deno.env.get(key) },
+    createClient,
   });
-  const { data: userData, error: userError } = await userClient.auth.getUser(token);
-  if (userError || !userData.user) return reply(req, 401, { ok: false, error: "invalid_session" });
-  const ownerId = userData.user.id;
+  if (!authentication.ok) {
+    if (authentication.status === 500) console.error("worker_environment_incomplete");
+    return reply(req, authentication.status, { ok: false, error: authentication.error });
+  }
+  const { userClient, ownerId, supabaseUrl, serviceRoleKey } = authentication;
 
   const bodyResult = await readJsonBodyLimited(req, 2048);
   if (!bodyResult.ok) {
