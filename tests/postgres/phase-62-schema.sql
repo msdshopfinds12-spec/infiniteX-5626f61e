@@ -86,6 +86,39 @@ AS $$
   SELECT EXISTS (SELECT 1 FROM claimed);
 $$;
 
+-- Match JavaScript encodeURIComponent over UTF-8 bytes.
+-- Safe set: A-Z a-z 0-9 - _ . ! ~ * ' ( )
+CREATE FUNCTION phase62.encode_uri_component(p_value text)
+RETURNS text
+LANGUAGE plpgsql
+IMMUTABLE
+STRICT
+SET search_path = phase62, pg_temp
+AS $phase62$
+DECLARE
+  v_bytes bytea := convert_to(p_value, 'UTF8');
+  v_result text := '';
+  v_byte integer;
+  i integer;
+BEGIN
+  IF octet_length(v_bytes) = 0 THEN
+    RETURN '';
+  END IF;
+
+  FOR i IN 0..octet_length(v_bytes) - 1 LOOP
+    v_byte := get_byte(v_bytes, i);
+    IF (v_byte BETWEEN 65 AND 90)
+       OR (v_byte BETWEEN 97 AND 122)
+       OR (v_byte BETWEEN 48 AND 57)
+       OR v_byte IN (45, 95, 46, 33, 126, 42, 39, 40, 41) THEN
+      v_result := v_result || chr(v_byte);
+    ELSE
+      v_result := v_result || '%' || upper(lpad(to_hex(v_byte), 2, '0'));
+    END IF;
+  END LOOP;
+  RETURN v_result;
+END;
+$phase62$;
 CREATE FUNCTION phase62.fail_and_schedule_retry(
   p_attempt_id text,
   p_owner_id text,
@@ -127,7 +160,9 @@ BEGIN
 
   v_next_key := format(
     'step-attempt:v1:%s:%s:%s',
-    v_current.run_id, v_current.step_id, v_current.attempt_number + 1
+    phase62.encode_uri_component(v_current.run_id),
+    phase62.encode_uri_component(v_current.step_id),
+    v_current.attempt_number + 1
   );
 
   IF v_current.status = 'failed' THEN
@@ -135,6 +170,14 @@ BEGIN
       FROM phase62.workflow_step_attempts
      WHERE owner_id = p_owner_id AND idempotency_key = v_next_key;
     IF FOUND THEN
+      IF v_next.owner_id <> v_current.owner_id
+         OR v_next.run_id <> v_current.run_id
+         OR v_next.step_id <> v_current.step_id
+         OR v_next.attempt_number <> v_current.attempt_number + 1
+         OR v_next.idempotency_key <> v_next_key
+         OR v_next.request_fingerprint <> v_current.request_fingerprint THEN
+        RAISE EXCEPTION 'retry_idempotency_conflict';
+      END IF;
       RETURN 'already_scheduled:' || v_next.id;
     END IF;
     RETURN 'already_terminal:' || v_current.id;
