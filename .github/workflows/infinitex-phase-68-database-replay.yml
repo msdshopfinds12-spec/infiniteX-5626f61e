@@ -3,7 +3,7 @@ name: InfiniteX Phase 68 Disposable PostgreSQL Replay
 on:
   push:
     branches:
-      - engineering/infinitex-phase-68-database-replay
+      - engineering/infinitex-canonical-integration-candidate
   pull_request:
     paths:
       - "supabase/migrations/**"
