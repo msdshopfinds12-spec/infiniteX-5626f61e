@@ -12,7 +12,7 @@ Version 2 replaces the previous partial catalog contract for the \`public\` and 
 - RLS policies and expressions.
 - Relation-level and column-level grants.
 - Non-internal trigger definitions and enabled state.
-- Function/procedure overload identity, owner, language, result type, volatility, parallel-safety, strict/leakproof flags, SECURITY DEFINER, search_path, EXECUTE roles, and an MD5 fingerprint of function definition. Function source is not emitted.
+- Function/procedure overload identity, owner, language, result type, volatility, parallel-safety, strict/leakproof flags, SECURITY DEFINER, search_path, and EXECUTE roles. Function bodies are neither read nor emitted; no body fingerprint is generated.
 - Installed extensions/versions, custom enum/domain/range/multirange types, non-internal role attributes, and role memberships.
 
 Role password hashes, application rows, function bodies, and arbitrary comments are excluded. Default expressions and policy/constraint/index/trigger definitions are schema metadata; inspect them for embedded literals before sharing.
