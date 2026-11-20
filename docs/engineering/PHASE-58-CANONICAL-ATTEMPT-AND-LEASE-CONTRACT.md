@@ -215,3 +215,21 @@ Use security-definer functions only when necessary. Fix search_path, revoke defa
 This document is a logical design reconciliation. It is not a migration, schema snapshot, implementation, proof of hosted parity, or production approval. It does not establish exact FK names, delete actions, indexes, grants, policies, trigger behavior, or function signatures.
 
 No production database access, DDL/DML, migration, enqueue enablement, provider execution, deployment, merge, or billing change is authorized by this document.
+
+
+## 13. Repository evidence checkpoint — 2026-11-21
+
+The following exact-head repository evidence was inspected while preparing this contract:
+
+- PR #81 head `24d913d96758e40b8c666683cf819ee48bdbf9a1`:
+  - Application CI run `44769049651`: SUCCESS.
+  - Phase 56 Catalog Capture Completeness run `44769049703`: SUCCESS. Static read-only/V2 contract validation and disposable PostgreSQL 17 capture smoke both passed.
+  - Database Contract Gate run `44769049550`: FAILURE by design at the offline source-readiness gate because the committed contract snapshot is still schemaVersion 1. The earlier disposable catalog execution, migration replay, and RLS/security checks passed; this does not create or approve a fresh live V2 capture.
+- PR #70 head `56ee91e8464480a18e345895f69eaa067248011e` has a Database Contract Gate failure; its branch is a read-only capture/validator implementation, not evidence that a fresh live V2 artifact was captured.
+- PR #77's `PHASE-52.1M-SCHEMA-CONTRACT-V2-READINESS.md` explicitly records the fresh V2 capture as BLOCKED / NOT YET CAPTURED, project identity and human review as pending, and catalog parity as NOT ESTABLISHED.
+- The existing `database-contract.snapshot.json` on the inspected clean-room branch remains schemaVersion 1 and PENDING_HUMAN_REVIEW. The Phase 52.1G catalog is explicitly public-only and cannot be promoted to V2.
+- PR #85's exact-head GitHub Actions run `44771115601` remains SUCCESS. Its separate Vercel build-rate-limit status is not GitHub Actions evidence.
+
+**Decision:** do not author executable migration SQL, persistence RPCs, FK changes, grants, RLS changes, or worker database adapters from the available repository evidence. The pure TypeScript attempt/lease domain already exists in PR #63 and is documented as persistence-unwired. The next safe engineering input is the fresh, authorized, metadata-only V2 capture plus independent review; after that, derive the additive schema from verified catalog facts and test it on disposable PostgreSQL.
+
+This evidence checkpoint does not authorize live database access, migrations, merge, deployment, or enqueue/provider activation.
