@@ -11,7 +11,9 @@
     "test": "node --experimental-strip-types --test",
     "test:edge-worker-security": "node --test supabase/functions/_shared/worker-security.test.mjs",
     "test:edge-function-cors": "node --experimental-strip-types --test supabase/functions/_shared/cors.test.mjs",
-    "test:edge-function-security": "npm run test:edge-function-cors && npm run test:edge-worker-security"
+    "test:edge-function-security": "npm run test:edge-function-cors && npm run test:edge-worker-security",
+    "test:worker-http-boundary": "node --test tests/workers/worker-auth-boundary.test.mjs",
+    "test:workers": "node --experimental-strip-types --test tests/workers"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.2",
