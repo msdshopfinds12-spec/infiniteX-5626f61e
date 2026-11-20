@@ -189,7 +189,7 @@ test("enforces one aggregate elapsed budget across attempts and backoff", async 
   const delays = [];
   await assert.rejects(() => executeWithRetry(async () => {
     calls++;
-    clock += 40;
+    clock += 10;
     throw Object.assign(new Error("temporary"), { code: "NETWORK_ERROR" });
   }, 5, {
     baseDelayMs: 30,
@@ -199,6 +199,6 @@ test("enforces one aggregate elapsed budget across attempts and backoff", async 
     now: () => clock,
     sleep: async (ms) => { delays.push(ms); clock += ms; },
   }), /step_timeout_exceeded/);
-  assert.equal(calls, 2);
-  assert.deepEqual(delays, [30, 20]);
+  assert.equal(calls, 3);
+  assert.deepEqual(delays, [30, 30, 10]);
 });
