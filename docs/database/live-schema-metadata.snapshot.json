@@ -72,7 +72,7 @@
           "definition": "CREATE INDEX billing_webhook_events_status_received_idx ON public.billing_webhook_events USING btree (processing_status, received_at)"
         }
       ],
-      "policies": null,
+      "policies": [],
       "force_rls": false,
       "constraints": [
         {
@@ -1886,6 +1886,29 @@
       }
     ],
     "candidate_20261120000000_recorded": false,
-    "disclaimer": "Metadata inventory only; not a pg_dump, bootstrap schema, replayable migration chain, or approval for production use."
+    "disclaimer": "Metadata inventory only; not a pg_dump, bootstrap schema, replayable migration chain, or approval for production use.",
+    "ledger_statement_recovery": {
+      "entry_count": 19,
+      "exact_file_comparisons": "19/19 VERIFIED",
+      "sha256_manifest": "docs/database/MIGRATION-LEDGER-RECOVERY-MANIFEST.json",
+      "original_git_blob_equivalence": "NOT_VERIFIED"
+    },
+    "observed_findings": [
+      {
+        "severity": "INFO",
+        "object": "public.billing_webhook_events",
+        "finding": "RLS enabled with zero policies; observed table grants limited to postgres and service_role; verify service-only intent."
+      },
+      {
+        "severity": "REVIEW",
+        "object": "public.platform_api_keys.key_hash",
+        "finding": "authenticated has SELECT privilege; review least-privilege exposure of stored API-key verifier."
+      },
+      {
+        "severity": "INFO",
+        "object": "public.simula_transition_workflow_step",
+        "finding": "Candidate transactional RPC absent from live public function catalog and applied migration ledger."
+      }
+    ]
   }
 }
