@@ -62,6 +62,18 @@ VALUES
   ('81000000-0000-4000-8000-000000000002', '{"full_name":"Phase 81 synthetic owner B"}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 
+INSERT INTO public.user_projects(id, user_id, title, project_type, content)
+VALUES
+  ('82000000-4000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', 'Phase 82 tenant A project', 'general', '{"tenant":"A"}'::jsonb),
+  ('82000000-4000-4000-8000-000000000002', '81000000-0000-4000-8000-000000000002', 'Phase 82 tenant B project', 'general', '{"tenant":"B"}'::jsonb)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.platform_api_keys(owner_id, label, key_prefix, key_hash, scopes)
+VALUES
+  ('81000000-0000-4000-8000-000000000001', 'Phase 82 synthetic A', 'p82a', repeat('a', 64), ARRAY['api:read']::text[]),
+  ('81000000-0000-4000-8000-000000000002', 'Phase 82 synthetic B', 'p82b', repeat('b', 64), ARRAY['api:read']::text[])
+ON CONFLICT (key_hash) DO NOTHING;
+
 INSERT INTO public.workflows(id, owner_id, name, status, trigger_type)
 VALUES
   ('81000000-1000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', 'Phase 81 HTTP worker A', 'active', 'manual'),
