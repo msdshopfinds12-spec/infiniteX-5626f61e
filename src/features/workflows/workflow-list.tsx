@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { WorkflowReadResult, WorkflowReadService } from "./workflow-read-service.ts";
+import WorkflowRunHistory from "./workflow-run-history";
 
 type WorkflowListState =
   | Readonly<{ key: string; status: "loading" }>
@@ -29,6 +30,7 @@ export default function WorkflowList({
     status: "loading",
   });
   const [retryCount, setRetryCount] = useState(0);
+  const [expandedWorkflowId, setExpandedWorkflowId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -88,18 +90,45 @@ export default function WorkflowList({
 
   return (
     <ul className="workflow-list" aria-label="Your workflows">
-      {workflows.map((workflow) => (
-        <li className="workflow-row" key={workflow.id}>
-          <div className="workflow-copy">
-            <span className="workflow-title">{workflow.name}</span>
-            <span className="workflow-description">{workflow.description || "No description provided"}</span>
-            <span className="workflow-meta">
-              {workflow.trigger_type} · Updated {new Date(workflow.updated_at).toLocaleDateString()}
-            </span>
-          </div>
-          <span className="badge badge-neutral">{workflow.status}</span>
-        </li>
-      ))}
+      {workflows.map((workflow) => {
+        const expanded = expandedWorkflowId === workflow.id;
+        const historyId = "workflow-runs-" + workflow.id;
+        return (
+          <li className="workflow-item" key={workflow.id}>
+            <div className="workflow-row">
+              <div className="workflow-copy">
+                <span className="workflow-title">{workflow.name}</span>
+                <span className="workflow-description">{workflow.description || "No description provided"}</span>
+                <span className="workflow-meta">
+                  {workflow.trigger_type} · Updated {new Date(workflow.updated_at).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="workflow-actions">
+                <span className="badge badge-neutral">{workflow.status}</span>
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  aria-expanded={expanded}
+                  aria-controls={historyId}
+                  onClick={() => setExpandedWorkflowId(expanded ? null : workflow.id)}
+                >
+                  {expanded ? "Hide runs" : "View runs"}
+                </button>
+              </div>
+            </div>
+            {expanded && (
+              <div className="workflow-history" id={historyId}>
+                <WorkflowRunHistory
+                  service={service}
+                  workflowId={workflow.id}
+                  userId={userId}
+                  identityEpoch={identityEpoch}
+                />
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
