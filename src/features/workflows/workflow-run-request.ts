@@ -28,7 +28,22 @@ function cloneAndFreezeJson(value: unknown, ancestors: WeakSet<object>): Json {
   ancestors.add(value);
   try {
     if (Array.isArray(value)) {
-      const result = value.map((item) => cloneAndFreezeJson(item, ancestors));
+      const keys = Reflect.ownKeys(value);
+      if (
+        keys.some((key) => typeof key !== "string") ||
+        keys.length !== value.length + 1
+      ) {
+        throw new TypeError("Workflow input arrays must be dense JSON arrays.");
+      }
+
+      const result: Json[] = [];
+      for (let index = 0; index < value.length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!descriptor || !descriptor.enumerable || !("value" in descriptor)) {
+          throw new TypeError("Workflow input arrays must not contain holes or accessors.");
+        }
+        result.push(cloneAndFreezeJson(descriptor.value, ancestors));
+      }
       return Object.freeze(result);
     }
 
