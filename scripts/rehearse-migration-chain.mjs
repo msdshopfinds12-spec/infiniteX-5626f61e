@@ -12,7 +12,7 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 export function classifyPsqlFailure(output = '') {
-  if (/relation\s+"?[^"\n]+"?\s+does not exist|schema\s+"?[^"\n]+"?\s+does not exist|role\s+"?[^"\n]+"?\s+does not exist|extension\s+"?[^"\n]+"?\s+is not available|must be loaded via shared_preload_libraries|database\s+"?[^"\n]+"?\s+does not exist/i.test(output)) {
+  if (/relation\s+"?[^"\n]+"?\s+does not exist|schema\s+"?[^"\n]+"?\s+does not exist|role\s+"?[^"\n]+"?\s+does not exist|extension\s+"?[^"\n]+"?\s+is not available|could not open extension control file|could not load library|function\\s+[^\\n]+\\s+does not exist|must be loaded via shared_preload_libraries|database\s+"?[^"\n]+"?\s+does not exist/i.test(output)) {
     return 'BLOCKED';
   }
   return 'FAIL';
