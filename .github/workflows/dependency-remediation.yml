@@ -1,28 +1,40 @@
-name: Phase 54 Dependency Remediation
+name: Phase 54 Dependency Remediation (Read Only)
 
 on:
+  pull_request:
+    branches:
+      - "engineering/phase-54-vite8-security-remediation"
+    paths:
+      - ".github/workflows/dependency-remediation.yml"
+      - "package.json"
+      - "package-lock.json"
   push:
     branches:
       - "engineering/phase-54-*"
     paths:
       - ".github/workflows/dependency-remediation.yml"
+      - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
 
+# Verification jobs must never receive repository write authority.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: phase-54-dependency-remediation-${{ github.ref }}
+  group: phase-54-dependency-remediation-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   remediate-and-verify:
-    name: Generate patched lockfile and run full application gates
+    name: Generate candidate manifests and run application gates
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout isolated remediation branch
+      - name: Checkout source without persisted credentials
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up supported Node.js runtime
         uses: actions/setup-node@v4
@@ -35,12 +47,12 @@ jobs:
           node --version
           npm --version
 
-      - name: Generate lockfile for patched Vite toolchain
+      - name: Generate candidate lockfile for patched Vite toolchain
         run: |
           npm install --package-lock-only --ignore-scripts --save-dev --save-exact vite@8.3.8 @vitejs/plugin-react@6.3.0
           node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('package.json','utf8')); const l=JSON.parse(fs.readFileSync('package-lock.json','utf8')); if(p.devDependencies?.vite!=='8.3.8'||p.devDependencies?.['@vitejs/plugin-react']!=='6.3.0'||l.packages?.['']?.devDependencies?.vite!=='8.3.8'||l.packages?.['']?.devDependencies?.['@vitejs/plugin-react']!=='6.3.0') process.exit(1); console.log('Manifest and lockfile root dependency declarations match the isolated target versions.');"
 
-      - name: Install exactly from generated lockfile and trace deprecations
+      - name: Install exactly from generated candidate lockfile
         shell: bash
         run: |
           set -o pipefail
@@ -74,24 +86,13 @@ jobs:
       - name: Verify production entry point
         run: test -s dist/index.html
 
-      - name: Commit verified patched dependency manifests
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          if git diff --cached --quiet; then
-            echo "Dependency manifests already match the verified target; no commit required."
-          else
-            git commit -m "fix(security): upgrade Vite toolchain and lock patched dependencies"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
-
-      - name: Upload generated manifests and verification evidence
+      # This workflow intentionally does not commit or push. A human reviews
+      # the generated manifests and applies them through a normal pull request.
+      - name: Upload candidate manifests and verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase-54-dependency-remediation-evidence
+          name: phase-54-dependency-remediation-candidate
           path: |
             package.json
             package-lock.json
