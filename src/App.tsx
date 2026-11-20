@@ -15,15 +15,24 @@ import type { ViewKey } from "./types";
 import type { AuthState } from "./features/auth/auth-state";
 import WorkflowList from "./features/workflows/workflow-list";
 import type { WorkflowReadService } from "./features/workflows/workflow-read-service";
+import ProfileSummary from "./features/profile/profile-summary";
+import type { ProfileReadService } from "./features/profile/profile-read-service";
 
 type AppProps = Readonly<{
   authState?: AuthState;
   authActions?: AuthActions;
   recoveryMode?: boolean;
   workflowReadService?: WorkflowReadService | null;
+  profileReadService?: ProfileReadService | null;
 }>;
 
-export default function App({ authState, authActions, recoveryMode = false, workflowReadService = null }: AppProps) {
+export default function App({
+  authState,
+  authActions,
+  recoveryMode = false,
+  workflowReadService = null,
+  profileReadService = null,
+}: AppProps) {
   const [view, setView] = useState<ViewKey>("overview");
   const [searchTerm, setSearchTerm] = useState("");
   const query = searchTerm.trim().toLocaleLowerCase();
@@ -203,9 +212,19 @@ export default function App({ authState, authActions, recoveryMode = false, work
                   <span className="badge badge-neutral">not connected</span>
                 </div>
                 <p className="muted">
-                  Provider, runtime and deployment settings are placeholders. No external account connection or
-                  configuration change is available from this demo screen.
+                  Account profile information is read-only in this phase. Profile editing, billing, provider
+                  connections, runtime settings, and deployment controls remain disabled until their security
+                  contracts and acceptance tests are complete.
                 </p>
+                {authState.status === "authenticated" ? (
+                  <ProfileSummary
+                    service={profileReadService}
+                    userId={authState.userId}
+                    identityEpoch={authState.identityEpoch}
+                  />
+                ) : (
+                  <p className="muted" role="status">Sign in to view your account profile.</p>
+                )}
               </div>
             )}
           </main>
