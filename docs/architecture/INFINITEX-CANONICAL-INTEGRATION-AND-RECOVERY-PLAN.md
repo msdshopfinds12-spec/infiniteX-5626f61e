@@ -569,3 +569,130 @@ The server constructs tenant/principal context. The client must never submit aut
 6. Verify durable persistence and retry/idempotency semantics independently of the in-process IQ Core engine.
 
 **Decision:** IQ Core is a valuable reference and candidate execution component, but it is not yet an approved production dependency. Selective reuse is approved at the architecture/design level only; code import remains BLOCKED pending provenance, license, security and exact-head test evidence.
+
+
+## 18. Live Supabase production schema and deployed-worker reconciliation — 2026-11-20
+
+**Inspection mode:** read-only Supabase MCP calls and SELECT/catalog queries. No table data was read, no secrets were retrieved, and no database state was changed.
+
+### 18.1 Live project identity and scope
+
+- Project `Ashaa-INX`, ref `vepacoemkhudamfaccah`.
+- Project status: `ACTIVE_HEALTHY`.
+- PostgreSQL 17.11.0.003, region `ap-northeast-2`.
+- 14 public tables returned by the verbose table inventory; all 14 have RLS enabled.
+- 19 migration ledger entries returned.
+- Three active Edge Functions returned.
+- The earlier plan's statement that production backend/schema was entirely unverified is superseded by this read-only inspection. Backend exists; implementation parity and runtime correctness remain under audit.
+
+### 18.2 Live migration ledger
+
+The live database reports these 19 versions/names:
+
+```text
+20261025182821 simula_app_factory_core_schema_rls
+20261025183121 simula_fk_indexes_and_integrity_review
+20261025183834 remove_seven_unused_nonconstraint_indexes
+20261025183942 add_foreign_key_supporting_indexes
+20261025201001 simula_workflow_cron_scheduler
+20261025201032 simula_workflow_scheduler_safe_interval_validation
+20261025201831 simula_secure_workflow_run_claiming
+20261025201906 simula_move_claim_definer_to_private_schema
+20261025201915 simula_allow_authenticated_claim_wrapper_access
+20261025202536 simula_worker_foundation_indexes_and_pg_net
+20261025202606 simula_internal_worker_queue_claiming
+20261025202644 simula_pg_net_extension_schema_hardening
+20261025202741 simula_secure_cron_worker_auth_and_vault
+20261025202809 simula_schedule_secure_cron_worker
+20261025202850 simula_worker_stale_run_recovery
+20261025204429 restrict_workflow_table_client_privileges
+20261025204844 harden_workflow_run_inserts_and_profile_updates
+20261103134251 ashaa_backend_api_keys_and_webhook_idempotency
+20261103134302 ashaa_backend_credit_ledger
+```
+
+This recovers the production migration **ledger**, not the original SQL bodies. Do not fabricate missing migration files from names or current schema.
+
+### 18.3 Workflow schema contract comparison
+
+Live `public.workflow_runs` includes `id, workflow_id, owner_id, status, input, output, error_message, attempt, started_at, finished_at, created_at, scheduled_for`.
+
+Live `public.workflow_steps` includes `id, workflow_id, step_order, name, action_type, config, retry_limit, timeout_seconds, created_at`.
+
+Live `public.workflow_step_runs` includes `id, run_id, step_id, owner_id, status, input, output, error_message, attempt, started_at, finished_at, created_at`.
+
+Verified constraints:
+- `workflow_step_runs` has unique `(run_id, step_id)`.
+- `workflow_steps` has unique `(workflow_id, step_order)`.
+- Workflow run and step-run attempt counters have nonnegative checks.
+- Foreign keys connect runs, steps, workflows and auth users.
+
+The candidate PR #35 migration's expected core columns and unique key substantially overlap the live schema. However, the live database does **not** expose a function named `simula_transition_workflow_step`; the PR #35 RPC migration is not in the 19-entry live migration ledger. Therefore PR #35 has not been proven deployed to this project.
+
+### 18.4 RLS and database-function findings
+
+- RLS is enabled on all 14 public tables.
+- 19 current public-table policies were returned by `pg_policies`.
+- Security Advisor reports one informational finding: `public.billing_webhook_events` has RLS enabled but no policy. This is fail-closed for ordinary roles absent a separate privileged path, but must be confirmed intentional; do not add a permissive policy as a quick fix.
+- Existing owner-scoped policies were observed on profiles, user projects, workflow tables, API keys, payments, subscriptions, usage logs and credit ledger.
+- `private.simula_claim_workflow_runs` and `private.simula_claim_workflow_runs_internal` are SECURITY DEFINER functions owned by postgres with empty search_path. Public wrappers are SECURITY INVOKER. Catalog privilege checks showed anon cannot execute the claim functions; authenticated can call only the user-scoped wrapper; service_role can call the internal wrapper.
+- `public.simula_verify_worker_secret(text)` is SECURITY DEFINER, empty search_path, and catalog privilege checks showed execute granted to service_role only.
+- No `simula_transition_workflow_step` function was found in public/private schemas.
+
+### 18.5 Critical deployed Edge Function versus GitHub candidate mismatch
+
+Live Edge Function inventory:
+- `simula-workflow-worker`, ACTIVE, verify_jwt=true, source SHA `91e3dcf52d08f2a426476298fbb3e64ef5f29fa99bf7f2adfb24b80c15a37b5e`.
+- `simula-workflow-cron-worker`, ACTIVE, verify_jwt=false, source SHA `c4e7e7aac6a6c9104fc3f8efd8bfed790256a44d3bda521ef5da6488f6b7de26`.
+- `ashaa-api-key-manager`, ACTIVE, verify_jwt=true, source SHA `a4b4ce8cc8e47413e22e54a867f306e7ce51b3880d96a953b4638e2729a51da0`.
+
+The deployed workflow and cron worker source was retrieved read-only and compared with the PR #46 canonical candidate at commit `b3091552cd205784f5ba7a200732f9047fddbf35`:
+- Candidate worker file blob: `f45a879e273aac97a8720a34b65ac4963b151cab`.
+- Candidate cron worker file blob: `8d8efc29cfff19344ed5a3b896bbdf950be3a86c`.
+
+**Critical VERIFIED source-level gap in deployed workers:** both deployed workers use direct REST `upsert` to start step runs and direct REST `update` operations to finish/fail step runs without an attempt-generation predicate. Their workflow terminal updates also predicate on run id/owner/status but not the claimed attempt. This leaves a stale-worker overwrite window even though queue claiming increments `workflow_runs.attempt`.
+
+The PR #46 candidate improves this with:
+- generation-aware conditional updates (`attempt` comparison);
+- run terminal updates guarded by the claimed attempt;
+- bounded request body parsing;
+- explicit step timeout/budget helper;
+- safer CORS handling for the authenticated worker;
+- ownership validation and superseded-run reporting.
+
+But PR #46's REST compare-and-set implementation is not equivalent to PR #35's stronger transactional parent-row lock/RPC. Neither candidate is proven deployed to the live project.
+
+**Additional source-level limitations in deployed workflow worker:**
+- It performs direct table mutations using service-role credentials after claim; these are not fenced against a newer generation.
+- `timeout_seconds` is selected but not enforced by the deployed action executor.
+- Its action registry currently contains deterministic JSON/text transformations only; it is not evidence of a connected LLM, external search, browser, code execution or other real AI provider.
+- The cron worker has `verify_jwt=false`, but its source checks a dedicated secret through the service-role-only verification RPC. Keep that control; do not disable or weaken it.
+- The API-key manager authenticates the user and derives owner ID from verified auth context. Raw key material is returned once; only SHA-256 digest is stored.
+
+These are source-review findings, not proof that a race has occurred in production. No production run records or user data were inspected.
+
+### 18.6 Performance and release findings
+
+Performance Advisor returned six informational unused-index candidates:
+- `user_projects_tool_id_fkey_idx`
+- `usage_logs_tool_id_fkey_idx`
+- `payments_subscription_id_fkey_idx`
+- `platform_api_keys_owner_created_idx`
+- `billing_webhook_events_status_received_idx`
+- `credit_ledger_owner_created_idx`
+
+Do not drop these automatically: low-traffic/young systems can show unused indexes, and some may support future query paths or FK operations. Measure workload and inspect index definitions before proposing removal.
+
+### 18.7 Recommended remediation sequence
+
+1. **Freeze production worker changes.** Preserve deployed source hashes and current migration ledger as the baseline.
+2. **Reconcile source provenance.** Recover exact migration SQL from repository history, CI artifacts or trusted backups; compare against live catalog definitions.
+3. **Prepare a forward-only transactional fencing migration.** Review PR #35 SQL against the exact live PostgreSQL 17 schema, ownership, grants, RLS and function ACLs. Do not apply yet.
+4. **Worker remediation candidate.** Prefer one authoritative transition RPC that locks the parent `workflow_runs` row and checks owner, status and attempt in the same transaction. Route start/succeed/fail mutations through it. Use the PR #46 CAS implementation only as a documented interim alternative if RPC work is blocked.
+5. **Test on disposable PostgreSQL 17 and local Supabase.** Run independent-session race tests, stale attempt tests, rollback, RPC permissions, RLS, cron secret validation and Edge Function integration. PostgreSQL 16 CI evidence remains useful but does not replace PostgreSQL 17 compatibility checks.
+6. **Add worker lease/timeout semantics.** Enforce `timeout_seconds` and ensure timeout/recovery transitions cannot overwrite a newer attempt.
+7. **Review webhook table policy and billing boundary.** Keep webhook event processing service-only unless a concrete client use case requires narrowly scoped access.
+8. **Run non-destructive load/usage review** before any unused-index change.
+9. **Only then request separate approval** for a production migration, Edge Function deployment or release.
+
+**Current decision:** production backend is VERIFIED PRESENT; workflow schema contract is PARTIALLY VERIFIED; live transactional step fencing is NOT VERIFIED / appears absent; deployed worker source has a VERIFIED missing attempt guard; production migration/deployment remains NOT AUTHORIZED.
