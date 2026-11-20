@@ -27,8 +27,6 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.2.12
-      - name: Deno worker HTTP integration tests
-        run: deno test --no-check supabase/functions/simula-workflow-worker/index.test.ts
       - name: Configure Node.js 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -41,6 +39,8 @@ jobs:
           git rev-parse HEAD
       - name: Install locked dependencies
         run: npm ci
+      - name: Deno worker HTTP integration tests
+        run: deno test --no-check supabase/functions/simula-workflow-worker/index.test.ts
       - name: Worker authentication boundary tests
         run: npm run test:worker-http-boundary
       - name: Existing worker and CORS security tests
