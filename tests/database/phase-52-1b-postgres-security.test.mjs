@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const harnessUrl = new URL('./phase-52-1b-postgres-security.sql', import.meta.url);
 const workflowUrl = new URL('../../.github/workflows/infinitex-phase-68-database-replay.yml', import.meta.url);
+const coreSchemaUrl = new URL('../../supabase/migrations/20261025182821_simula_app_factory_core_schema_rls.sql', import.meta.url);
 
 test('PostgreSQL behavior harness applies the exact reviewed migrations in disposable scope', async () => {
   const sql = await readFile(harnessUrl, 'utf8');
@@ -26,6 +27,7 @@ test('PostgreSQL behavior harness applies the exact reviewed migrations in dispo
 
 test('behavior harness covers tenant isolation, secret columns, webhook grants, and privileged functions', async () => {
   const sql = await readFile(harnessUrl, 'utf8');
+  const coreSchema = await readFile(coreSchemaUrl, 'utf8');
   for (const token of [
     'has_column_privilege',
     'key_hash',
@@ -42,11 +44,12 @@ test('behavior harness covers tenant isolation, secret columns, webhook grants, 
     'user A modified user B profile',
     'user B modified user A profile',
     'Forged tenant project',
-    'projects_select_own',
-    'profiles_select_own',
     'search_path=""',
   ]) {
     assert.ok(sql.includes(token), 'missing security assertion: ' + token);
+  }
+  for (const policy of ['projects_select_own', 'projects_insert_own', 'projects_update_own', 'projects_delete_own', 'profiles_select_own', 'profiles_update_own']) {
+    assert.ok(coreSchema.includes(policy), 'missing checked-in RLS policy: ' + policy);
   }
 });
 
