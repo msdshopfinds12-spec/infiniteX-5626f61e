@@ -5,6 +5,7 @@ import { AuthSessionProvider, useAuthActions, useAuthRecoveryMode, useAuthState 
 import { resolveAuthBootstrapState } from "./features/auth/auth-bootstrap.ts";
 import { createSupabaseAuthSessionAdapter } from "./features/auth/supabase-auth-session-adapter";
 import { createBrowserSupabaseClient } from "./lib/supabase/client";
+import { createWorkflowReadService } from "./features/workflows/workflow-read-service";
 import "./styles/global.css";
 
 const supabaseResult = createBrowserSupabaseClient({
@@ -17,11 +18,23 @@ const authAdapter =
     ? createSupabaseAuthSessionAdapter(supabaseResult.client)
     : null;
 
+const workflowReadService =
+  supabaseResult.status === "ready"
+    ? createWorkflowReadService(supabaseResult.client)
+    : null;
+
 function ConnectedApp() {
   const authState = useAuthState();
   const authActions = useAuthActions();
   const recoveryMode = useAuthRecoveryMode();
-  return <App authState={authState} authActions={authActions} recoveryMode={recoveryMode} />;
+  return (
+    <App
+      authState={authState}
+      authActions={authActions}
+      recoveryMode={recoveryMode}
+      workflowReadService={workflowReadService}
+    />
+  );
 }
 
 function Root() {
