@@ -1,0 +1,44 @@
+name: Phase 62 PostgreSQL contract verification
+
+on:
+  pull_request:
+    branches:
+      - feat/phase-60-transactional-retry-orchestration
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-62-postgres-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-contract:
+    name: PostgreSQL 17 transaction and concurrency contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: infinitex_test
+          POSTGRES_PASSWORD: infinitex_test_only
+          POSTGRES_DB: infinitex_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U infinitex_test -d infinitex_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Run disposable PostgreSQL contract suite
+        env:
+          PG_CONTAINER_ID: ${{ job.services.postgres.id }}
+          POSTGRES_USER: infinitex_test
+          POSTGRES_DB: infinitex_test
+        run: bash tests/postgres/run-phase-62.sh
