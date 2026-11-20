@@ -7,6 +7,7 @@ import { createSupabaseAuthSessionAdapter } from "./features/auth/supabase-auth-
 import { createBrowserSupabaseClient } from "./lib/supabase/client";
 import { createWorkflowReadService } from "./features/workflows/workflow-read-service";
 import { createProfileReadService } from "./features/profile/profile-read-service";
+import { createProjectReadService } from "./features/projects/project-read-service";
 import "./styles/global.css";
 
 const supabaseResult = createBrowserSupabaseClient({
@@ -29,6 +30,11 @@ const profileReadService =
     ? createProfileReadService(supabaseResult.client)
     : null;
 
+const projectReadService =
+  supabaseResult.status === "ready"
+    ? createProjectReadService(supabaseResult.client)
+    : null;
+
 function ConnectedApp() {
   const authState = useAuthState();
   const authActions = useAuthActions();
@@ -40,6 +46,7 @@ function ConnectedApp() {
       recoveryMode={recoveryMode}
       workflowReadService={workflowReadService}
       profileReadService={profileReadService}
+      projectReadService={projectReadService}
     />
   );
 }
