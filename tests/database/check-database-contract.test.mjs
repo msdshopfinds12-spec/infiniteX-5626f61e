@@ -20,8 +20,8 @@ const valid={
   constraints:[{name:'profiles_pkey',type:'p',definition:'PRIMARY KEY (id)',validated:true,deferrable:false,initiallyDeferred:false}],
   indexes:[{name:'profiles_pkey',definition:'CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)',unique:true,primary:true,valid:true,ready:true}],
   policies:[{name:'profiles_read',command:'SELECT',roles:['authenticated'],using:'true',check:null}],
-  grants:[{grantee:'postgres',privilege:'SELECT',grantable:true}],columnGrants:[],triggers:[]}],
- functions:[{schema:'public',name:'get_profile',owner:'postgres',language:'sql',resultType:'uuid',identityArguments:'user_id uuid',securityDefiner:false,searchPath:'',volatility:'STABLE',parallelSafety:'SAFE',strict:false,leakproof:false,executeRoles:['authenticated'],definitionMd5:'0123456789abcdef0123456789abcdef'}],
+  grants:[{grantor:'postgres',grantee:'postgres',privilege:'SELECT',grantable:true}],columnGrants:[],triggers:[]}],
+ functions:[{schema:'public',name:'get_profile',owner:'postgres',language:'sql',resultType:'uuid',identityArguments:'user_id uuid',securityDefiner:false,searchPath:'',volatility:'STABLE',parallelSafety:'SAFE',strict:false,leakproof:false,executeRoles:['authenticated']}],
  extensions:[{name:'pgcrypto',schema:'extensions',version:'1.3'}],
  types:[{schema_name:'public',name:'profile_state',kind:'enum',formatted_type:'profile_state',enum_labels:['active'],base_type:null,not_null:false}],
  roles:[{name:'authenticated',superuser:false,inherit:true,create_role:false,create_db:false,can_login:false,replication:false,bypass_rls:false,connection_limit:-1}],
@@ -41,3 +41,15 @@ test('SECURITY DEFINER without fixed search_path is rejected',async t=>{const v=
 test('approved snapshot requires reviewer evidence',async t=>{const r=await run(t,JSON.stringify({...valid,review:{reviewedBy:'',reviewedAt:'',reviewEvidence:''}}));assert.equal(r.status,1);assert.match(r.stderr,/review.reviewedBy/);});
 test('malformed JSON returns controlled error',async t=>{const r=await run(t,'{not-json');assert.equal(r.status,1);assert.match(r.stderr,/Unable to parse/);});
 test('null root returns validation error not crash',async t=>{const r=await run(t,'null');assert.equal(r.status,1);assert.match(r.stderr,/root must be a JSON object/);});
+
+test('different ACL grantors remain distinct identities',async t=>{
+ const value=structuredClone(valid);
+ value.tables[0].grants.push({grantor:'admin_role',grantee:'authenticated',privilege:'SELECT',grantable:false});
+ const r=await run(t,JSON.stringify(value));
+ assert.equal(r.status,0,r.stderr);
+});
+test('ACL grantor is required for relation grants',async t=>{
+ const value=structuredClone(valid);delete value.tables[0].grants[0].grantor;
+ const r=await run(t,JSON.stringify(value));
+ assert.equal(r.status,1);assert.match(r.stderr,/grantor must be a non-empty string/);
+});
