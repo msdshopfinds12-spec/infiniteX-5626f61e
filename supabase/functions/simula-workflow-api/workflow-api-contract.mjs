@@ -3,6 +3,7 @@ export const WORKFLOW_API_MAX_JSON_DEPTH = 12;
 export const WORKFLOW_API_MAX_JSON_NODES = 1_000;
 export const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const RUN_STATUSES = new Set(["queued", "running", "succeeded", "failed", "cancelled"]);
 
 const isRecord = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -36,6 +37,32 @@ function inspectJson(value, depth, budget) {
 
 export function validateIdempotencyKey(value) {
   return typeof value === "string" && IDEMPOTENCY_KEY_PATTERN.test(value);
+}
+
+/** Return a strict status allowlist; never serialize raw database rows or output payloads. */
+export function toWorkflowRunStatusDto(run) {
+  if (!isRecord(run) ||
+      typeof run.id !== "string" ||
+      !UUID_PATTERN.test(run.id) ||
+      typeof run.workflow_id !== "string" ||
+      !UUID_PATTERN.test(run.workflow_id) ||
+      !RUN_STATUSES.has(run.status) ||
+      !Number.isSafeInteger(run.attempt) ||
+      run.attempt < 0 ||
+      typeof run.created_at !== "string" ||
+      !(run.started_at === null || typeof run.started_at === "string") ||
+      !(run.finished_at === null || typeof run.finished_at === "string")) {
+    return null;
+  }
+  return Object.freeze({
+    id: run.id,
+    workflow_id: run.workflow_id,
+    status: run.status,
+    attempt: run.attempt,
+    created_at: run.created_at,
+    started_at: run.started_at,
+    finished_at: run.finished_at,
+  });
 }
 
 /** Validate only browser-owned business fields; ownership and lifecycle are server-derived. */
