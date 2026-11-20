@@ -82,6 +82,10 @@ function requireSafeInteger(value: number, label: string, minimum: number): void
   }
 }
 
+function isRetryFailureKind(value: unknown): value is RetryFailureKind {
+  return value === "transient" || value === "permanent" || value === "cancelled";
+}
+
 /**
  * Canonical, deterministic key for one logical step execution.
  * The version prefix permits future format migrations without ambiguous parsing.
@@ -239,6 +243,11 @@ export function createQueuedStepAttempt(input: CreateQueuedAttemptInput): StepAt
   requireText(input.idempotencyKey, "idempotency_key", 256);
   requireText(input.requestFingerprint, "request_fingerprint", 256);
   requireSafeInteger(input.attemptNumber, "attempt_number", 1);
+  if (input.idempotencyKey !== canonicalStepAttemptIdempotencyKey(
+    input.runId, input.stepId, input.attemptNumber,
+  )) {
+    throw new StepAttemptDomainError("idempotency_key_mismatch");
+  }
   requireSafeInteger(input.scheduledAtMs, "scheduled_at_ms", 0);
   const leaseGeneration = input.leaseGeneration ?? 0;
   requireSafeInteger(leaseGeneration, "lease_generation", 0);
@@ -308,10 +317,11 @@ export function heartbeatStepAttempt(
   if (attempt.heartbeatAtMs !== null && input.nowMs < attempt.heartbeatAtMs) {
     throw new StepAttemptDomainError("timestamp_regression");
   }
-  const leaseExpiresAtMs = input.nowMs + input.leaseDurationMs;
-  if (!Number.isSafeInteger(leaseExpiresAtMs)) {
+  const candidateExpiry = input.nowMs + input.leaseDurationMs;
+  if (!Number.isSafeInteger(candidateExpiry)) {
     throw new StepAttemptDomainError("lease_expiry_overflow");
   }
+  const leaseExpiresAtMs = Math.max(attempt.leaseExpiresAtMs!, candidateExpiry);
   return freezeAttempt({ ...attempt, heartbeatAtMs: input.nowMs, leaseExpiresAtMs });
 }
 
@@ -329,13 +339,19 @@ export function finishStepAttempt(
 ): StepAttempt {
   assertNotTerminal(attempt);
   assertActiveLease(attempt, input);
+  if (input.outcome !== "succeeded" && input.outcome !== "failed") {
+    throw new StepAttemptDomainError("outcome_invalid");
+  }
   if (attempt.heartbeatAtMs !== null && input.nowMs < attempt.heartbeatAtMs) {
     throw new StepAttemptDomainError("timestamp_regression");
   }
-  if (input.outcome === "failed" && !input.failureKind) {
+  if (input.outcome === "failed" && input.failureKind === undefined) {
     throw new StepAttemptDomainError("failure_kind_required");
   }
-  if (input.outcome === "succeeded" && input.failureKind) {
+  if (input.outcome === "failed" && !isRetryFailureKind(input.failureKind)) {
+    throw new StepAttemptDomainError("failure_kind_invalid");
+  }
+  if (input.outcome === "succeeded" && input.failureKind !== undefined) {
     throw new StepAttemptDomainError("success_failure_kind_conflict");
   }
   const errorCode = input.errorCode ?? null;
