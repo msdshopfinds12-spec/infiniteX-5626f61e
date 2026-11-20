@@ -8,6 +8,12 @@ export function isValidAttempt(value) {
   return Number.isSafeInteger(value) && value > 0;
 }
 
+/** True only when a candidate lease generation is strictly newer than stored state. */
+export function isAttemptGenerationNewer(storedAttempt, candidateAttempt) {
+  return isValidAttempt(storedAttempt) && isValidAttempt(candidateAttempt) &&
+    candidateAttempt > storedAttempt;
+}
+
 export function isClaimedRunValid(run) {
   return run !== null && typeof run === "object" && !Array.isArray(run) &&
     isNonEmptyString(run.id) &&
