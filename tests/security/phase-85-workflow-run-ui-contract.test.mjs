@@ -33,7 +33,7 @@ test("queue UI preserves idempotency on retry and never reports worker execution
 test("queue acceptance refreshes safe run history without exposing raw output", async () => {
   const list = await read("src/features/workflows/workflow-list.tsx");
   const history = await read("src/features/workflows/workflow-run-history.tsx");
-  assert.match(list, /runService=\{runService\}/);
+  assert.match(list, /service=\{runService\}/);
   assert.match(list, /historyRefreshToken/);
   assert.match(list, /refreshToken=\{historyRefreshToken\}/);
   assert.match(history, /refreshToken\?: number/);
