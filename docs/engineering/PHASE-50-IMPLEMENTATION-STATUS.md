@@ -1,31 +1,43 @@
 # InfiniteX Phase 50 — Implementation Status
 
-**Status:** INITIALIZED — design artifacts committed; backend implementation and verification outstanding  
+**Status:** Fail-closed authorization endpoint and pure policy tests added; runtime verification outstanding  
 **Parent PR:** #60  
-**Parent head:** `7606e9fb574acc57138baa02ff36407ae0bd61d5`  
 **Working branch:** `feat/phase-50-trusted-authorization`
 
-## Completed in this branch
+## Implemented in source
 
 - [x] Created an isolated Phase 50 branch from the exact PR #60 head.
-- [x] Added trusted authorization architecture.
-- [x] Added proposed API contract.
+- [x] Added trusted authorization architecture and API contract.
 - [x] Added synthetic-account security test plan.
-- [x] Recorded known schema risks and explicit non-goals.
+- [x] Added `supabase/functions/authorization/index.ts`.
+- [x] Reused exact-origin CORS and bounded streamed JSON parsing.
+- [x] Verify caller identity through Supabase Auth `getUser(token)`.
+- [x] Reject caller-supplied identity, owner, role, and permission fields.
+- [x] Return `503 POLICY_UNAVAILABLE` with zero permissions until an authoritative membership/role source is verified.
+- [x] Added runtime-neutral unit tests for empty-request validation and deny-by-default policy output.
 
-## Not completed
+## Not completed / not verified
 
-- [ ] Implement trusted Edge Function endpoint.
-- [ ] Confirm authoritative role/membership schema.
-- [ ] Implement server-side capability grants.
-- [ ] Implement account-scoped read-only service.
-- [ ] Implement secure workflow enqueue endpoint.
-- [ ] Remediate API-key hash column privilege (migration proposal only, pending approval).
-- [ ] Restrict workflow-run insert privileges (migration proposal only, pending approval).
-- [ ] Execute Owner A/Owner B isolation tests.
-- [ ] Run npm install/audit/lint/tests/build on this branch.
+- [ ] Authoritative membership/role schema and semantics.
+- [ ] Server-side capability grants.
+- [ ] Frontend invocation and loading/error integration.
+- [ ] Account-scoped read-only service.
+- [ ] Secure workflow enqueue endpoint.
+- [ ] API-key hash column privilege remediation (migration proposal only, pending separate approval).
+- [ ] Workflow-run lifecycle privilege remediation (migration proposal only, pending separate approval).
+- [ ] Owner A/Owner B isolation tests against an isolated Supabase test project.
+- [ ] Deno Edge Function runtime execution.
+- [ ] npm audit, lint, full unit tests, and production build on this exact branch head.
 - [ ] Independent security review.
 
 ## Safety invariants
 
-No production SQL, migrations, RLS/grant changes, secrets, billing, Edge Function deployment, Vercel deployment, merge, or release were performed. This status file must be updated only with evidence from the exact tested commit.
+No production SQL, migrations, GRANT/REVOKE, RLS changes, data mutations, secrets, billing, Supabase deployment, Vercel deployment, merge, or release were performed. The endpoint has not been deployed. The implementation is not production authorization completion.
+
+## Next acceptance gates
+
+1. Verify the authoritative membership and role tables/policies from schema evidence.
+2. Implement capability resolution with explicit deny-by-default semantics.
+3. Add endpoint integration tests using synthetic identities.
+4. Integrate frontend request handling without treating the UI snapshot as an enforcement boundary.
+5. Obtain independent security review before any migration or deployment.
