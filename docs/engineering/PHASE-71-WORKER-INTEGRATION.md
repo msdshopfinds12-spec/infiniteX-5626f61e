@@ -10,6 +10,8 @@ This phase extracts the authentication/privilege boundary from the two Deno work
 - `worker-auth-boundary.test.mjs`: executable Node tests using fake environment providers and mock Supabase clients.
 - Authenticated worker delegates bearer parsing, environment validation, and `auth.getUser` to the boundary.
 - Cron worker delegates secret validation and `simula_verify_worker_secret` to the boundary.
+- Bearer parsing trims HTTP optional whitespace and requires exactly one non-whitespace token; malformed schemes and multi-token values are rejected.
+- A regression was found during code review: the initial parser regex was double-escaped. It has been corrected and malformed-header cases were added to the test suite.
 - Existing downstream claim RPCs, owner checks, workflow execution, attempt fencing, and terminal writes remain in their respective adapters.
 
 ## Security invariants
