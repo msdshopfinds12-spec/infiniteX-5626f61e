@@ -45,7 +45,8 @@ export function validatePassword(value: string, minimumLength = 8): string | nul
 
 export function createPasswordRecoveryRedirect(origin: string): string {
   const safeOrigin = new URL(origin);
-  if (safeOrigin.protocol !== "https:" && safeOrigin.hostname !== "localhost") {
+  const isLoopbackHost = ["localhost", "127.0.0.1", "[::1]"].includes(safeOrigin.hostname);
+  if (safeOrigin.protocol !== "https:" && !isLoopbackHost) {
     throw new Error("Password recovery requires a secure HTTPS origin.");
   }
   return new URL("/?auth=recovery", safeOrigin).toString();
