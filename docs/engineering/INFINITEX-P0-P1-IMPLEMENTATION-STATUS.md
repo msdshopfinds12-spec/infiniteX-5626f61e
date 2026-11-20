@@ -23,21 +23,22 @@
 
 ## Verification evidence
 
-Last successful full CI head SHA: `9a25e1b044713c3cf478e569f2c6fb740b311d20`
+Current PR head SHA: `02943de2cf2299e705ec1db45f23d9a22072d2c3`
 
-GitHub Actions run #28: [44681684392](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44681684392)
+GitHub Actions run #30 on this exact head: [44682132729](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44682132729)
 
 - Node.js: v22.23.5; npm: 10.9.9.
-- `npm ci`: PASS.
+- `npm ci`: PASS — 30 packages installed from the committed lockfile.
 - `npm audit`: PASS — 0 vulnerabilities reported.
 - `npm run lint`: PASS.
 - `npm test`: PASS — 58 tests, 58 passed, 0 failed.
 - `npm run build`: PASS — Vite production bundle generated.
 - Build artifact uploaded to GitHub Actions artifact storage; it was not deployed.
+- The artifact is a build output only; it does not establish live authentication or production readiness.
 
 A first CI run exposed that Node test modules were included in the browser TypeScript project without Node type declarations. The application tsconfig now excludes `src/**/*.test.ts`, leaving those tests under the Node test runner.
 
-The latest branch also contains a documentation refresh and a formatting-only cleanup to keep the tsconfig diff minimal. Those later commits have not yet been represented by the successful run above; a fresh exact-head CI run is required before treating the current branch head as verified.
+The exact current PR head has now passed the full CI workflow. This verifies the existing demo/application build and regression suite only; it does not verify a live Supabase authentication integration.
 
 ## P1 integration blocker
 
