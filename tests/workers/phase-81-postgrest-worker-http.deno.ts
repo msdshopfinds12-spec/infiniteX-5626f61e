@@ -41,6 +41,11 @@ Deno.test({
     const userId = required("PHASE81_USER_ID");
     const runId = required("PHASE81_RUN_ID");
     const anonKey = "phase81-disposable-anon-key";
+    const executeSafeAction = (await import("../../supabase/functions/_shared/workflow-actions.mjs")).executeSafeAction;
+    let releaseBlockedAction!: () => void;
+    let notifyBlockedActionStarted!: () => void;
+    const blockedActionStarted = new Promise<void>((resolve) => { notifyBlockedActionStarted = resolve; });
+    const blockedActionGate = new Promise<void>((resolve) => { releaseBlockedAction = resolve; });
 
     const handler = createAuthenticatedWorkerHandler({
       createClient: createPostgrestClient as never,
@@ -53,7 +58,14 @@ Deno.test({
         },
       },
       corsHeadersForRequest: (request) => createCorsHeaders(request.headers.get("origin"), ""),
-      executeSafeAction: (await import("../../supabase/functions/_shared/workflow-actions.mjs")).executeSafeAction,
+      executeSafeAction: (async (actionType: string, input: unknown, config: Record<string, unknown>) => {
+        const payload = input && typeof input === "object" ? input as Record<string, unknown> : {};
+        if (payload.seed === "phase81-inflight-fencing") {
+          notifyBlockedActionStarted();
+          await blockedActionGate;
+        }
+        return executeSafeAction(actionType, input, config);
+      }) as never,
       // The integration supplies a deterministic synthetic identity boundary. The
       // JWT itself is still verified by PostgREST's signature/role enforcement.
       authenticateBearerRequest: (async ({ request, env, createClient: makeClient }: { request: Request; env: { get(name: string): string | undefined }; createClient: typeof createClient }) => {
@@ -136,8 +148,88 @@ Deno.test({
         .select("status,attempt")
         .eq("id", "81000000-3000-4000-8000-000000000002")
         .single();
+
       assert(!tenantBError && tenantB?.status === "queued" && tenantB.attempt === 0,
         "concurrent owner-A requests must not claim owner-B queue rows");
+
+      // Exercise a real database lease takeover while the old HTTP worker is
+      // blocked inside its action. The stale worker must fail its generation CAS.
+      const staleRunId = "81000000-3000-4000-8000-000000000004";
+      const staleRequestPromise = fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + userJwt,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ limit: 1 }),
+      });
+      await blockedActionStarted;
+
+      const { data: claimedRun, error: claimReadError } = await admin
+        .from("workflow_runs")
+        .select("id,status,attempt")
+        .eq("id", staleRunId)
+        .single();
+      assert(!claimReadError && claimedRun?.status === "running" && claimedRun.attempt === 1,
+        "stale-run fixture must be claimed at generation 1 before takeover");
+
+      const { data: newerRun, error: newerRunError } = await admin
+        .from("workflow_runs")
+        .update({ status: "running", attempt: 2, started_at: new Date().toISOString() })
+        .eq("id", staleRunId)
+        .eq("attempt", 1)
+        .select("id")
+        .maybeSingle();
+      assert(!newerRunError && newerRun?.id === staleRunId, "test must promote run to generation 2");
+
+      const { data: newerStep, error: newerStepError } = await admin
+        .from("workflow_step_runs")
+        .update({ status: "running", attempt: 2, started_at: new Date().toISOString(), finished_at: null })
+        .eq("run_id", staleRunId)
+        .eq("step_id", "81000000-2000-4000-8000-000000000001")
+        .eq("attempt", 1)
+        .select("id")
+        .maybeSingle();
+      assert(!newerStepError && newerStep?.id, "test must promote active step to generation 2");
+
+      releaseBlockedAction();
+      const staleResponse = await staleRequestPromise;
+      const staleBody = await staleResponse.json();
+      assert(staleResponse.status === 200, "superseded worker batch should return a safe summary");
+      assert(staleBody.superseded === 1 && staleBody.succeeded === 0,
+        "generation-1 worker must be reported as superseded: " + JSON.stringify(staleBody));
+
+      const { data: finalRun, error: finalRunError } = await admin
+        .from("workflow_runs")
+        .select("status,attempt")
+        .eq("id", staleRunId)
+        .single();
+      assert(!finalRunError && finalRun?.status === "running" && finalRun.attempt === 2,
+        "stale worker must not overwrite newer run generation");
+
+      const { data: finalStep, error: finalStepError } = await admin
+        .from("workflow_step_runs")
+        .select("status,attempt")
+        .eq("run_id", staleRunId)
+        .eq("step_id", "81000000-2000-4000-8000-000000000001")
+        .single();
+      assert(!finalStepError && finalStep?.status === "running" && finalStep.attempt === 2,
+        "stale worker must not overwrite newer step generation");
+
+      const { data: staleLogs, error: staleLogsError } = await admin
+        .from("workflow_logs")
+        .select("id")
+        .eq("run_id", staleRunId);
+      assert(!staleLogsError && staleLogs?.length === 0,
+        "stale worker must not write success logs after losing its lease");
+
+      const { data: laterSteps, error: laterStepsError } = await admin
+        .from("workflow_step_runs")
+        .select("id")
+        .eq("run_id", staleRunId)
+        .eq("step_id", "81000000-2000-4000-8000-000000000002");
+      assert(!laterStepsError && laterSteps?.length === 0,
+        "stale worker must stop before executing later workflow steps");
     } finally {
       await server.shutdown();
     }
