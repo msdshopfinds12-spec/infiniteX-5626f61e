@@ -110,7 +110,7 @@ export function createSupabaseAuthSessionAdapter(
         data: { subscription },
       } = client.auth.onAuthStateChange((_event, session) => {
         const userId = session?.user.id;
-        listener(userId ? { user: { id: userId } } : null);
+        listener(userId ? { user: { id: userId } } : null, _event);
       });
 
       return () => subscription.unsubscribe();
@@ -138,6 +138,34 @@ export function createSupabaseAuthSessionAdapter(
         return {
           status: "success",
           message: "Account request received. Check your email for the confirmation link before signing in.",
+        };
+      } catch (error) {
+        return mapAuthError(toSupabaseAuthError(error));
+      }
+    },
+
+    async requestPasswordReset(email, redirectTo) {
+      try {
+        const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
+        if (error) return mapAuthError(error);
+        // Avoid account enumeration: the same message is returned whether or not
+        // the address belongs to an account.
+        return {
+          status: "success",
+          message: "If an account exists for that email, a password reset link will be sent.",
+        };
+      } catch (error) {
+        return mapAuthError(toSupabaseAuthError(error));
+      }
+    },
+
+    async updatePassword(password) {
+      try {
+        const { error } = await client.auth.updateUser({ password });
+        if (error) return mapAuthError(error);
+        return {
+          status: "success",
+          message: "Your password has been updated. You can continue to your workspace.",
         };
       } catch (error) {
         return mapAuthError(toSupabaseAuthError(error));
