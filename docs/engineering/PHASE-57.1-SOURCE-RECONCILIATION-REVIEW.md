@@ -190,3 +190,57 @@ This review used GitHub PR metadata, changed-file lists, unified diffs and exact
 No application source, SQL, migration, dependency, workflow, secret, repository setting, branch protection, deployment, live database or billing state was changed by this review. No PR was merged and no production action was performed.
 
 **Next safe action:** human review of findings F-01 and F-02, then implement their fixes in isolated source branches with disposable-only tests and read-only CI permissions.
+
+
+## 7. Supplemental review — cron worker and attempt-ledger contract
+
+A follow-up source read of the full Phase 51 branch found that the retry gap is not isolated to the user-authenticated worker.
+
+### F-07 — The cron worker also ignores retry_limit
+
+**Severity:** HIGH — duplicate execution path / correctness  
+**Source:** PR #63 head a9568b5cdbf1405f55d3c85304f18ad897920e0a  
+**File:** supabase/functions/simula-workflow-cron-worker/index.ts
+
+Observed:
+- The cron worker selects retry_limit and timeout_seconds.
+- It uses the same current-state workflow_step_runs row and run attempt generation pattern.
+- It does not call decideStepRetry or planNextStepAttempt.
+- Its action failure path marks the step and run failed; it does not persist a distinct next attempt or due time.
+
+**Decision:** both worker entry points must be treated as non-retrying until a single shared, trusted persistence adapter is implemented. Do not fix only one worker and leave the other path behaviorally divergent. Prefer one shared orchestration service used by both authenticated and cron entry points, with distinct authentication/authorization adapters.
+
+### F-08 — Attempt-ledger architecture explicitly says persistence is NOT IMPLEMENTED
+
+**Severity:** CRITICAL — implementation readiness / schema safety  
+**Source:** PR #63 head  
+**Files:** docs/engineering/PHASE-51.3-DURABLE-STEP-ATTEMPT-LEDGER-CONTRACT.md, docs/engineering/PHASE-51.6B-ATTEMPT-LEASE-DOMAIN.md, docs/engineering/PHASE-51-WORKER-STATE-MACHINE-AND-TEST-MATRIX.md
+
+Observed:
+- Phase 51.3 marks the ledger contract “Design-only; no migration or production changes” and “Implementation status: NOT IMPLEMENTED”.
+- Phase 51.6B states pure domain code is implemented but persistence wiring is NOT IMPLEMENTED.
+- The test matrix explicitly says database/worker integration, concurrency and recovery tests remain unimplemented.
+- The ledger contract records that existing workflow_step_runs has UNIQUE (run_id, step_id), so it cannot represent immutable retry history by inserting another row for the same logical step without a reviewed schema change.
+- It explicitly warns not to reinterpret workflow_runs.attempt or workflow_step_runs.attempt as the new logical step-attempt counter.
+
+**Conclusion:** adding a call to the pure retry helper inside either worker is not a safe fix. The current schema's one-row-per-run/step projection cannot provide append-only attempt history, durable due scheduling, atomic queue/attempt/projection updates, or lease recovery. The correct implementation requires a reviewed additive persistence contract and disposable database migration/test evidence.
+
+**Hard stop:** no migration SQL or worker persistence adapter should be authored against guessed columns, FK targets, delete actions, uniqueness scopes, or grants. The reviewed hosted V2 snapshot remains required before migration design can be finalized.
+
+### F-09 — Retry jitter formula needs documentation consistency
+
+The pure retry helper implements capped multiplicative jitter:
+`rawDelay * (1 - jitterRatio + 2 * jitterRatio * random())`.
+The Phase 51.3 contract records this as the current implementation formula, while older architecture text described additive bounded jitter. Reconcile all architecture and test docs to one formula before runtime integration. This is a documentation consistency issue, not a runtime defect in the pure helper.
+
+## 8. Updated implementation disposition
+
+The correct next code phase is not “wire decideStepRetry directly into worker”. It is:
+1. Obtain the reviewed live V2 schema snapshot and inspect the full FK/unique/grant/policy/function surface.
+2. Approve a logical-to-physical mapping for append-only attempts, due scheduling, lease fencing, and enqueue idempotency.
+3. Implement the persistence adapter/RPCs in a disposable database branch with least-privilege grants.
+4. Integrate both worker entry points through the same adapter.
+5. Prove concurrency, duplicate delivery, crash recovery, cancellation arbitration, stale lease rejection and provider idempotency.
+6. Keep enqueue and external side effects disabled until independent review.
+
+This supplemental review does not authorize a schema migration or worker runtime change.
