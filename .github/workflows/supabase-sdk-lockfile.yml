@@ -1,0 +1,55 @@
+name: InfiniteX Supabase SDK lockfile generation
+
+on:
+  pull_request:
+    branches:
+      - eng/infinitex-unified-ui-backend-2026-11-20
+    paths:
+      - "package.json"
+      - ".github/workflows/supabase-sdk-lockfile.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-supabase-lockfile-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    name: Node 22 / generate reproducible Supabase SDK lockfile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Record toolchain
+        run: |
+          node --version
+          npm --version
+
+      - name: Generate lockfile with official npm resolver
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Verify clean reproducible install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Audit resolved dependency tree
+        run: npm audit
+
+      - name: Upload generated manifests for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infinitex-supabase-sdk-manifests-${{ github.sha }}
+          path: |
+            package.json
+            package-lock.json
+          if-no-files-found: error
+          retention-days: 3
