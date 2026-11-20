@@ -1,6 +1,6 @@
 # InfiniteX Phase 46C — Supabase SDK and Auth Adapter
 
-**Status:** PARTIAL — exact SDK dependency is committed and verified; typed browser client/session adapter is wired; sign-in UI and backend data access remain out of scope.
+**Status:** SDK, sign-in/sign-up, and password recovery UX are implemented with automated CI verification. Live provider configuration, OAuth/MFA, RLS isolation, and production data access remain pending.
 **Target branch:** `eng/infinitex-p0-p1-auth-2026-11-20`
 **Target PR:** #60 (Draft)
 **Dependency commit:** `f0fd57fd8aea8c50d4a2c0061f27e33a11676a2e`
@@ -63,7 +63,7 @@ If live credentials or backend integration is unavailable:
 
 ## 6. Explicitly not done
 
-- No sign-in/sign-up/password-reset UI or OAuth callback screen.
+- OAuth providers and MFA are not configured; password recovery is implemented in Phase 48 but not live-tested.
 - No protected routes or account-scoped data services.
 - No live RLS isolation test using synthetic Supabase users.
 - No production schema, RLS, migration, Edge Function, secret, environment, or billing changes.
@@ -142,3 +142,46 @@ Latest measured results:
 - No Vercel deployment was triggered by this verification workflow.
 
 The following documentation-only commit is not the exact source-tested commit; any subsequent source changes must trigger these checks again. Vercel build-rate-limit contexts remain independent failures and are not represented as cleared.
+
+
+## 8. Phase 48 — Password recovery and session hardening
+
+**Status:** IMPLEMENTED; exact-head automated quality gates passed. Live email delivery and callback acceptance remain unverified.
+
+### Implementation
+
+- Added a typed `requestPasswordReset(email, redirectTo)` action using the official Supabase SDK `resetPasswordForEmail`.
+- Recovery requests return a non-enumerating success message whether or not the email belongs to an account.
+- Added a same-origin recovery redirect builder. It accepts HTTPS origins and localhost development only; production UI derives the origin from `window.location.origin`, not user input.
+- The redirect is `/?auth=recovery`; the Supabase SDK uses its configured PKCE flow and URL callback detection to process the code.
+- The adapter forwards the SDK `PASSWORD_RECOVERY` event to the provider-neutral session layer.
+- Recovery mode is enabled only when the SDK emits `PASSWORD_RECOVERY` with a non-null session. A query-string value alone never authorizes recovery mode.
+- Added a password update action using `auth.updateUser({ password })`.
+- Added a recovery screen with new-password confirmation, 8–128 character validation, safe error handling, and an explicit sign-out transition back to normal sign-in after success.
+- Recovery mode remains active after `USER_UPDATED`; only a verified `SIGNED_OUT` event clears recovery mode.
+- Added regression coverage for recovery redirect validation, non-enumerating reset responses, safe provider error mapping, password updates, and recovery event propagation.
+
+### Security properties
+
+- No password, recovery code, access token, or refresh token is copied into application state or logs.
+- The application does not parse, store, or manually exchange the PKCE code; the official SDK owns callback processing.
+- The recovery screen is not enabled by `?auth=recovery` alone; it requires the SDK's authenticated recovery event and session.
+- Password reset UI does not reveal whether an account exists.
+- The recovery redirect must be explicitly allow-listed in the Supabase Auth URL Configuration. This setting has not been changed by this work.
+- Live email delivery, redirect allow-list acceptance, expiry/replay behavior, and end-to-end recovery are NOT TESTED.
+
+### Exact-head verification
+
+The first Phase 48 test run exposed a pre-existing malformed email-validation regex after the auth helper was expanded. The test caught it; the regex was corrected from an over-escaped pattern to the intended whitespace matcher before the successful run.
+
+Successful source verification at commit `1c9dbf5e9cc39f9034b67a9070305887c5cc9924`:
+- [InfiniteX Quality Gates run](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44700126775): SUCCESS.
+- `npm ci`: PASS — 43 packages installed; 44 audited.
+- `npm audit`: PASS — 0 vulnerabilities.
+- `npm run lint`: PASS.
+- `npm test`: PASS — 100 passed, 0 failed.
+- Edge Function CORS tests: PASS — 8 passed.
+- Worker security tests: PASS — 10 passed.
+- `npm run build`: PASS — 1,617 modules transformed.
+
+The subsequent fail-closed recovery-session guard and this documentation update require their own exact-head CI confirmation. No production Supabase settings, secrets, database, migration, deployment, or release were changed.
