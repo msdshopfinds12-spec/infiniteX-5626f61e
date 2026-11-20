@@ -31,12 +31,18 @@ test('catalog capture excludes application row and secret-value queries', async 
 
 test('ACL aggregation uses explicit deterministic catalog fields', async () => {
   const sql = await readFile(sqlPath, 'utf8');
-  assert.ok(sql.includes('ORDER BY a.grantee,a.privilege_type,a.is_grantable'), 'relation/schema ACLs must sort by explicit ACL fields');
-  assert.ok(sql.includes('ORDER BY a.attnum,x.grantee,x.privilege_type,x.is_grantable'), 'column ACLs must sort by ordinal and explicit ACL fields');
+  assert.ok(sql.includes('ORDER BY a.grantor,a.grantee,a.privilege_type,a.is_grantable'), 'relation/schema ACLs must sort by explicit ACL fields');
+  assert.ok(sql.includes('ORDER BY a.attnum,x.grantor,x.grantee,x.privilege_type,x.is_grantable'), 'column ACLs must sort by ordinal and explicit ACL fields');
   assert.equal(/ORDER BY\s+1\s*,\s*2\s*,\s*3/.test(sql), false, 'positional ACL ordering is forbidden');
 });
 
 test('sequence and relation ACL default object types remain PostgreSQL char values', async () => {
   const sql = await readFile(sqlPath, 'utf8');
   assert.ok(sql.includes("CASE WHEN t.relkind='S' THEN 'S'::\"char\" ELSE 'r'::\"char\" END"), 'acldefault CASE must be explicitly cast to PostgreSQL internal char');
+});
+
+test('catalog capture does not inspect or hash function bodies', async () => {
+  const sql = await readFile(sqlPath, 'utf8');
+  assert.equal(sql.includes('pg_get_functiondef'), false);
+  assert.equal(sql.includes('definitionMd5'), false);
 });
