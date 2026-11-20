@@ -70,3 +70,45 @@ If live credentials or backend integration is unavailable:
 - No merge, deployment, or release.
 
 **Release status: NOT APPROVED. Keep PR #60 Draft.**
+
+
+## 7. Phase 47 — Authentication UX implementation
+
+**Status:** IMPLEMENTED; automated quality gates passed on commit `b921c94d9d5bca7e88e7b684a717baea872a8dec`.
+
+Implemented on the same Draft PR:
+- Responsive sign-in and sign-up screen with accessible labels, keyboard focus, loading, success, and error states.
+- Email normalization and syntax/length validation.
+- Sign-up password minimum of 8 characters and maximum of 128 characters.
+- Existing sign-in passwords are not forced through the new-account minimum-length rule.
+- Password confirmation for account creation.
+- Typed `AuthActions` contract for sign-in, sign-up, and sign-out.
+- Supabase error mapping to safe, non-enumerating user messages; raw provider messages are not rendered or logged.
+- Session-gated dashboard: anonymous users see the auth screen; loading/error states fail closed; authenticated users may sign out.
+- Dashboard content remains demo-only after sign-in. Authentication does not grant access to any unverified data service.
+- A read-only GitHub Actions quality-gate workflow runs install, audit, lint, tests, edge/worker security tests, and production build.
+
+### Phase 47 verification evidence
+
+Workflow: [InfiniteX Quality Gates run 3](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44698961302)
+
+Exact tested commit: `b921c94d9d5bca7e88e7b684a717baea872a8dec`
+
+- `npm ci`: PASS — 43 packages installed; 44 audited.
+- `npm audit --audit-level=low`: PASS — 0 vulnerabilities.
+- `npm run lint`: PASS.
+- `npm test`: PASS — 92 tests, 0 failures.
+- `npm run test:edge-function-security`: PASS — 8 CORS tests and 10 worker security tests.
+- `npm run build`: PASS — Vite transformed 1,616 modules and generated the production bundle.
+- Node emitted a non-blocking dependency `url.parse()` deprecation warning; no test, audit, lint, or build failure resulted.
+
+### Phase 47 known limitations / next gates
+
+- Password recovery is intentionally not exposed until the PASSWORD_RECOVERY callback and password-update flow can be implemented and tested end-to-end.
+- OAuth providers and MFA are not configured.
+- No CAPTCHA or custom anti-abuse integration is enabled; Supabase Auth rate limits remain provider configuration.
+- No live Supabase test account or production credential was used.
+- No RLS-backed data query, production database mutation, schema migration, Edge Function deployment, Vercel deployment, or release was performed.
+- The Vercel build status contexts still report a build-rate-limit failure; the successful GitHub Actions build is separate evidence and does not clear those Vercel contexts.
+
+**Phase 47 release status:** Code and CI verified; live provider integration and security acceptance remain pending. PR #60 stays Draft.
