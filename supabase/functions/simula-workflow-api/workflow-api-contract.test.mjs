@@ -5,6 +5,7 @@ import {
   WORKFLOW_API_MAX_BODY_BYTES,
   validateEnqueueWorkflowRequest,
   validateIdempotencyKey,
+  toWorkflowRunStatusDto,
   parseWorkflowApiRoute,
 } from "./workflow-api-contract.mjs";
 
@@ -68,6 +69,49 @@ test("accepts only bounded opaque idempotency keys", () => {
     assert.equal(validateIdempotencyKey(value), false);
   }
   assert.equal(IDEMPOTENCY_KEY_PATTERN.test("safe.key:123-abc"), true);
+});
+
+test("status DTO is allowlisted and excludes output, owner, input, and error internals", () => {
+  const source = {
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    workflow_id: WORKFLOW_ID,
+    owner_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    status: "succeeded",
+    attempt: 2,
+    created_at: "2026-11-20T00:00:00.000Z",
+    started_at: "2026-11-20T00:00:01.000Z",
+    finished_at: "2026-11-20T00:00:02.000Z",
+    output: { secret: "must-not-leak" },
+    input: { private: true },
+    error_message: "internal stack trace",
+  };
+  const dto = toWorkflowRunStatusDto(source);
+  assert.deepEqual(dto, {
+    id: source.id,
+    workflow_id: source.workflow_id,
+    status: source.status,
+    attempt: source.attempt,
+    created_at: source.created_at,
+    started_at: source.started_at,
+    finished_at: source.finished_at,
+  });
+  assert.equal(Object.hasOwn(dto, "output"), false);
+  assert.equal(Object.hasOwn(dto, "owner_id"), false);
+  assert.equal(Object.hasOwn(dto, "error_message"), false);
+});
+
+test("status DTO rejects malformed or unsupported database rows", () => {
+  assert.equal(toWorkflowRunStatusDto(null), null);
+  assert.equal(toWorkflowRunStatusDto({ id: "not-a-uuid" }), null);
+  assert.equal(toWorkflowRunStatusDto({
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    workflow_id: WORKFLOW_ID,
+    status: "unknown",
+    attempt: 0,
+    created_at: "now",
+    started_at: null,
+    finished_at: null,
+  }), null);
 });
 
 test("parses collection route with or without the function gateway prefix", () => {
