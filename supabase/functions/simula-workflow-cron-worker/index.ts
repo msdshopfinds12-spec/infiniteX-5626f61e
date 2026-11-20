@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { executeSafeAction } from "../_shared/workflow-actions.mjs";
+import { authenticateCronRequest } from "../_shared/worker-auth-boundary.mjs";
 import {
   clampBatchLimit,
   executeWithinStepBudget,
@@ -43,23 +44,16 @@ async function logEvent(
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return reply(405, { ok: false, error: "method_not_allowed" });
 
-  const suppliedSecret = req.headers.get("x-simula-worker-secret");
-  if (!suppliedSecret || suppliedSecret.length < 32) return reply(401, { ok: false, error: "unauthorized" });
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error("worker_environment_incomplete");
-    return reply(500, { ok: false, error: "worker_environment_incomplete" });
-  }
-
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
+  const authentication = await authenticateCronRequest({
+    request: req,
+    env: { get: (key: string) => Deno.env.get(key) },
+    createClient,
   });
-  const { data: secretValid, error: verifyError } = await admin.rpc(
-    "simula_verify_worker_secret", { p_secret: suppliedSecret },
-  );
-  if (verifyError || secretValid !== true) return reply(401, { ok: false, error: "unauthorized" });
+  if (!authentication.ok) {
+    if (authentication.status === 500) console.error("worker_environment_incomplete");
+    return reply(authentication.status, { ok: false, error: authentication.error });
+  }
+  const { admin, supabaseUrl, serviceRoleKey } = authentication;
 
   const bodyResult = await readJsonBodyLimited(req, 2048);
   if (!bodyResult.ok) {
