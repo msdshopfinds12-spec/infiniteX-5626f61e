@@ -110,7 +110,7 @@ test("successful completion stores a detached deeply immutable JSON snapshot", (
   assert.deepEqual(done.output, output);
   assert.equal(Object.isFrozen(done.output), true);
   assert.equal(Object.isFrozen((done.output as { nested: object }).nested), true);
-  assert.equal(Object.isFrozen((done.output as { nested: { values: unknown[] } }).nested.values), true);
+  assert.equal(Object.isFrozen((done.output as { nested: { values: readonly unknown[] } }).nested.values), true);
   output.nested.values.push(3);
   assert.deepEqual(done.output, { result: "synthetic", nested: { values: [1, 2] } });
   assert.throws(
