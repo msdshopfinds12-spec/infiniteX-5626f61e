@@ -172,3 +172,12 @@ The disposable PostgreSQL job executes the 19 recovered statements and separatel
 **Scope precision:** the row-lock harness is real PostgreSQL session testing, not a high-volume claim stress test. It does not prove the deployed Edge Functions have been updated or that a live workflow completes end to end. No production SQL writes, migration, function deployment, secret change, cron change, merge, or release occurred.
 
 The exact candidate CI pass is code evidence for the candidate branch. It is not a substitute for full live catalog parity, deployed source reconciliation, operational monitoring, and a separately approved rollout.
+
+
+## 11. Phase 69 correction — parallel stress evidence
+
+The earlier statement that high-volume concurrency was untested is superseded for the bounded CI scenario. On candidate head `aaf9bb1d3f16904ec07d5e32b1c495ec8010dd3a`, 16 concurrent PostgreSQL sessions claimed 80 synthetic runs exactly once; all attempt generations were 1 and no queued fixtures remained. Two concurrent inserts for one `(run_id, step_id)` identity produced exactly one row.
+
+[PR Phase 69 PostgreSQL replay/stress/security — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44796503703)
+
+The older sections describing the initial missing migration source are historical observations and are superseded by Phase 68 recovery. The older statement that there is no candidate migration directory is no longer current. The live catalog parity and deployed worker parity gaps remain open.
