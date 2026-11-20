@@ -9,6 +9,18 @@ type SupabaseAuthError = Readonly<{
   message?: string;
 }>;
 
+function toSupabaseAuthError(error: unknown): SupabaseAuthError {
+  if (typeof error === "object" && error !== null) {
+    const candidate = error as { code?: unknown; status?: unknown; message?: unknown };
+    return {
+      code: typeof candidate.code === "string" ? candidate.code : undefined,
+      status: typeof candidate.status === "number" ? candidate.status : undefined,
+      message: typeof candidate.message === "string" ? candidate.message : undefined,
+    };
+  }
+  return { message: typeof error === "string" ? error : undefined };
+}
+
 function mapAuthError(error: SupabaseAuthError): AuthActionResult {
   const code = error.code?.toLowerCase() ?? "";
   const message = error.message?.toLowerCase() ?? "";
@@ -37,10 +49,7 @@ function mapAuthError(error: SupabaseAuthError): AuthActionResult {
     };
   }
 
-  if (
-    message.includes("email not confirmed") ||
-    code.includes("email_not_confirmed")
-  ) {
+  if (message.includes("email not confirmed") || code.includes("email_not_confirmed")) {
     return {
       status: "error",
       code: "email-not-confirmed",
@@ -108,29 +117,41 @@ export function createSupabaseAuthSessionAdapter(
     },
 
     async signIn(email, password) {
-      const { error } = await client.auth.signInWithPassword({ email, password });
-      if (error) return mapAuthError(error);
-      return { status: "success", message: "You are signed in." };
+      try {
+        const { error } = await client.auth.signInWithPassword({ email, password });
+        if (error) return mapAuthError(error);
+        return { status: "success", message: "You are signed in." };
+      } catch (error) {
+        return mapAuthError(toSupabaseAuthError(error));
+      }
     },
 
     async signUp(email, password) {
-      const { data, error } = await client.auth.signUp({ email, password });
-      if (error) return mapAuthError(error);
+      try {
+        const { data, error } = await client.auth.signUp({ email, password });
+        if (error) return mapAuthError(error);
 
-      if (data.session) {
-        return { status: "success", message: "Your account is ready." };
+        if (data.session) {
+          return { status: "success", message: "Your account is ready." };
+        }
+
+        return {
+          status: "success",
+          message: "Account request received. Check your email for the confirmation link before signing in.",
+        };
+      } catch (error) {
+        return mapAuthError(toSupabaseAuthError(error));
       }
-
-      return {
-        status: "success",
-        message: "Account request received. Check your email for the confirmation link before signing in.",
-      };
     },
 
     async signOut() {
-      const { error } = await client.auth.signOut();
-      if (error) return mapAuthError(error);
-      return { status: "success", message: "You have been signed out." };
+      try {
+        const { error } = await client.auth.signOut();
+        if (error) return mapAuthError(error);
+        return { status: "success", message: "You have been signed out." };
+      } catch (error) {
+        return mapAuthError(toSupabaseAuthError(error));
+      }
     },
   };
 }
