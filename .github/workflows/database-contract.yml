@@ -44,6 +44,8 @@ jobs:
           node --check tests/database/platform-api-key-column-grants.test.mjs
           node --check tests/database/migration-provenance.test.mjs
           node --check tests/database/phase-52-1b-postgres-security.test.mjs
+          node --check scripts/rehearse-migration-chain.mjs
+          node --check tests/database/phase-52-1c-migration-rehearsal.test.mjs
       - name: Verify applied versus candidate migration provenance
         run: node scripts/verify-migration-provenance.mjs
       - name: Run migration provenance regression tests
@@ -62,6 +64,8 @@ jobs:
         run: node --test tests/database/platform-api-key-column-grants.test.mjs
       - name: Run Phase 52.1B PostgreSQL harness guard tests
         run: node --test tests/database/phase-52-1b-postgres-security.test.mjs
+      - name: Run Phase 52.1C migration rehearsal regression tests
+        run: node --test tests/database/phase-52-1c-migration-rehearsal.test.mjs
       - name: Run migration integrity regression tests
         run: node --test tests/database/check-migration-integrity.test.mjs
       - name: Check migration naming and content integrity
@@ -209,3 +213,62 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: infinitex_security_test
         run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-52-1b-postgres-security.sql
+
+
+  migration-chain-rehearsal:
+    name: Supabase PostgreSQL 17 disposable migration-chain rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Start isolated Supabase PostgreSQL 17 container with scheduled jobs disabled
+        run: |
+          docker run -d --name infinitex-rehearsal-db \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_USER=supabase_admin \
+            -e POSTGRES_DB=infinitex_rehearsal \
+            -p 5432:5432 \
+            supabase/postgres:17.6.1.136 \
+            postgres -c config_file=/etc/postgresql/postgresql.conf \
+              -c shared_preload_libraries=pg_cron \
+              -c cron.database_name=infinitex_rehearsal \
+              -c cron.launch_active_jobs=off
+          for attempt in $(seq 1 60); do
+            if pg_isready -h 127.0.0.1 -p 5432 -U supabase_admin -d infinitex_rehearsal; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs infinitex-rehearsal-db
+          exit 1
+      - name: Replay recovered migrations in disposable database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        shell: bash
+        run: |
+          set +e
+          node scripts/rehearse-migration-chain.mjs
+          status=$?
+          set -e
+          if [ "$status" -eq 2 ]; then
+            echo "::warning::Migration replay BLOCKED by missing authoritative platform or application baseline. See report; no schema was fabricated."
+            exit 0
+          fi
+          exit "$status"
+      - name: Collect disposable database container logs
+        if: always()
+        run: docker logs infinitex-rehearsal-db 2>&1 | tail -n 200 || true
+      - name: Remove disposable database container
+        if: always()
+        run: docker rm -f infinitex-rehearsal-db || true
