@@ -1,0 +1,62 @@
+name: InfiniteX Phase 80 Test Source Type Safety
+
+on:
+  push:
+    branches:
+      - phase-80/test-source-type-safety
+    paths:
+      - ".github/workflows/phase-80-test-source-type-safety.yml"
+      - "src/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+  pull_request:
+    paths:
+      - ".github/workflows/phase-80-test-source-type-safety.yml"
+      - "src/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-phase-80-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-source-type-safety:
+    name: Node 22 / Test source type safety
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configure Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install reproducibly from lockfile
+        run: npm ci
+
+      - name: Install ephemeral Node.js type definitions
+        run: npm install --no-save --package-lock=false --ignore-scripts @types/node@22.19.3
+
+      - name: Type-check all TypeScript test sources
+        run: npx tsc --noEmit -p tsconfig.test.json
+
+      - name: Existing project lint
+        run: npm run lint
+
+      - name: Existing regression suite
+        run: npm test
+
+      - name: Production build
+        run: npm run build
