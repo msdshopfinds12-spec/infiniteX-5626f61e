@@ -105,8 +105,6 @@ Deno.test({
         .eq("step_id", stepId!)
         .eq("owner_id", ownerId!)
         .eq("attempt", attempt);
-      assert(!cleanupStepError, cleanupStepError?.message ?? "fixture_step_cleanup_failed");
-
       const { error: cleanupRunError } = await admin
         .from("workflow_runs")
         .update({ attempt })
@@ -114,7 +112,12 @@ Deno.test({
         .eq("owner_id", ownerId!)
         .eq("status", "running")
         .eq("attempt", attempt + 1);
-      assert(!cleanupRunError, cleanupRunError?.message ?? "fixture_run_cleanup_failed");
+
+      const cleanupErrors = [
+        cleanupStepError?.message,
+        cleanupRunError?.message,
+      ].filter((message): message is string => Boolean(message));
+      assertEquals(cleanupErrors, [], "fixture_cleanup_must_restore_all_mutated_state");
     }
   },
 });
