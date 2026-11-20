@@ -14,6 +14,8 @@ on:
       - "scripts/rehearse-migration-chain.mjs"
       - "scripts/test-workflow-claim-stress.sh"
       - "tests/database/phase-52-1*"
+      - "tests/database/phase-63-*"
+      - "tests/database/run-phase-63-*"
       - ".github/workflows/infinitex-phase-68-database-replay.yml"
 
 permissions:
@@ -101,6 +103,21 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: infinitex_security_test
         run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-52-1b-postgres-security.sql
+      - name: Create isolated Phase 63 retry regression database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+        run: createdb --maintenance-db=postgres infinitex_phase63_retry
+      - name: Prove old retry lookup fails and corrected lookup passes
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_phase63_retry
+        run: bash tests/database/run-phase-63-retry-idempotency-regression.sh
       - name: Collect disposable PostgreSQL logs
         if: always()
         run: docker logs infinitex-phase68-replay 2>&1 | tail -n 200 || true
