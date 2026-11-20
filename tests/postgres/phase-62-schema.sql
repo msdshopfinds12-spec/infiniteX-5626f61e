@@ -94,29 +94,31 @@ LANGUAGE plpgsql
 IMMUTABLE
 STRICT
 SET search_path = phase62, pg_temp
-AS $
+AS $phase62$
 DECLARE
   v_bytes bytea := convert_to(p_value, 'UTF8');
   v_result text := '';
   v_byte integer;
-  v_char text;
+  i integer;
 BEGIN
-  FOR i IN 0..length(v_bytes) - 1 LOOP
+  IF octet_length(v_bytes) = 0 THEN
+    RETURN '';
+  END IF;
+
+  FOR i IN 0..octet_length(v_bytes) - 1 LOOP
     v_byte := get_byte(v_bytes, i);
-    v_char := chr(v_byte);
     IF (v_byte BETWEEN 65 AND 90)
        OR (v_byte BETWEEN 97 AND 122)
        OR (v_byte BETWEEN 48 AND 57)
-       OR v_char IN ('-', '_', '.', '!', '~', '*', '''', '(', ')') THEN
-      v_result := v_result || v_char;
+       OR v_byte IN (45, 95, 46, 33, 126, 42, 39, 40, 41) THEN
+      v_result := v_result || chr(v_byte);
     ELSE
       v_result := v_result || '%' || upper(lpad(to_hex(v_byte), 2, '0'));
     END IF;
   END LOOP;
   RETURN v_result;
 END;
-$;
-
+$phase62$;
 CREATE FUNCTION phase62.fail_and_schedule_retry(
   p_attempt_id text,
   p_owner_id text,
