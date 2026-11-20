@@ -190,24 +190,34 @@ export async function executeWithRetry(action, retryLimit, options = {}) {
   const retries = validateRetryLimit(retryLimit);
   const baseDelayMs = options.baseDelayMs ?? 100;
   const maxDelayMs = options.maxDelayMs ?? 1000;
+  const maxElapsedMs = options.maxElapsedMs ?? 30_000;
   const sleep = options.sleep ?? ((milliseconds) =>
     new Promise((resolve) => setTimeout(resolve, milliseconds)));
   const random = options.random ?? Math.random;
+  const now = options.now ?? (() => performance.now());
   if (!Number.isInteger(baseDelayMs) || baseDelayMs < 0 ||
       !Number.isInteger(maxDelayMs) || maxDelayMs < baseDelayMs ||
-      typeof sleep !== "function" || typeof random !== "function") {
+      !Number.isFinite(maxElapsedMs) || maxElapsedMs < 1 ||
+      typeof sleep !== "function" || typeof random !== "function" || typeof now !== "function") {
     throw new TypeError("invalid_retry_options");
   }
 
+  const deadline = now() + maxElapsedMs;
   for (let attempt = 0; ; attempt++) {
+    if (now() >= deadline) throw new Error("step_timeout_exceeded");
     try {
-      return await action(attempt);
+      const result = await action(attempt);
+      if (now() >= deadline) throw new Error("step_timeout_exceeded");
+      return result;
     } catch (error) {
       if (attempt >= retries || !isRetryableStepError(error)) throw error;
+      const remainingMs = deadline - now();
+      if (remainingMs <= 0) throw new Error("step_timeout_exceeded");
       const ceiling = Math.min(maxDelayMs, baseDelayMs * (2 ** attempt));
       const sample = random();
       const boundedSample = Number.isFinite(sample) ? Math.max(0, Math.min(1, sample)) : 0;
-      await sleep(Math.floor(ceiling * boundedSample));
+      const delayMs = Math.min(Math.floor(ceiling * boundedSample), Math.floor(remainingMs));
+      if (delayMs > 0) await sleep(delayMs);
     }
   }
 }
