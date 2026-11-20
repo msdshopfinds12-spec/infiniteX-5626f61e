@@ -37,8 +37,10 @@ jobs:
           node-version: '22'
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install --yes postgresql-client
-      - name: Verify worker source contracts
+      - name: Verify worker source and Phase 77 harness contracts
         run: |
+          npm run test:phase-77-contract
+          bash -n scripts/test-phase-77-worker-state-machine.sh
           npm run test:edge-worker-security
           npm run test:edge-function-cors
           npm run test:worker-http-boundary
