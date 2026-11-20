@@ -3,7 +3,7 @@
 **Review target:** `engineering/infinitex-canonical-integration-candidate`  
 **Review basis:** source files fetched from the candidate branch on 2026-11-21  
 **Review mode:** read-only source inspection; this document adds findings only  
-**Status:** PARTIAL — source changes and CI verified; live database concurrency proof and deployed-runtime parity remain pending
+**Status:** PARTIAL — candidate source, disposable PostgreSQL replay/concurrency/security tests, and exact-head CI verified; deployed-runtime parity and production end-to-end execution remain pending
 
 ## Executive decision
 
@@ -29,18 +29,18 @@ See [WORKER-RETRY-POLICY.md](./WORKER-RETRY-POLICY.md). Exact-head CI and deploy
 
 **Required fix:** keep the allowlist strictly synchronous and cheap, with bounded input/output; for external or long-running actions use a separately cancellable job boundary with a durable lease, deadline, and idempotency key. Rename/document the current helper as a cooperative budget check if that improves clarity. Add a test proving the contract is explicitly cooperative, not preemptive.
 
-### WF-03 — Claim RPC and uniqueness contract verified; live concurrency proof blocked
+### WF-03 — Claim RPC and uniqueness contract verified; isolated PostgreSQL contention tests pass
 
-The workers use a unique-conflict recovery path and conditional updates filtered by `run_id`, `step_id`, `owner_id`, and a lower `attempt` generation. The live catalog confirms `UNIQUE (run_id, step_id)`, both claim RPCs use `FOR UPDATE SKIP LOCKED`, and status transition plus attempt increment occur in one update. The internal claim function also requeues running leases older than 15 minutes below attempt 5 and fails those at/above attempt 5. Both candidate workers perform an early strict-generation check and retain the conditional database update (`attempt < candidate`) as the authoritative compare-and-set. However, the candidate repository has no `supabase/config.toml` or migration directory despite 19 migrations applied to the connected database, so a faithful local integration test cannot yet be constructed.
+The workers use a unique-conflict recovery path and conditional updates filtered by `run_id`, `step_id`, `owner_id`, and a lower `attempt` generation. The live catalog confirms `UNIQUE (run_id, step_id)`, both claim RPCs use `FOR UPDATE SKIP LOCKED`, and status transition plus attempt increment occur in one update. The internal claim function also requeues running leases older than 15 minutes below attempt 5 and fails those at/above attempt 5. Both candidate workers perform an early strict-generation check and retain the conditional database update (`attempt < candidate`) as the authoritative compare-and-set. The 19 ledger-recovered SQL statements and provenance/test harness have since been restored into the candidate. An isolated PostgreSQL 17 test now uses real sessions and a deliberately held row lock to verify `SKIP LOCKED`, distinct claim generations, lease recovery, attempt-5 terminal failure, step-run uniqueness, and stale-generation update rejection.
 
-**Impact:** without the matching unique constraint and claim-generation semantics, duplicate rows or stale-worker races may not be prevented as intended.
+**Impact:** production correctness still depends on the deployed workers being brought to the candidate generation-fencing contract through a separately approved rollout.
 
-**Remaining verification:** recover the exact 19 migration sources and Supabase config into the candidate repo, then reproduce concurrent claims, lease expiry/reclaim, insert races, and late stale completions against an isolated PostgreSQL/Supabase environment. The read-only live catalog inspection confirmed the definitions/privileges of:
+**Verified isolated behavior:** candidate replay and database contention tests pass on exact head `37863d751532e8293a0a4f69c9fb16d1a7b7c278`. The test uses two PostgreSQL sessions around a held row lock; it is not a high-volume claim stress test or a complete Edge Function end-to-end race test. The read-only live catalog inspection confirmed the definitions/privileges of:
 - `simula_claim_workflow_runs`
 - `simula_claim_workflow_runs_internal`
 - `simula_verify_worker_secret`
 
-Verify the unique key for `workflow_step_runs` (expected candidate: `run_id, step_id`), atomic queue claiming, lease expiry/reclaim behavior, attempt increment semantics, and function EXECUTE grants. Do not infer these properties from TypeScript types.
+Keep verifying the unique key for `workflow_step_runs`, atomic queue claiming, lease expiry/reclaim behavior, attempt increment semantics, and function EXECUTE grants on every schema revision. Do not infer these properties from TypeScript types.
 
 ### WF-04 — Shared action executor extracted; state-machine parity remains
 
@@ -66,7 +66,7 @@ The authenticated worker and cron worker now import the same runtime-neutral `wo
 
 1. Capture genuine read-only database metadata from the intended Supabase project and independently compare it with `src/lib/supabase/database.types.ts`.
 2. Verify indexes, constraints, RLS policies, function definitions, function grants, and worker-secret storage/rotation design.
-3. Add worker integration tests using an isolated local/test database or deterministic RPC fakes; cover concurrent claims and lease expiry. Current deterministic concurrency-model tests are contract tests, not PostgreSQL concurrency proof.
+3. Expand isolated PostgreSQL tests into high-volume concurrent claim stress, simultaneous duplicate insert races, and full worker-adapter end-to-end tests. Current row-lock test is real database-session evidence but not a high-volume stress test.
 4. Retry semantics are now implemented and covered by Node/Deno tests; external action adapters still need idempotency and integration tests before retrying real upstream calls.
 5. Add tests for malformed claim RPC rows, duplicate step-run insertion races, stale generations, partial failure, and logging failures.
 6. Run all candidate CI checks on the exact resulting commit.
