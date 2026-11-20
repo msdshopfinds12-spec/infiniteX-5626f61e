@@ -36,7 +36,7 @@ table_contract AS (
  COALESCE((SELECT jsonb_agg(jsonb_build_object(
   'grantee',CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE r.rolname END,
   'privilege',a.privilege_type,'grantable',a.is_grantable
- ) ORDER BY 1,2,3) FROM pg_catalog.aclexplode(COALESCE(
+ ) ORDER BY a.grantee,a.privilege_type,a.is_grantable) FROM pg_catalog.aclexplode(COALESCE(
   (SELECT c.relacl FROM pg_catalog.pg_class c WHERE c.oid=t.oid),
   pg_catalog.acldefault(CASE WHEN t.relkind='S' THEN 'S' ELSE 'r' END,
     (SELECT c.relowner FROM pg_catalog.pg_class c WHERE c.oid=t.oid))
@@ -44,7 +44,7 @@ table_contract AS (
  COALESCE((SELECT jsonb_agg(jsonb_build_object(
   'column',a.attname,'grantee',CASE WHEN x.grantee=0 THEN 'PUBLIC' ELSE r.rolname END,
   'privilege',x.privilege_type,'grantable',x.is_grantable
- ) ORDER BY a.attnum,2,3) FROM pg_catalog.pg_attribute a
+ ) ORDER BY a.attnum,x.grantee,x.privilege_type,x.is_grantable) FROM pg_catalog.pg_attribute a
  CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) x LEFT JOIN pg_catalog.pg_roles r ON r.oid=x.grantee
  WHERE a.attrelid=t.oid AND a.attnum>0 AND NOT a.attisdropped AND a.attacl IS NOT NULL),'[]'::jsonb) AS column_grants,
  COALESCE((SELECT jsonb_agg(jsonb_build_object(
@@ -77,7 +77,7 @@ schema_contract AS (
   COALESCE((SELECT jsonb_agg(jsonb_build_object(
    'grantee',CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE r.rolname END,
    'privilege',a.privilege_type,'grantable',a.is_grantable
-  ) ORDER BY 1,2,3) FROM pg_catalog.aclexplode(COALESCE(n.nspacl,pg_catalog.acldefault('n',n.nspowner))) a
+  ) ORDER BY a.grantee,a.privilege_type,a.is_grantable) FROM pg_catalog.aclexplode(COALESCE(n.nspacl,pg_catalog.acldefault('n',n.nspowner))) a
   LEFT JOIN pg_catalog.pg_roles r ON r.oid=a.grantee),'[]'::jsonb) AS grants
  FROM scope_schemas s JOIN pg_catalog.pg_namespace n ON n.oid=s.oid
 ),
