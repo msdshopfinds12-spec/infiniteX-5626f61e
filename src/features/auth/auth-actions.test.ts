@@ -36,3 +36,15 @@ test("rejects insecure non-localhost password recovery origins", () => {
     "http://localhost:5173/?auth=recovery",
   );
 });
+
+
+test("allows explicit IPv4 and IPv6 loopback origins for local recovery", () => {
+  assert.equal(
+    createPasswordRecoveryRedirect("http://127.0.0.1:4174"),
+    "http://127.0.0.1:4174/?auth=recovery",
+  );
+  assert.equal(
+    createPasswordRecoveryRedirect("http://[::1]:4174"),
+    "http://[::1]:4174/?auth=recovery",
+  );
+});
