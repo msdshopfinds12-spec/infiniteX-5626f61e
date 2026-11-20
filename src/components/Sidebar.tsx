@@ -1,10 +1,11 @@
-import { Activity, Bot, GitBranch, Settings, ShieldCheck, Terminal, Zap, type LucideIcon } from "lucide-react";
+import { Activity, Bot, BriefcaseBusiness, GitBranch, Settings, ShieldCheck, Terminal, Zap, type LucideIcon } from "lucide-react";
 import type { ViewKey } from "../types";
 
 const nav: { key: ViewKey; label: string; icon: LucideIcon }[] = [
   { key: "overview", label: "Overview", icon: Activity },
   { key: "agents", label: "AI Agents", icon: Bot },
   { key: "pipelines", label: "Pipelines", icon: GitBranch },
+  { key: "projects", label: "Projects", icon: BriefcaseBusiness },
   { key: "logs", label: "Log Stream", icon: Terminal },
   { key: "security", label: "Security", icon: ShieldCheck },
   { key: "settings", label: "Settings", icon: Settings },
