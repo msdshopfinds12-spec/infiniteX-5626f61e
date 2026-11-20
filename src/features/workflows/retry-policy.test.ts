@@ -147,6 +147,8 @@ test("invalid attempt, retry, clock, delay and jitter values fail closed", () =>
     { baseDelayMs: 2_000, maxDelayMs: 1_000 },
     { jitterRatio: -0.1 },
     { jitterRatio: 1.1 },
+    { random: "not-a-function" },
+    { failureKind: "unknown" },
     { random: () => Number.NaN },
     { random: () => 1.1 },
   ]) {
