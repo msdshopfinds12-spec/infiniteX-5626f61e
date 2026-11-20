@@ -17,6 +17,18 @@ Deno.test({
     // Fail closed: missing fixture configuration must never turn a required test green.
     assert(configured, "phase_4n8b_fixture_configuration_required");
 
+    // Hard-stop if someone accidentally points the destructive fixture test at production.
+    const fixtureUrl = new URL(url!);
+    assert(
+      fixtureUrl.hostname !== "vepacoemkhudamfaccah.supabase.co",
+      "phase_4n8b_refusing_production_supabase_endpoint",
+    );
+    assert(
+      fixtureUrl.protocol === "https:" || fixtureUrl.hostname === "127.0.0.1" ||
+        fixtureUrl.hostname === "localhost",
+      "phase_4n8b_fixture_endpoint_must_use_https_or_localhost",
+    );
+
     const admin = createClient(url!, serviceRoleKey!, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
