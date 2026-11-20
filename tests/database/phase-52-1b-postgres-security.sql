@@ -5,9 +5,24 @@
 -- migrations, exercises grants/RLS/functions, and rolls everything back.
 BEGIN;
 
-CREATE ROLE anon NOLOGIN;
-CREATE ROLE authenticated NOLOGIN;
-CREATE ROLE service_role NOLOGIN BYPASSRLS;
+DO $roles$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'anon') THEN
+    CREATE ROLE anon NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE ROLE authenticated NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'service_role') THEN
+    CREATE ROLE service_role NOLOGIN BYPASSRLS;
+  ELSIF EXISTS (
+    SELECT 1 FROM pg_catalog.pg_roles
+    WHERE rolname = 'service_role' AND rolbypassrls = false
+  ) THEN
+    RAISE EXCEPTION 'service_role must retain BYPASSRLS in the disposable security test';
+  END IF;
+END
+$roles$;
 
 CREATE SCHEMA auth;
 CREATE SCHEMA private;
