@@ -1,0 +1,170 @@
+name: Phase 55 Disposable Database Reliability
+
+on:
+  push:
+    branches:
+      - "engineering/phase-55-disposable-database-replay"
+    paths:
+      - ".github/workflows/phase-55-database-replay.yml"
+      - "supabase/migrations/**"
+      - "scripts/rehearse-migration-chain.mjs"
+      - "docs/database/**"
+      - "tests/database/**"
+  pull_request:
+    branches:
+      - "engineering/phase-54-vite8-security-remediation"
+    paths:
+      - ".github/workflows/phase-55-database-replay.yml"
+      - "supabase/migrations/**"
+      - "scripts/rehearse-migration-chain.mjs"
+      - "docs/database/**"
+      - "tests/database/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-55-disposable-db-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-integrity:
+    name: Verify migration provenance and offline contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate migration tooling syntax
+        run: |
+          node --check scripts/rehearse-migration-chain.mjs
+          node --check scripts/verify-migration-provenance.mjs
+          node --check scripts/verify-recovered-migration-manifest.mjs
+          node --check scripts/audit-migration-side-effects.mjs
+          node --check scripts/check-database-contract.mjs
+      - name: Verify migration provenance
+        run: node scripts/verify-migration-provenance.mjs
+      - name: Verify recovered migration SHA-256 manifest
+        run: node scripts/verify-recovered-migration-manifest.mjs
+      - name: Audit migration side effects
+        run: node scripts/audit-migration-side-effects.mjs
+      - name: Run database contract validator tests
+        run: node --test tests/database/check-database-contract.test.mjs
+      - name: Run migration provenance tests
+        run: node --test tests/database/migration-provenance.test.mjs
+      - name: Run migration rehearsal policy tests
+        run: node --test tests/database/phase-52-1c-migration-rehearsal.test.mjs
+
+  disposable-migration-replay:
+    name: Replay recovered migrations in disposable Supabase PostgreSQL 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Start isolated Supabase PostgreSQL container
+        shell: bash
+        run: |
+          docker run -d --name infinitex-phase55-replay \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_USER=supabase_admin \
+            -e POSTGRES_DB=infinitex_rehearsal \
+            -p 5432:5432 \
+            supabase/postgres:17.6.1.136 \
+            postgres -c config_file=/etc/postgresql/postgresql.conf \
+              -c shared_preload_libraries=pg_stat_statements,pgaudit,plpgsql,plpgsql_check,pg_cron,pg_net,pgsodium,auto_explain,pg_tle,plan_filter,supabase_vault \
+              -c pgsodium.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
+              -c vault.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
+              -c cron.database_name=infinitex_rehearsal \
+              -c cron.launch_active_jobs=off
+          for attempt in $(seq 1 60); do
+            if pg_isready -h 127.0.0.1 -p 5432 -U supabase_admin -d infinitex_rehearsal; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs infinitex-phase55-replay
+          exit 1
+      - name: Replay recovered migrations and separately classified candidate
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: node scripts/rehearse-migration-chain.mjs
+      - name: Preserve disposable database diagnostics
+        if: always()
+        run: docker logs infinitex-phase55-replay > "${{ runner.temp }}/phase55-postgres.log" 2>&1 || true
+      - name: Remove disposable database container
+        if: always()
+        run: docker rm -f infinitex-phase55-replay || true
+      - name: Upload replay evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase55-disposable-migration-replay
+          path: |
+            ${{ runner.temp }}/infinitex-phase-52-1c-report.json
+            ${{ runner.temp }}/phase55-postgres.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  disposable-security-behavior:
+    name: Execute PostgreSQL RLS and privilege behavior tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Start clean PostgreSQL 17 security fixture
+        run: |
+          docker run -d --name infinitex-phase55-security \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=infinitex_security \
+            -p 5432:5432 \
+            postgres:17
+          for attempt in $(seq 1 60); do
+            if pg_isready -h 127.0.0.1 -p 5432 -U postgres -d infinitex_security; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs infinitex-phase55-security
+          exit 1
+      - name: Run synthetic Owner A and Owner B security assertions
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_security
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-52-1b-postgres-security.sql
+      - name: Preserve disposable security diagnostics
+        if: always()
+        run: docker logs infinitex-phase55-security > "${{ runner.temp }}/phase55-security-postgres.log" 2>&1 || true
+      - name: Remove disposable database container
+        if: always()
+        run: docker rm -f infinitex-phase55-security || true
+      - name: Upload security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase55-disposable-security-evidence
+          path: ${{ runner.temp }}/phase55-security-postgres.log
+          if-no-files-found: warn
+          retention-days: 14
