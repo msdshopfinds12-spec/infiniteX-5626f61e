@@ -80,7 +80,7 @@ test("parses only a single UUID run resource", () => {
     resource: "run", runId: id,
   });
   assert.equal(parseWorkflowApiRoute("/runs/not-a-uuid"), null);
-  assert.equal(parseWorkflowApiRoute("/runs/" + id + "/cancel"), null);
+  assert.deepEqual(parseWorkflowApiRoute("/runs/" + id + "/cancel"), { resource: "cancel", runId: id });
   assert.equal(parseWorkflowApiRoute("/runs/" + id + "/extra"), null);
   assert.equal(parseWorkflowApiRoute("/unrelated/runs"), null);
 });
