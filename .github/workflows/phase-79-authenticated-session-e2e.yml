@@ -13,6 +13,7 @@ on:
       - "package-lock.json"
       - "tsconfig*.json"
       - "vite.config.*"
+      - "supabase/functions/**"
   pull_request:
     branches:
       - main
@@ -26,6 +27,7 @@ on:
       - "package-lock.json"
       - "tsconfig*.json"
       - "vite.config.*"
+      - "supabase/functions/**"
   workflow_dispatch:
 
 permissions:
@@ -61,6 +63,15 @@ jobs:
 
       - name: Authentication lifecycle regression
         run: node --experimental-strip-types --test src/features/auth/*.test.ts
+
+      - name: Worker security regression suite
+        run: npx --yes deno@2.2.12 test --no-lock supabase/functions/_shared/worker-security.deno.ts
+
+      - name: Type-check authenticated workflow worker
+        run: npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-worker/index.ts
+
+      - name: Type-check cron workflow worker
+        run: npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
 
       - name: Install ephemeral Playwright runner
         run: |
