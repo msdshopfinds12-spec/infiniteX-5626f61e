@@ -43,6 +43,14 @@ else{
  if(Array.isArray(s.capture.scopeSchemas))for(const x of ['public','private'])if(!s.capture.scopeSchemas.includes(x))errors.push('capture.scopeSchemas missing '+x+'.');
 }
 named(s.schemas,'schemas',['name'],[['owner','string']]);
+if(arr(s.schemas,'schemas'))for(const [i,schema] of s.schemas.entries()){
+ if(!obj(schema))continue;
+ if(arr(schema.grants,'schemas['+i+'].grants'))for(const [j,g] of schema.grants.entries()){
+  if(!obj(g)){errors.push('schemas['+i+'].grants['+j+'] must be an object.');continue;}
+  for(const field of ['grantor','grantee','privilege'])str(g[field],'schemas['+i+'].grants['+j+'].'+field);
+  bool(g.grantable,'schemas['+i+'].grants['+j+'].grantable');
+ }
+}
 named(s.extensions,'extensions',['name'],[['schema','string'],['version','string']]);
 named(s.types,'types',['schema_name','name'],[['kind','string'],['formatted_type','string'],['not_null','boolean']]);
 named(s.roles,'roles',['name'],[['superuser','boolean'],['inherit','boolean'],['create_role','boolean'],['create_db','boolean'],['can_login','boolean'],['replication','boolean'],['bypass_rls','boolean']]);
@@ -63,11 +71,11 @@ if(arr(s.tables,'tables')){const tableIds=new Set();for(const [i,t] of s.tables.
    if(f==='columns'){id=x.name;str(x.type,k+'.columns['+j+'].type');bool(x.notNull,k+'.columns['+j+'].notNull');
     if(!Number.isInteger(x.ordinal)||x.ordinal<1)errors.push(k+'.columns['+j+'].ordinal must be positive integer.');
     if(x.default!==null&&typeof x.default!=='string')errors.push(k+'.columns['+j+'].default must be string or null.');}
-   else if(f==='grants')id=String(x.grantee)+'|'+String(x.privilege);
-   else if(f==='columnGrants')id=String(x.column)+'|'+String(x.grantee)+'|'+String(x.privilege);
+   else if(f==='grants')id=String(x.grantor)+'|'+String(x.grantee)+'|'+String(x.privilege);
+   else if(f==='columnGrants')id=String(x.column)+'|'+String(x.grantor)+'|'+String(x.grantee)+'|'+String(x.privilege);
    else{id=x.name;str(x.name,k+'.'+f+'['+j+'].name');}
    if(['constraints','indexes','triggers'].includes(f))str(x.definition,k+'.'+f+'['+j+'].definition');
-   if(f==='grants'||f==='columnGrants'){str(x.grantee,k+'.'+f+'['+j+'].grantee');str(x.privilege,k+'.'+f+'['+j+'].privilege');bool(x.grantable,k+'.'+f+'['+j+'].grantable');}
+   if(f==='grants'||f==='columnGrants'){str(x.grantor,k+'.'+f+'['+j+'].grantor');str(x.grantee,k+'.'+f+'['+j+'].grantee');str(x.privilege,k+'.'+f+'['+j+'].privilege');bool(x.grantable,k+'.'+f+'['+j+'].grantable');}
    if(f==='policies'){str(x.command,k+'.policies['+j+'].command');arr(x.roles,k+'.policies['+j+'].roles');}
    if(id!==undefined&&seen.has(id))errors.push(k+'.'+f+' duplicate identity '+id+'.');if(id!==undefined)seen.add(id);
   }
@@ -75,7 +83,7 @@ if(arr(s.tables,'tables')){const tableIds=new Set();for(const [i,t] of s.tables.
 }}
 if(arr(s.functions,'functions')){const seen=new Set();for(const [i,f] of s.functions.entries()){
  if(!obj(f)){errors.push('functions['+i+'] must be an object.');continue;}
- for(const k of ['schema','name','owner','language','resultType','identityArguments','searchPath','volatility','parallelSafety','definitionMd5'])str(f[k],'functions['+i+'].'+k,k==='identityArguments'||k==='searchPath');
+ for(const k of ['schema','name','owner','language','resultType','identityArguments','searchPath','volatility','parallelSafety'])str(f[k],'functions['+i+'].'+k,k==='identityArguments'||k==='searchPath');
  for(const k of ['securityDefiner','strict','leakproof'])bool(f[k],'functions['+i+'].'+k);
  arr(f.executeRoles,'functions['+i+'].executeRoles');
  if(Array.isArray(f.executeRoles)&&f.executeRoles.some(x=>typeof x!=='string'||!x.trim()))errors.push('functions['+i+'].executeRoles contains invalid role.');
