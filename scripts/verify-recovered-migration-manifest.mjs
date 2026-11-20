@@ -45,7 +45,7 @@ for (const entry of entries) {
   const relativePath = entry?.path;
   const expectedHash = entry?.sha256;
 
-  if (typeof version !== 'string' || !/^\\d{14}$/.test(version)) {
+  if (typeof version !== 'string' || !/^\d{14}$/.test(version)) {
     fail(`Invalid migration version: ${String(version)}`);
     continue;
   }
