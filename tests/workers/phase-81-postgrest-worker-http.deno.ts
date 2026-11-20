@@ -11,6 +11,15 @@ function required(name: string): string {
   return value;
 }
 
+/** Standalone PostgREST has no Supabase Kong /rest/v1 prefix. */
+const postgrestFetch: typeof fetch = (input, init) => {
+  const source = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
+  const target = new URL(source);
+  target.pathname = target.pathname.replace(/^\\/rest\\/v1(?=\\/|$)/, "") || "/";
+  if (input instanceof Request) return fetch(new Request(target, input));
+  return fetch(target, init);
+};
+
 Deno.test({
   name: "Phase 81: real worker HTTP request persists through PostgREST into disposable PostgreSQL",
   sanitizeOps: false,
@@ -47,7 +56,7 @@ Deno.test({
         const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const userClient = makeClient(supabaseUrl, publishableKey, {
           auth: { persistSession: false, autoRefreshToken: false },
-          global: { headers: { Authorization: "Bearer " + userJwt } },
+          global: { headers: { Authorization: "Bearer " + userJwt }, fetch: postgrestFetch },
         });
         return { ok: true as const, userClient, ownerId: userId, supabaseUrl, serviceRoleKey };
       }) as never,
@@ -70,7 +79,7 @@ Deno.test({
 
       const admin = createClient(url, serviceJwt, {
         auth: { persistSession: false, autoRefreshToken: false },
-        global: { headers: { Authorization: "Bearer " + serviceJwt } },
+        global: { headers: { Authorization: "Bearer " + serviceJwt }, fetch: postgrestFetch },
       });
       const { data: run, error: runError } = await admin
         .from("workflow_runs")
