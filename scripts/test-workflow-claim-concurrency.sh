@@ -15,7 +15,6 @@ RUN_B="bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb"
 OWNER="cccccccc-3333-4333-8333-cccccccccccc"
 WORKFLOW="dddddddd-4444-4444-8444-dddddddddddd"
 STEP="eeeeeeee-5555-4555-8555-eeeeeeeeeeee"
-LOCK_LOG="$(mktemp)"
 LOCK_PID=""
 
 cleanup() {
@@ -24,7 +23,6 @@ cleanup() {
     wait "$LOCK_PID" >/dev/null 2>&1 || true
   fi
   psql -X -v ON_ERROR_STOP=1 -qAt -c "DELETE FROM auth.users WHERE id = '$OWNER';" >/dev/null 2>&1 || true
-  rm -f "$LOCK_LOG"
 }
 trap cleanup EXIT
 
@@ -44,16 +42,19 @@ SQL
 
 # Hold the oldest queue row in one real PostgreSQL session. A second session must
 # skip that locked row and claim the next eligible row instead of blocking/duplicating.
-psql -X -v ON_ERROR_STOP=1 -qAt -c "BEGIN; SELECT id FROM public.workflow_runs WHERE id = '$RUN_A' FOR UPDATE; SELECT 'LOCK_HELD'; SELECT pg_sleep(3); COMMIT;" >"$LOCK_LOG" 2>&1 &
+psql -X -v ON_ERROR_STOP=1 -qAt -c "BEGIN; SELECT pg_advisory_xact_lock(8675309); SELECT id FROM public.workflow_runs WHERE id = '$RUN_A' FOR UPDATE; SELECT pg_sleep(3); COMMIT;" >/dev/null 2>&1 &
 LOCK_PID=$!
 
+# Poll a separate session until the lock-holder owns the advisory lock. This avoids
+# relying on buffered psql stdout as a synchronization signal.
+LOCK_CONFIRMED="false"
 for attempt in $(seq 1 50); do
-  if grep -q "LOCK_HELD" "$LOCK_LOG"; then break; fi
+  LOCK_HELD="$(psql -X -qAt -v ON_ERROR_STOP=1 -c "SELECT NOT pg_try_advisory_lock(8675309);")"
+  if [[ "$LOCK_HELD" == "t" ]]; then LOCK_CONFIRMED="true"; break; fi
   sleep 0.1
 done
-if ! grep -q "LOCK_HELD" "$LOCK_LOG"; then
-  echo "FAIL: lock-holder session did not acquire the expected row lock."
-  cat "$LOCK_LOG"
+if [[ "$LOCK_CONFIRMED" != "true" ]] || ! kill -0 "$LOCK_PID" >/dev/null 2>&1; then
+  echo "FAIL: lock-holder session did not retain the advisory and row locks."
   exit 1
 fi
 
