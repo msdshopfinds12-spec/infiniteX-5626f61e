@@ -7,6 +7,7 @@ on:
       - eng/infinitex-p0-p1-auth-2026-11-20
       - feat/phase-50-trusted-authorization
       - feat/phase-51-durable-workflow-engine
+      - feat/phase-60-transactional-retry-orchestration
   push:
     branches:
       - eng/infinitex-p0-p1-auth-2026-11-20
