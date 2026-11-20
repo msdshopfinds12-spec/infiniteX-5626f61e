@@ -5,6 +5,7 @@ on:
     paths:
       - "supabase/**"
       - "scripts/check-*.mjs"
+      - "scripts/verify-recovered-migration-manifest.mjs"
       - "tests/database/**"
       - "docs/database/**"
       - ".github/workflows/database-contract.yml"
@@ -30,9 +31,12 @@ jobs:
         run: |
           node --check scripts/check-migration-integrity.mjs
           node --check scripts/check-database-contract.mjs
+          node --check scripts/verify-recovered-migration-manifest.mjs
           node --check tests/database/check-database-contract.test.mjs
           node --check tests/database/check-migration-integrity.test.mjs
           node --check tests/database/platform-api-key-column-grants.test.mjs
+      - name: Verify recovered migration SHA-256 manifest
+        run: node scripts/verify-recovered-migration-manifest.mjs
       - name: Run database contract validator regression tests
         run: node --test tests/database/check-database-contract.test.mjs
       - name: Run API-key column privilege regression tests
