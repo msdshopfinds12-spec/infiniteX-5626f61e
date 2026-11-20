@@ -10,20 +10,25 @@ import {
   createAuthSessionCoordinator,
 } from "./auth-session-coordinator.ts";
 import type { AuthSessionIdentity, AuthState } from "./auth-state.ts";
+import type { AuthActions } from "./auth-actions.ts";
 
 /**
- * Small adapter contract between React and an authentication provider.
- * The Supabase implementation must map its SDK session to { user: { id } }
- * and return the SDK subscription's unsubscribe function.
+ * Provider-neutral adapter between React and the authentication provider.
+ * Implementations expose only the minimal user identity to the session layer.
  */
-export type AuthSessionAdapter = Readonly<{
+export type AuthSessionAdapter = AuthActions & Readonly<{
   getSession: () => Promise<AuthSessionIdentity | null>;
   onAuthStateChange: (
     listener: (session: AuthSessionIdentity | null) => void,
   ) => () => void;
 }>;
 
-const AuthStateContext = createContext<AuthState | null>(null);
+type AuthContextValue = Readonly<{
+  state: AuthState;
+  actions: AuthActions;
+}>;
+
+const AuthContext = createContext<AuthContextValue | null>(null);
 
 export type AuthSessionProviderProps = Readonly<{
   adapter: AuthSessionAdapter;
@@ -31,11 +36,8 @@ export type AuthSessionProviderProps = Readonly<{
 }>;
 
 /**
- * Provider-neutral React session provider.
- *
- * Subscribe before requesting the initial session so that auth events cannot
- * be missed during startup. The coordinator fences late initial results.
- * Cleanup prevents callbacks from a prior mount/adapter from updating state.
+ * Subscribe before requesting the initial session so auth events cannot be
+ * missed during startup. The coordinator fences late initial results.
  */
 export function AuthSessionProvider({
   adapter,
@@ -84,18 +86,32 @@ export function AuthSessionProvider({
     };
   }, [adapter, coordinator]);
 
-  return (
-    <AuthStateContext.Provider value={state}>
-      {children}
-    </AuthStateContext.Provider>
+  const contextValue = useMemo(
+    () => ({ state, actions: adapter }),
+    [state, adapter],
   );
+
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+function useAuthContext(): AuthContextValue {
+  const context = useContext(AuthContext);
+  if (context === null) {
+    throw new Error("Authentication hooks must be used within AuthSessionProvider");
+  }
+  return context;
 }
 
 /** Must be called below an AuthSessionProvider. */
 export function useAuthState(): AuthState {
-  const state = useContext(AuthStateContext);
-  if (state === null) {
-    throw new Error("useAuthState must be used within AuthSessionProvider");
-  }
-  return state;
+  return useAuthContext().state;
+}
+
+/** Explicit auth actions; no credentials are persisted by this hook. */
+export function useAuthActions(): AuthActions {
+  return useAuthContext().actions;
 }
