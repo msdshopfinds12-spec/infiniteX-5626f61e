@@ -30,9 +30,8 @@ Deno.serve(async (req: Request) => {
   if (route.resource === "run" && req.method !== "GET") return reply(req, 405, { ok: false, error: "method_not_allowed" });
   if (route.resource === "cancel" && req.method !== "POST") return reply(req, 405, { ok: false, error: "method_not_allowed" });
 
-  const authorization = req.headers.get("Authorization") ?? "";
-  const tokenMatch = authorization.match(/^Bearer\\s+([^\\s]+)$/i);
-  if (!tokenMatch) return reply(req, 401, { ok: false, error: "invalid_session" });
+  const accessToken = parseBearerToken(req.headers.get("Authorization"));
+  if (!accessToken) return reply(req, 401, { ok: false, error: "invalid_session" });
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const publishableKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
