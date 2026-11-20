@@ -21,8 +21,8 @@
     "replay_runner": "be45a53a3b2d4f30fddc6bbdcf1e4fc937822e53",
     "workflow": "df3dd917b09f60b173d057451f911f8b3ed86813"
   },
-  "exact_19_sql_blob_equivalence": "NOT_ESTABLISHED",
-  "current_52_1k_branch_replay": "NOT_VERIFIED",
+  "exact_19_sql_blob_equivalence": "VERIFIED_IDENTICAL_GIT_BLOBS",
+  "current_52_1k_branch_replay": "PRIOR_REPLAY_COVERS_IDENTICAL_SQL_BLOBS; NO_FRESH_RUN_ON_52_1K_HEAD",
   "independent_workflow_failure": {
     "job": "Offline migration and contract checks",
     "cause": "Legacy or incomplete contract snapshot; fresh Schema Contract V2 capture required",
@@ -38,10 +38,17 @@
   "merge_authorized": false,
   "deployment_authorized": false,
   "next_steps": [
-    "Compare all 19 SQL blob SHAs at the prior run commit and current Phase 52.1K branch head",
-    "Compare candidate migration blob separately",
-    "Rerun the workflow on exact current Phase 52.1K branch head if any source differs or equivalence remains unverified",
+    "Trigger Database Contract Gate on exact current branch head through approved workflow-dispatch or PR event; current GitHub connector does not expose workflow_dispatch",
     "Obtain approved read-only Schema Contract V2 capture",
     "Perform exact live-vs-replay catalog parity review"
-  ]
+  ],
+  "candidate_migration_blob_equivalence": "VERIFIED_IDENTICAL_GIT_BLOB",
+  "source_comparison": {
+    "prior_replay_commit": "80697a74e0a893b5b0d722d7d50e7261d7a7b044",
+    "compared_phase_52_1k_head": "4ade4ae72ca875e073f1f589277168e0ded2dbca",
+    "paths_compared": 20,
+    "identical_git_blob_shas": 20,
+    "missing_or_different_paths": 0,
+    "comparison_method": "GitHub recursive Git tree SHA comparison"
+  }
 }
