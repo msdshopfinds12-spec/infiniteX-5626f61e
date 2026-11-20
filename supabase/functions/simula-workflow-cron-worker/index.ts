@@ -3,10 +3,12 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import {
   clampBatchLimit,
   executeWithinStepBudget,
+  executeWithRetry,
   isClaimedRunValid,
   isWorkflowOwnedBy,
   readJsonBodyLimited,
   validateStepTimeoutSeconds,
+  validateRetryLimit,
 } from "../_shared/worker-security.mjs";
 
 type JsonRecord = Record<string, unknown>;
@@ -175,11 +177,15 @@ Deno.serve(async (req: Request) => {
         let actionError = "";
         try {
           const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
-          output = executeWithinStepBudget(
-            () => executeSafeAction(step.action_type, payload, config),
-            { input: payload, config },
-            timeoutSeconds,
-            64 * 1024,
+          const retryLimit = validateRetryLimit(step.retry_limit);
+          output = await executeWithRetry(
+            () => executeWithinStepBudget(
+              () => executeSafeAction(step.action_type, payload, config),
+              { input: payload, config },
+              timeoutSeconds,
+              64 * 1024,
+            ),
+            retryLimit,
           );
         } catch (error) {
           actionError = error instanceof Error ? error.message : "action_failed";
