@@ -176,3 +176,9 @@ No hosted database, production secrets, deployment, billing, or release state wa
 - Browser assertions cover HTTP 200, fail-closed authentication UI when public Supabase configuration is absent, accessible alert, retry control without auth bypass, no protected workspace rendering, mobile 390×844 and desktop 1440×900 horizontal overflow, and uncaught page errors.
 - Playwright is installed ephemerally (no committed dependency or lockfile mutation); the workflow now pins its version and includes `scripts/**` in relevant path filters.
 - **Limitations:** This is a real Chromium browser smoke test of the fail-closed bootstrap state, not authenticated login/account-switch E2E, full workflow interaction coverage, cross-browser matrix, screen-reader audit, or physical Android device QA. Live HTTP-to-PostgreSQL and deployed Supabase parity remain NOT VERIFIED.
+
+
+### Browser runner compatibility hardening
+
+- A subsequent reproducibility attempt pinned Playwright to `1.56.1` while retaining `ubuntu-latest`; the runner had advanced to Ubuntu 26.04, which Playwright 1.56.1 does not support for browser dependency installation. This was an environment compatibility failure before Chromium tests, not an application regression.
+- Corrective change: pin the CI runner to `ubuntu-24.04`, a supported LTS environment for the pinned Playwright release. A new exact-head CI run is required before this runner pin can be marked VERIFIED.
