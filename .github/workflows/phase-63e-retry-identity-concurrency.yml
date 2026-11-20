@@ -55,4 +55,4 @@ jobs:
       - name: Verify immutable identity and legitimate worker updates
         run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-63e-identity-regression.sql
       - name: Verify independent-session retry serialization and identity rejection
-        run: bash tests/database/run-phase-63e-concurrency.sh
+        run: bash tests/database/run-phase-63e-concurrency-verified.sh
