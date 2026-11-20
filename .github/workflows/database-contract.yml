@@ -1,5 +1,8 @@
 name: Database Contract Gate
 on:
+  push:
+    branches:
+      - engineering/phase-64c-schema-contract-v2
   pull_request:
     paths:
       - "supabase/**"
