@@ -42,7 +42,7 @@ export function createProjectReadService(
           .limit(limit);
 
         if (error) return { status: "error", code: "query_failed" } as const;
-        return { status: "success", data: (data ?? []) as OwnProjectSummary[] } as const;
+        return { status: "success", data: data ?? [] } as const;
       } catch {
         return { status: "error", code: "network_unavailable" } as const;
       }
