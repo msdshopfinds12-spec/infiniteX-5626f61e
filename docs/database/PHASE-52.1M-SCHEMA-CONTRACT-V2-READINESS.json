@@ -1,0 +1,111 @@
+{
+  "artifact": "PHASE_52_1M_SCHEMA_CONTRACT_V2_READINESS",
+  "repository": "msdshopfinds12-spec/infiniteX-5626f61e",
+  "branch": "engineering/phase-52-1k-clean-room-replay-preparation",
+  "status": "BLOCKED_PENDING_FRESH_V2_CAPTURE_AND_HUMAN_REVIEW",
+  "evidence": {
+    "ci_run": 44761412669,
+    "ci_run_url": "https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44761412669",
+    "failed_job": "Offline migration and contract checks",
+    "failed_step": "Enforce merge-blocking source readiness gate",
+    "migration_integrity_exit_code": 0,
+    "contract_snapshot_exit_code": 2,
+    "reason": "Current committed contract snapshot is schemaVersion 1; validator requires schemaVersion 2."
+  },
+  "inspected_sources": [
+    {
+      "path": "supabase/contracts/database-contract.snapshot.json",
+      "blob_sha": "5432f8822d30ab1684d9531604a24bce882c9f67",
+      "finding": "schemaVersion 1; PENDING_HUMAN_REVIEW"
+    },
+    {
+      "path": "scripts/check-database-contract.mjs",
+      "blob_sha": "54f380650ff29250769db8328623230bbc2b14ed",
+      "finding": "Fail-closed V2 structural and explicit approval validator"
+    },
+    {
+      "path": "supabase/contracts/capture-database-contract.readonly.sql",
+      "blob_sha": "3e6c36f0a2a5de80b9f2e08ca19714c8781ec8c2",
+      "finding": "Single metadata-only SELECT; V2; public/private scope; pending review; project ref deliberately unverified"
+    },
+    {
+      "path": "docs/database/PHASE-52.1G-NORMALIZED-LIVE-CATALOG.json",
+      "blob_sha": "18ca43bf14d256e41b9cf5a0031edaedc4b7b105",
+      "finding": "Public-only point-in-time catalog artifact; not a substitute for V2 capture"
+    },
+    {
+      "path": "docs/database/PHASE-52.1G-NORMALIZED-CATALOG-REPORT.md",
+      "blob_sha": "087674bb42c22db001bc046ce9678c257a7380d7",
+      "finding": "Explicitly documents V2 blocked and completeness limitations"
+    },
+    {
+      "path": "docs/database/PHASE-51.6L-COMPLETE-CATALOG-CONTRACT.md",
+      "blob_sha": "7f4fea85f68f7cba9053b2afeca02fb32656c792",
+      "finding": "V2 capture semantics and human review process"
+    }
+  ],
+  "phase_52_1g_capture": {
+    "captured_at": "2026-11-20T14:54:23.029113+00:00",
+    "project_ref": "vepacoemkhudamfaccah",
+    "postgres_version": "17.11",
+    "scope": "public schema application-owned catalog metadata",
+    "counts": {
+      "relations": 15,
+      "columns": 132,
+      "constraints": 85,
+      "indexes": 44,
+      "policies": 19,
+      "routines": 4,
+      "triggers": 6,
+      "extensions": 7,
+      "migration_ledger": 19,
+      "table_grants": 219,
+      "column_grants": 1250,
+      "role_memberships": 16,
+      "role_attributes": 5
+    },
+    "known_missing": {
+      "other_schemas": true,
+      "default_privileges": true,
+      "partition_dependency_graph": true,
+      "function_bodies": true
+    },
+    "limitations": [
+      "Point-in-time evidence; not simultaneous with historical snapshot",
+      "Public-only scope",
+      "Does not establish full V2 contract or canonical schema parity"
+    ]
+  },
+  "safe_next_steps": [
+    "Inspect the complete V2 capture SQL before execution.",
+    "Use an explicitly authorized read-only session against the intended Supabase project.",
+    "Independently verify project identity; never infer projectRef from current_database().",
+    "Execute only the metadata-only SELECT; do not run DDL, DML, grants, revokes, or migrations.",
+    "Preserve raw JSON output; do not hand-edit catalog facts.",
+    "Run validator and tests; expect exit 2 while reviewStatus is PENDING_HUMAN_REVIEW.",
+    "Perform independent review of source identity, scope, RLS, grants, role graph, function security metadata, triggers, extensions and custom types.",
+    "Record reviewer identity and evidence only after actual review; then approve in a separately reviewable change.",
+    "Re-run CI on exact commit and retain draft PR until explicit merge authorization."
+  ],
+  "acceptance": {
+    "migration_integrity": "PASS_CURRENT_PR_RUN",
+    "fresh_schema_contract_v2_capture": "BLOCKED_NOT_YET_CAPTURED",
+    "project_identity": "PENDING_INDEPENDENT_VERIFICATION",
+    "human_review": "PENDING",
+    "contract_validator": "BLOCKED",
+    "live_vs_replay_definition_parity": "NOT_ESTABLISHED",
+    "production_migration": "NOT_AUTHORIZED",
+    "merge": "NOT_AUTHORIZED",
+    "deployment": "NOT_AUTHORIZED"
+  },
+  "safety": {
+    "live_database_access_performed": false,
+    "database_writes_performed": false,
+    "application_rows_read": false,
+    "secrets_read": false,
+    "production_migrations_performed": false,
+    "merge_performed": false,
+    "deployment_performed": false,
+    "billing_changed": false
+  }
+}
