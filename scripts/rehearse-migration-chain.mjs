@@ -26,10 +26,19 @@ export function validateProvenance({ manifest, classification, files }) {
   if (classification?.schemaVersion !== 1 || !Array.isArray(classification?.candidateMigrations)) {
     errors.push('Candidate classification document is missing or unsupported.');
   }
+  if (classification?.candidateMigrations?.length !== 1) {
+    errors.push('Exactly one separately classified candidate migration is expected for this rehearsal.');
+  }
   const applied = new Set((manifest?.applied_migrations ?? []).map((entry) => entry.path));
   const candidates = new Set((classification?.candidateMigrations ?? []).map((entry) => entry.path));
-  for (const candidate of candidates) {
-    if (applied.has(candidate)) errors.push('Candidate migration overlaps recovered applied history: ' + candidate);
+  for (const candidate of classification?.candidateMigrations ?? []) {
+    if (applied.has(candidate.path)) errors.push('Candidate migration overlaps recovered applied history: ' + candidate.path);
+    if (candidate.classification !== 'PROPOSED_NOT_APPLIED'
+        || candidate.sourceStatus !== 'NOT_VERIFIED_LIVE'
+        || candidate.productionApproval !== 'NOT_GRANTED'
+        || !/^[a-f0-9]{64}$/.test(candidate.sha256 ?? '')) {
+      errors.push('Candidate must remain hash-verified, proposed only, not live-verified, and not production-approved: ' + candidate.path);
+    }
   }
   const expected = new Set([...applied, ...candidates]);
   for (const file of files) if (!expected.has(file)) errors.push('Unclassified SQL migration: ' + file);
