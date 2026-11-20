@@ -17,7 +17,7 @@ inside the same transaction.
 5. Set `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
    `PHASE_4N8B_TEST_RUN_ID`, `PHASE_4N8B_TEST_STEP_ID`,
    `PHASE_4N8B_TEST_OWNER_ID`, and `PHASE_4N8B_TEST_ATTEMPT`, then run
-   `deno test --allow-env --allow-net supabase/functions/_shared/transactional-step-fencing.integration.test.ts`.
+   `deno test --no-lock --allow-env=SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,PHASE_4N8B_TEST_RUN_ID,PHASE_4N8B_TEST_STEP_ID,PHASE_4N8B_TEST_OWNER_ID,PHASE_4N8B_TEST_ATTEMPT --allow-net=localhost,127.0.0.1 supabase/functions/_shared/transactional-step-fencing.integration.test.ts`.
 6. The integration test races two same-generation starts (exactly one must win),
    advances the parent generation, then asserts the stale worker cannot finish.
 
@@ -104,12 +104,11 @@ remain release gates.
 
 ## Destructive-test endpoint guard
 
-The Deno integration test now rejects the known production Supabase hostname
-`vepacoemkhudamfaccah.supabase.co` before creating a client or reading fixture
-rows. It also requires HTTPS for remote fixture endpoints (localhost/127.0.0.1
-are allowed for a local disposable stack). This is a defense-in-depth guard,
-not a replacement for dedicated disposable credentials, fixture isolation,
-and teardown controls.
+The Deno integration test now accepts only HTTP loopback endpoints (`localhost` or
+`127.0.0.1`) and rejects every remote endpoint before creating a client or reading
+fixture rows. The Deno invocation also limits network access to loopback and
+restricts environment access to the six fixture variables. This is defense in depth,
+not a replacement for synthetic fixture isolation and teardown controls.
 
 
 ## Migration schema-contract test
