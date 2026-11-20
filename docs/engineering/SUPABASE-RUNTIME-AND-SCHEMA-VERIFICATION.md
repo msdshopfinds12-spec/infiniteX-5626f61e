@@ -87,10 +87,10 @@ The deployed worker version returned by Supabase does not include these same con
 
 ### Retry behavior differs
 
-- Candidate branch worker source reads `retry_limit` in the Step type but does not use it in the action execution path. The candidate static review correctly identifies this as a candidate-branch gap.
+- The current candidate branch implements a shared `executeWithRetry` helper in both workers. It validates `retry_limit` from 0 through 10, retries only allowlisted transient error codes, applies capped exponential full jitter, and enforces an aggregate step timeout. The current deterministic local action set does not emit retryable errors. This is candidate-source behavior only; the deployed Edge Functions remain on the older implementation until an approved rollout.
 - The deployed functions contain a retry loop based on `retry_limit`, but they retry every caught action error, including deterministic validation/configuration failures. That is not a robust transient-error retry policy.
 
-**Required reconciliation:** retain candidate generation fencing and request hardening; then implement explicit retry semantics with error classification, bounded attempts, backoff/jitter where appropriate, and tests. Do not copy the older deployed retry loop blindly.
+**Required reconciliation:** retain candidate generation fencing and request hardening; verify the bounded retry contract against the database limit and add idempotency/integration tests before enabling retries for external side effects. Do not copy the older deployed retry loop blindly.
 
 ## 6. Generated TypeScript schema parity
 
@@ -124,8 +124,8 @@ Do not drop these indexes solely from the advisor result. Confirm workload, quer
 ## 8. Critical next engineering actions
 
 1. **Runtime drift gate:** compare all deployed Edge Function files with the candidate source and record an explicit release diff.
-2. **Worker concurrency tests:** reproduce lease expiry/reclaim and prove stale generations cannot change step/run state.
-3. **Retry contract:** define retryable errors, attempts semantics, delay/backoff, and persistence; align product validation and UI with the real behavior.
+2. **Worker concurrency tests:** candidate now has strict-generation prechecks, database CAS predicates, and deterministic Node/Deno model tests. Reproduce lease expiry/reclaim and stale completion against an isolated PostgreSQL/Supabase runtime before release.
+3. **Retry contract:** candidate retry semantics are implemented and covered by Node/Deno tests. Still add adapter idempotency and integration tests before external side-effect actions are enabled.
 4. **Cron observability:** inspect recent Edge Function/Postgres logs for invocation failures, HTTP outcomes, claim counts, and worker-secret verification failures. Avoid logging secrets or tokens.
 5. **Type parity:** perform a full generated TypeScript diff, including table columns, relationships, and RPC Args/Returns.
 6. **Billing webhook isolation:** preserve service-role-only access; review webhook signature verification and idempotency behavior separately.
