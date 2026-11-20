@@ -166,7 +166,7 @@ END;
 $$;
 
 -- Cross-language canonical key vectors (JavaScript encodeURIComponent parity).
-DO $
+DO $phase62$
 BEGIN
   IF phase62.encode_uri_component('run:/%') <> 'run%3A%2F%25' THEN
     RAISE EXCEPTION 'URI component encoding mismatch for reserved characters';
@@ -178,7 +178,7 @@ BEGIN
     RAISE EXCEPTION 'URI component encoding mismatch for UTF-8';
   END IF;
 END;
-$;
+$phase62$;
 
 -- A colliding retry key with a different request fingerprint must fail closed.
 INSERT INTO workflow_step_attempts(
@@ -191,7 +191,7 @@ INSERT INTO workflow_step_attempts(
   ('attempt-conflict-fp-2', 'owner-a', 'run-conflict-fp', 'step-g', 2,
    'step-attempt:v1:run-conflict-fp:step-g:2', 'fingerprint-different',
    'queued', clock_timestamp());
-DO $
+DO $phase62$
 BEGIN
   BEGIN
     PERFORM phase62.fail_and_schedule_retry(
@@ -203,7 +203,7 @@ BEGIN
     IF SQLERRM <> 'retry_idempotency_conflict' THEN RAISE; END IF;
   END;
 END;
-$;
+$phase62$;
 
 -- A colliding retry key bound to a different run identity must also fail closed.
 INSERT INTO workflow_step_attempts(
@@ -216,7 +216,7 @@ INSERT INTO workflow_step_attempts(
   ('attempt-conflict-run-2', 'owner-a', 'different-run', 'step-h', 2,
    'step-attempt:v1:run-conflict-run:step-h:2', 'fingerprint-h',
    'queued', clock_timestamp());
-DO $
+DO $phase62$
 BEGIN
   BEGIN
     PERFORM phase62.fail_and_schedule_retry(
@@ -228,6 +228,6 @@ BEGIN
     IF SQLERRM <> 'retry_idempotency_conflict' THEN RAISE; END IF;
   END;
 END;
-$;
+$phase62$;
 
 SELECT 'phase-62-sql-contract-tests-passed' AS result;
