@@ -6,9 +6,14 @@ const sqlPath = new URL('../../supabase/contracts/capture-database-contract.read
 
 test('catalog capture is one read-only SELECT statement', async () => {
   const sql = await readFile(sqlPath, 'utf8');
-  assert.match(sql.trim(), /^WITH\\b[\\s\\S]*\\bSELECT\\s+jsonb_build_object[\\s\\S]*;$/i);
-  assert.equal((sql.match(/\\bSELECT\\s+jsonb_build_object\\s*\\(/gi) ?? []).length, 1);
-  assert.doesNotMatch(sql, /^\\s*(CREATE|ALTER|INSERT|UPDATE|DELETE|DROP|TRUNCATE|GRANT|REVOKE|CALL|DO)\\b/im);
+  const trimmed = sql.trim();
+  assert.ok(trimmed.startsWith('WITH table_inventory AS'));
+  assert.ok(trimmed.endsWith(';'));
+  assert.equal(sql.split('SELECT jsonb_build_object(').length - 1, 1);
+  const mutation = sql.split(/\\r?\\n/).some((line) =>
+    /^(CREATE|ALTER|INSERT|UPDATE|DELETE|DROP|TRUNCATE|GRANT|REVOKE|CALL|DO)\\b/i.test(line.trim())
+  );
+  assert.equal(mutation, false);
 });
 
 test('catalog capture includes required RLS and function security metadata', async () => {
@@ -20,6 +25,7 @@ test('catalog capture includes required RLS and function security metadata', asy
 
 test('catalog capture excludes application row and secret-value queries', async () => {
   const sql = await readFile(sqlPath, 'utf8');
-  assert.doesNotMatch(sql, /vault\\.decrypted_secrets|vault\\.secrets|platform_api_keys|webhook_events/i);
-  assert.doesNotMatch(sql, /net\\.http_post|cron\\.schedule/i);
+  for (const token of ['vault.decrypted_secrets', 'vault.secrets', 'platform_api_keys', 'webhook_events', 'net.http_post', 'cron.schedule']) {
+    assert.equal(sql.includes(token), false, `unexpected sensitive or side-effect reference: ${token}`);
+  }
 });
