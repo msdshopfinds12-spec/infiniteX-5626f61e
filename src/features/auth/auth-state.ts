@@ -6,8 +6,9 @@
  * current epoch changes (sign-out or account switch) before completion.
  *
  * This module deliberately does not implement authentication or persist
- * credentials. The official Supabase SDK adapter is added only alongside a
- * matching npm-generated lockfile and exact-head verification.
+ * credentials. The provider-specific Supabase adapter lives in
+ * supabase-auth-session-adapter.ts; only public configuration reaches the
+ * browser client, and exact-head CI verifies the committed SDK lockfile.
  */
 
 export type AuthSessionIdentity = Readonly<{
