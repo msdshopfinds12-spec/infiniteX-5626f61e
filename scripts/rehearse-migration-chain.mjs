@@ -59,8 +59,8 @@ export function validateProvenance({ manifest, classification, files }) {
   if (classification?.schemaVersion !== 1 || !Array.isArray(classification?.candidateMigrations)) {
     errors.push('Candidate classification document is missing or unsupported.');
   }
-  if (classification?.candidateMigrations?.length !== 1) {
-    errors.push('Exactly one separately classified candidate migration is expected for this rehearsal.');
+  if (!Array.isArray(classification?.candidateMigrations) || classification.candidateMigrations.length < 1) {
+    errors.push('At least one separately classified candidate migration is required for this rehearsal.');
   }
   const applied = new Set((manifest?.applied_migrations ?? []).map((entry) => entry.path));
   const candidates = new Set((classification?.candidateMigrations ?? []).map((entry) => entry.path));
