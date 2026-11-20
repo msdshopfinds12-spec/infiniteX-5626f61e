@@ -10,10 +10,15 @@ const completeEnv = env({
   SUPABASE_SERVICE_ROLE_KEY: "service-test-key",
 });
 
-test("authenticated boundary rejects missing bearer before creating a client", async () => {
+test("authenticated boundary rejects missing and malformed bearer headers before creating a client", async () => {
   let created = 0;
   const result = await authenticateBearerRequest({ request: request(), env: completeEnv, createClient: () => { created++; } });
   assert.deepEqual(result, { ok: false, status: 401, error: "missing_bearer_token" });
+  for (const authorization of ["Basic token", "Bearer", "Bearer two tokens", "Bearer\\snot-a-token"]) {
+    const malformed = await authenticateBearerRequest({ request: request({ Authorization: authorization }), env: completeEnv, createClient: () => { created++; } });
+    assert.equal(malformed.ok, false, "expected rejection for " + authorization);
+    assert.equal(malformed.status, 401);
+  }
   assert.equal(created, 0);
 });
 
