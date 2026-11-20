@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { WorkflowReadService, WorkflowRunReadResult } from "./workflow-read-service.ts";
+import WorkflowLogList from "./workflow-log-list";
 
 type State =
   | Readonly<{ key: string; status: "loading" }>
@@ -28,6 +29,7 @@ export default function WorkflowRunHistory({
 }: Props) {
   const requestKey = [userId, identityEpoch, workflowId].join(":");
   const [retryCount, setRetryCount] = useState(0);
+  const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const [state, setState] = useState<State>({ key: "", status: "loading" });
 
   useEffect(() => {
@@ -76,17 +78,44 @@ export default function WorkflowRunHistory({
 
   return (
     <ul className="workflow-run-list" aria-label="Recent workflow runs">
-      {currentState.result.data.map((run) => (
-        <li className="workflow-run-row" key={run.id}>
-          <div>
-            <strong>{run.status}</strong>
-            <span className="workflow-meta">Attempt {run.attempt} · Created {formatTime(run.created_at)}</span>
-          </div>
-          <span className="workflow-meta">
-            {run.finished_at ? "Finished " + formatTime(run.finished_at) : "Not finished"}
-          </span>
-        </li>
-      ))}
+      {currentState.result.data.map((run) => {
+        const expanded = expandedRunId === run.id;
+        const eventListId = "workflow-events-" + run.id;
+        return (
+          <li className="workflow-run-item" key={run.id}>
+            <div className="workflow-run-row">
+              <div>
+                <strong>{run.status}</strong>
+                <span className="workflow-meta">Attempt {run.attempt} · Created {formatTime(run.created_at)}</span>
+              </div>
+              <div className="workflow-run-actions">
+                <span className="workflow-meta">
+                  {run.finished_at ? "Finished " + formatTime(run.finished_at) : "Not finished"}
+                </span>
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  aria-expanded={expanded}
+                  aria-controls={expanded ? eventListId : undefined}
+                  onClick={() => setExpandedRunId(expanded ? null : run.id)}
+                >
+                  {expanded ? "Hide events" : "Events"}
+                </button>
+              </div>
+            </div>
+            {expanded && (
+              <div className="workflow-event-history" id={eventListId}>
+                <WorkflowLogList
+                  service={service}
+                  runId={run.id}
+                  userId={userId}
+                  identityEpoch={identityEpoch}
+                />
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
