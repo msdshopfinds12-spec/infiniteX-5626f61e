@@ -10,9 +10,8 @@ test('catalog capture is one read-only SELECT statement', async () => {
   assert.ok(trimmed.startsWith('WITH table_inventory AS'));
   assert.ok(trimmed.endsWith(';'));
   assert.equal(sql.split('SELECT jsonb_build_object(').length - 1, 1);
-  const mutation = sql.split(/\\r?\\n/).some((line) =>
-    /^(CREATE|ALTER|INSERT|UPDATE|DELETE|DROP|TRUNCATE|GRANT|REVOKE|CALL|DO)\\b/i.test(line.trim())
-  );
+  const mutationWords = new Set(['CREATE', 'ALTER', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'GRANT', 'REVOKE', 'CALL', 'DO']);
+  const mutation = sql.split('\n').some((line) => mutationWords.has(line.trim().split(' ')[0].toUpperCase()));
   assert.equal(mutation, false);
 });
 
