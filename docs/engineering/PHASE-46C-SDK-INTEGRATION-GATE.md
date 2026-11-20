@@ -196,3 +196,46 @@ The fail-closed recovery-session guard and documentation were subsequently inclu
 - [Final-head SDK lockfile verification](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44700267878): SUCCESS.
 
 Final-head measured results remain: 100/100 unit and regression tests; 8/8 Edge Function CORS tests; 10/10 worker security tests; zero npm audit vulnerabilities; lint PASS; production build PASS (1,617 modules). No source changes occurred after this tested head at the time of this record.
+
+
+## 9. Phase 49 — Fail-closed bootstrap and authorization contract
+
+**Status:** SOURCE IMPLEMENTED; exact-head CI pending. No live role, permission, or RLS behavior is claimed by this phase.
+
+### Critical issue found and corrected
+
+The previous `Root` fallback rendered `<App />` without an authentication state when Supabase public configuration was missing or invalid. The App shell could then proceed to the demo workspace. This was a fail-open bootstrap path.
+
+The fix:
+- Added `src/features/auth/auth-bootstrap.ts` with `resolveAuthBootstrapState`.
+- Missing or invalid auth configuration now resolves to the existing generic `error` auth state.
+- `Root` passes that fail-closed state to `App`; it no longer renders the workspace as an unauthenticated fallback.
+- `App` itself now fails closed when `authState` is absent, as defense in depth.
+- The error screen does not display environment values, project URLs, or key material.
+
+### Authorization decision contract
+
+Added:
+- `src/features/auth/authorization.ts`
+- `src/features/auth/authorization.test.ts`
+
+The pure UI decision helper denies access when authentication is not verified, the authorization snapshot is missing, the snapshot subject does not match the current authenticated user, the snapshot is expired/invalid, or the requested capability is absent.
+
+Capabilities are named explicitly: workspace read, agent read/execute, workflow read/execute, logs read, security read, and settings manage.
+
+**Important boundary:** this is a client-side UX contract only. It is not a security boundary and cannot make browser-supplied permission data trustworthy. Every future server endpoint and database operation must independently authorize the authenticated subject; RLS remains mandatory.
+
+### Existing live-schema constraints retained
+
+The read-only live schema baseline still governs feature implementation:
+- Never select `platform_api_keys.key_hash`; use the existing safe metadata projection.
+- Never insert or fabricate `workflow_runs` lifecycle/result fields from the browser.
+- Derive owner identity from the verified server-side session, never a form, URL, or local state.
+- Keep billing, credit ledger mutation, worker claims, and privileged operations server-side.
+- No schema, grant, policy, or migration change is part of Phase 49.
+
+### Verification gate
+
+The new regression tests cover ready, missing, and invalid auth bootstrap states; authenticated capability allow; unauthenticated denial; missing snapshot; subject mismatch; expired/invalid expiry; and missing capability.
+
+The final commit must pass the complete GitHub Actions workflow at its exact head before this phase is called CI-verified.
