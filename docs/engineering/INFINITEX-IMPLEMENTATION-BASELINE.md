@@ -1,8 +1,8 @@
 # InfiniteX Engineering Implementation Baseline
 
 **Status:** Working engineering baseline; not a production-readiness declaration.  
-**Branch:** `eng/infinitex-implementation-hardening-2026-11-20`  
-**Frontend source baseline:** PR #48 head `a60d9f9ab1f65bf43ad3a5cef0c94e7cdff48763`  
+**Branch:** `eng/infinitex-p0-p1-auth-2026-11-20` (implementation branch; PR #60)  
+**Frontend source baseline:** PR #48 head `a60d9f9ab1f65bf43ad3a5cef0c94e7cdff48763`; auth safety work tracked in PR #60  
 **Default branch at branch creation:** `main` at `4538bd0cceb3d2ee6adbaf36777047108229cf3c`
 
 ## 1. Executive decision
