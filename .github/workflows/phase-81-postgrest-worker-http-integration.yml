@@ -10,7 +10,7 @@ on:
       - "supabase/functions/simula-workflow-worker/**"
       - "supabase/functions/_shared/**"
       - "tests/database/phase-81-postgrest-worker-fixtures.sql"
-      - "tests/workers/phase-81-postgrest-worker-http.deno.ts"
+      - "tests/workers/**"
       - "scripts/rehearse-migration-chain.mjs"
       - "scripts/phase-81-generate-jwt.mjs"
       - "package.json"
