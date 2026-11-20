@@ -443,3 +443,64 @@ InfiniteX is production-ready only when:
 **Current release status: NOT READY / NOT AUTHORIZED.**
 
 This document is a recovery and implementation plan. It does not claim that production code, database integration, AI providers, or deployments are complete.
+
+
+## 16. Migration provenance and transactional fencing audit — 2026-11-20
+
+### 16.1 Repository-wide branch scan result
+
+A read-only scan of the 90 branches visible at the time of inspection found:
+- Historical branches `phase-4/database-persistence`, `phase-3/backend-api`, `feat/phase-3d4-trusted-backend`, and `gh-20/secure-backend-foundation` do not contain tracked `.sql` files or a `supabase/` tree at their inspected heads.
+- Workflow reliability branches contain Edge Function sources but no historical schema migration chain.
+- The PR #35 candidate lineage contains one migration: `20261120000000_phase_4n8b_transactional_step_fencing.sql`.
+- The later verification branch `eng/phase-4n27-transactional-fencing-verification` adds a synthetic schema fixture and an isolated PostgreSQL runner, not historical production migrations.
+
+This scan is limited to visible repository branches and tracked trees. It does not prove that SQL never existed in unlisted repositories, deleted refs, external backups, or the live database.
+
+### 16.2 New verification evidence
+
+Exact commit inspected: `0d8e74fbef0742cea85588a1f183fbb17433a5e4`.
+
+GitHub Actions run #44635578904 completed successfully:
+- Disposable PostgreSQL 16 service container initialized.
+- Synthetic contract fixture applied.
+- Candidate transactional fencing migration applied.
+- SQL privilege/catalog assertions passed.
+- Two independent PostgreSQL sessions exercised the parent-row lock and competing same-generation start.
+- Duplicate/stale generation rejection passed.
+- Transaction rollback behavior passed.
+- Newer-generation replacement and completion passed.
+- Node/Deno security tests and application build/type-check steps in the same job passed.
+
+Run: https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44635578904
+
+**Evidence classification: VERIFIED for the synthetic contract and isolated PostgreSQL test harness only. NOT VERIFIED for production schema compatibility.** The fixture explicitly states that it models only the columns and unique key consumed by the RPC and is not evidence of production schema shape.
+
+### 16.3 Important test-design improvement
+
+The independent-session test is stronger than the earlier `Promise.all`-only integration test because it deliberately holds the parent `workflow_runs` row lock in Session A while Session B connects and attempts the RPC. This creates a controlled lock interleaving and proves the expected stale/duplicate rejection against PostgreSQL 16 in the disposable CI service.
+
+Keep both tests for distinct purposes:
+- Synthetic SQL contract test: function signature, role execute grants and core database invariants.
+- Disposable PostgreSQL runner: real PostgreSQL transaction, lock, rollback and stale-generation behavior.
+- Local Supabase integration test: PostgREST/RPC wiring and Supabase-specific role/config behavior, only against loopback disposable Supabase.
+
+### 16.4 Remaining blockers and audit questions
+
+1. Historical production migration SQL remains unrecovered. Do not reconstruct it from this synthetic fixture.
+2. Production schema parity remains unknown: constraints, foreign keys, RLS, table grants, policies, triggers, function ownership and existing data were not represented in full by the fixture.
+3. The SQL runner drops and recreates four `public.workflow_*` tables. Its exact URL guard is a useful safety control, but it must remain limited to its ephemeral CI service. Never point it at a shared or production database.
+4. The RPC accepts `p_owner_id` as a parameter and checks it against the parent run. The authenticated server boundary must derive this value from verified identity and must not trust a browser-supplied owner ID.
+5. Review worker code to ensure all step mutations go through the RPC and there are no alternate direct REST/table writes that bypass fencing.
+6. Review queue claim and stale-recovery functions to confirm they lock the same parent run row and update attempt/status atomically.
+7. Confirm the database function owner and all underlying table privileges under the actual Supabase deployment role model.
+8. Verify terminal state transitions, retry attempt increments, cancellation, timeout, and worker lease expiry as a complete state machine.
+9. The verification branch has Vercel build-rate-limit failures; the successful GitHub Actions run is separate evidence and does not establish a deployment.
+
+### 16.5 Updated recovery conclusion
+
+The transactional fencing implementation now has meaningful isolated PostgreSQL 16 test evidence. This advances it from unexecuted candidate to **PARTIAL — isolated database contract verified**.
+
+The correct next step is not to invent or apply a historical migration chain. It is to obtain a read-only schema/migration inventory from the authoritative Supabase project and reconcile it with available backups, archived branches, CI artifacts and repository history. Only after provenance is proven should a separate forward-only migration plan be prepared.
+
+Production release remains NOT READY and NOT AUTHORIZED.
