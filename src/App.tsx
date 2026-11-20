@@ -49,13 +49,13 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
     );
   }
 
-  if (authState?.status === "error") {
+  if (!authState || authState.status === "error") {
     return (
       <main className="auth-status-page">
         <div className="auth-status-card" role="alert">
           <ShieldAlert size={28} />
           <h1>Session could not be verified</h1>
-          <p>InfiniteX could not confirm your session. Refresh the page or check your connection. Your workspace data remains protected.</p>
+          <p>Authentication is not configured or could not be verified. Check the workspace configuration or connection, then retry. Protected workspace content remains unavailable.</p>
           <button className="auth-submit" type="button" onClick={() => window.location.reload()}>
             Retry session check
           </button>
