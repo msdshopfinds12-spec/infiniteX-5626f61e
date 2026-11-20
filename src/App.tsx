@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Activity, Bot, Cpu, GitBranch, LogOut, Play, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
+import { Activity, Bot, BriefcaseBusiness, Cpu, GitBranch, LogOut, Play, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -13,14 +13,30 @@ import PasswordRecoveryScreen from "./features/auth/password-recovery-screen";
 import type { AuthActions } from "./features/auth/auth-actions";
 import type { ViewKey } from "./types";
 import type { AuthState } from "./features/auth/auth-state";
+import WorkflowList from "./features/workflows/workflow-list";
+import type { WorkflowReadService } from "./features/workflows/workflow-read-service";
+import ProfileSummary from "./features/profile/profile-summary";
+import type { ProfileReadService } from "./features/profile/profile-read-service";
+import ProjectList from "./features/projects/project-list";
+import type { ProjectReadService } from "./features/projects/project-read-service";
 
 type AppProps = Readonly<{
   authState?: AuthState;
   authActions?: AuthActions;
   recoveryMode?: boolean;
+  workflowReadService?: WorkflowReadService | null;
+  profileReadService?: ProfileReadService | null;
+  projectReadService?: ProjectReadService | null;
 }>;
 
-export default function App({ authState, authActions, recoveryMode = false }: AppProps) {
+export default function App({
+  authState,
+  authActions,
+  recoveryMode = false,
+  workflowReadService = null,
+  profileReadService = null,
+  projectReadService = null,
+}: AppProps) {
   const [view, setView] = useState<ViewKey>("overview");
   const [searchTerm, setSearchTerm] = useState("");
   const query = searchTerm.trim().toLocaleLowerCase();
@@ -85,6 +101,7 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
     view === "overview" ? "Overview" :
     view === "agents" ? "AI Agents" :
     view === "pipelines" ? "Pipelines" :
+    view === "projects" ? "Projects" :
     view === "logs" ? "Log Stream" :
     view === "security" ? "Security Posture" : "Settings";
 
@@ -105,10 +122,11 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
             )}
             {signOutError && <p className="auth-inline-error" role="alert">{signOutError}</p>}
             <div className="demo-notice" role="status">
-              <strong>DEMO MODE</strong>
+              <strong>{authState.status === "authenticated" && (workflowReadService || projectReadService || profileReadService) ? "READ-ONLY INTEGRATION" : "DEMO MODE"}</strong>
               <span>
-                Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified.
-                {authState?.status === "authenticated" && " Your session is authenticated, but dashboard data remains demo-only."}
+                {authState.status === "authenticated" && (workflowReadService || projectReadService || profileReadService)
+                  ? "Available workflow, project, and profile services use authenticated read-only Supabase queries protected by database RLS. Project content is not loaded; overview metrics, agents, sample logs, and security posture remain demo or unverified."
+                  : "Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified."}
               </span>
             </div>
             {view === "overview" && (
@@ -152,15 +170,40 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
                 <AgentList searchTerm={query} />
               </div>
             )}
+            {view === "projects" && (
+              <div className="panel">
+                <div className="panel-head">
+                  <h2><BriefcaseBusiness size={18} /> Your Saved Projects</h2>
+                  <span className="badge badge-neutral">READ ONLY</span>
+                </div>
+                {authState.status === "authenticated" ? (
+                  <ProjectList
+                    service={projectReadService}
+                    userId={authState.userId}
+                    identityEpoch={authState.identityEpoch}
+                    searchTerm={query}
+                  />
+                ) : (
+                  <p className="muted" role="status">Sign in to view your saved projects.</p>
+                )}
+              </div>
+            )}
             {view === "pipelines" && (
               <div className="panel">
                 <div className="panel-head">
-                  <h2><GitBranch size={18} /> Sample Pipeline Board</h2>
-                  <button className="btn btn-primary" type="button" disabled title="Pipeline creation is not connected">
-                    <Play size={14} /> Creation unavailable
-                  </button>
+                  <h2><GitBranch size={18} /> Your Workflows</h2>
+                  <span className="badge badge-neutral">READ ONLY</span>
                 </div>
-                <PipelineBoard expanded searchTerm={query} />
+                {authState.status === "authenticated" ? (
+                  <WorkflowList
+                    service={workflowReadService}
+                    userId={authState.userId}
+                    identityEpoch={authState.identityEpoch}
+                    searchTerm={query}
+                  />
+                ) : (
+                  <p className="muted" role="status">Sign in to view account workflows.</p>
+                )}
               </div>
             )}
             {view === "logs" && (
@@ -192,9 +235,19 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
                   <span className="badge badge-neutral">not connected</span>
                 </div>
                 <p className="muted">
-                  Provider, runtime and deployment settings are placeholders. No external account connection or
-                  configuration change is available from this demo screen.
+                  Account profile information is read-only in this phase. Profile editing, billing, provider
+                  connections, runtime settings, and deployment controls remain disabled until their security
+                  contracts and acceptance tests are complete.
                 </p>
+                {authState.status === "authenticated" ? (
+                  <ProfileSummary
+                    service={profileReadService}
+                    userId={authState.userId}
+                    identityEpoch={authState.identityEpoch}
+                  />
+                ) : (
+                  <p className="muted" role="status">Sign in to view your account profile.</p>
+                )}
               </div>
             )}
           </main>

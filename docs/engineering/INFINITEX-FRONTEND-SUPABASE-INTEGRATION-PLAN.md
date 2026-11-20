@@ -1,9 +1,25 @@
 # InfiniteX Frontend-to-Supabase Integration Plan
 
-**Status:** PARTIAL — auth safety foundation implemented; SDK integration and authenticated application remain incomplete  
-**Date:** 2026-11-20  
+**Status:** PARTIAL — Supabase SDK/auth foundation and read-only workflow list implemented; broader live data integration and environment verification remain incomplete  
+**Date:** 2026-11-21  
 **Base candidate:** PR #50  
 **Live project:** Ashaa-INX (`vepacoemkhudamfaccah`)
+
+## 0. Current verified implementation (2026-11-21)
+
+This plan began as a demo-to-Supabase implementation proposal. The isolated Phase 71–72 branch has since implemented the following source-level capabilities:
+
+- `@supabase/supabase-js@2.119.2` is declared in `package.json` and the npm lockfile is committed.
+- `createBrowserSupabaseClient` validates public URL/publishable-key configuration and fails closed when configuration is missing or invalid.
+- Supabase Auth session adapter, auth-state coordinator, React provider, sign-in/sign-up/recovery/sign-out flows, and related tests exist.
+- `createWorkflowReadService` provides bounded, read-only workflow, run-history, and event-log queries with explicit safe-column projections and no caller-supplied owner ID.
+- `createProfileReadService` reads only safe profile fields through the current authenticated Supabase session and RLS; it no longer accepts a caller-supplied user ID.
+- `createProjectReadService` provides bounded read-only project metadata; the Projects navigation and view are connected to it, while project JSON content and ownership columns are not selected.
+- The Pipelines view renders an authenticated, identity-fenced workflow list with expandable run history and event timeline, loading, empty, error, retry, and search states. Run history excludes input/output/raw error text; event logs exclude the JSON `details` payload.
+- Overview metrics, agent cards, sample logs, workflow execution/mutations, and security posture remain demo or unverified. Projects are read-only; project creation/edit/delete is not enabled.
+- GitHub Actions run #44805498658 and disposable PostgreSQL run #44805508557 passed on exact head `060c0516f9d3d3964e1c292b8c856f026083f3c6`.
+
+These results verify source behavior and isolated CI. They do not prove that a browser session has successfully queried the intended live Supabase project, that two-user browser RLS tests have passed, or that production deployment is ready.
 
 ## 1. Goal
 
@@ -29,11 +45,11 @@ Relevant live worker RPCs include `public.simula_claim_workflow_runs`, `public.s
 
 ## 3. Dependency decision
 
-Use the official `@supabase/supabase-js` client. The reviewed Node 22 / npm 10.9.9 experiment resolved v2.119.2 and generated a matching npm lockfile candidate. That candidate completed `npm ci --ignore-scripts` and `npm audit` with zero reported vulnerabilities in GitHub Actions. Treat v2.119.2 as the current candidate, not an installed application dependency: review the artifact, then commit the exact version declaration and matching lockfile atomically before importing the SDK.
+Use the official `@supabase/supabase-js` client. The reviewed Node 22 / npm 10.9.9 workflow resolved v2.119.2. The exact version is now declared in `package.json` with a matching committed npm lockfile and is imported by the typed browser client and auth adapter.
 
 Do not hand-edit `package-lock.json`. Generate it using npm in a clean Node 22 environment, then run `npm ci`, `npm audit`, lint, tests, and build. The repository currently uses Node 22 in CI.
 
-The dependency is not yet added to the application branch. The temporary Node 22 workflow produced a reviewed candidate artifact, but the repository still has its original synchronized `package.json` and `package-lock.json`. Do not hand-edit or partially commit either manifest. Commit the exact dependency declaration and npm-generated lockfile together, then rerun the full CI workflow on the resulting head.
+The dependency and lockfile are present on the isolated Phase 71–72 branch. Exact-head CI has run `npm ci`, unit/regression tests, lint, and production build successfully. Any future dependency change must regenerate the lockfile with npm and pass the same gates; never hand-edit lockfile metadata.
 
 ## 4. Environment contract
 

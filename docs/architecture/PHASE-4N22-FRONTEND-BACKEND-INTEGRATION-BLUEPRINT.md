@@ -1,15 +1,15 @@
 # Phase 4N.22 — InfiniteX Frontend/Backend Integration Blueprint
 
-**Evidence baseline:** PR #50 head `82c347d1b6a303de68e788adc5739852a0fdba18`  
-**Status:** Architecture proposal only; no runtime integration or dependency change performed.
+**Evidence baseline:** PR #50 head `82c347d1b6a303de68e788adc5739852a0fdba18` (historical)  
+**Status:** Historical architecture proposal; source implementation has advanced on isolated Phase 71–72 branch. See `docs/engineering/INFINITEX-FRONTEND-SUPABASE-INTEGRATION-PLAN.md` for current evidence.
 
 ## 1. Verified current implementation
 
-The inspected `src/App.tsx` explicitly renders DEMO MODE. Agent cards, pipeline stages, and log entries are local static arrays. Metric values are illustrative; pipeline creation and run actions are disabled. The security view correctly says security posture is not verified.
+The original PR #50 baseline rendered DEMO MODE throughout. On the newer Phase 71–72 branch, AuthProvider and the Supabase SDK are present and the Pipelines view now has a read-only workflow query; overview metrics, agent cards, sample logs, and workflow mutations remain demo/unverified.
 
-The repository has browser-safe Supabase configuration parsing in `src/lib/supabase/config.ts` and `public-config.ts`, plus generated-looking database types in `src/lib/supabase/database.types.ts`. However, the inspected `package.json` does not declare `@supabase/supabase-js`. There is no verified Supabase client, auth provider, protected-route boundary, or feature data-service layer in the inspected source tree.
+The repository has browser-safe Supabase configuration parsing in `src/lib/supabase/config.ts` and `public-config.ts`, plus generated-looking database types in `src/lib/supabase/database.types.ts`. The historical PR #50 inspection did not contain the SDK/auth layer. The newer Phase 71–72 branch declares `@supabase/supabase-js@2.119.2`, has a validated browser client, auth provider, and one read-only workflow data service.
 
-**Conclusion:** this is a polished frontend demo and configuration foundation, not an integrated Supabase application.
+**Historical conclusion:** PR #50 was a polished frontend demo and configuration foundation. The newer branch is partially integrated, but does not yet qualify as a complete live Supabase application.
 
 ## 2. Target architecture
 
