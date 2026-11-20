@@ -229,7 +229,12 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Start isolated Supabase PostgreSQL 17 container with scheduled jobs disabled
+        shell: bash
         run: |
+          # Generate a throwaway pgsodium server key for this disposable CI container only.
+          # It is never stored in GitHub secrets, repository files, or production.
+          PGSODIUM_TEST_SERVER_SECRET="$(openssl rand -hex 32)"
+          echo "::add-mask::$PGSODIUM_TEST_SERVER_SECRET"
           docker run -d --name infinitex-rehearsal-db \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_USER=supabase_admin \
@@ -237,7 +242,8 @@ jobs:
             -p 5432:5432 \
             supabase/postgres:17.6.1.136 \
             postgres -c config_file=/etc/postgresql/postgresql.conf \
-              -c shared_preload_libraries=pg_cron,pg_net,pg_stat_statements \
+              -c shared_preload_libraries=pg_cron,pg_net,pg_stat_statements,pgsodium \
+              -c pgsodium.server_secret_key="$PGSODIUM_TEST_SERVER_SECRET" \
               -c cron.database_name=infinitex_rehearsal \
               -c cron.launch_active_jobs=off
           for attempt in $(seq 1 60); do
