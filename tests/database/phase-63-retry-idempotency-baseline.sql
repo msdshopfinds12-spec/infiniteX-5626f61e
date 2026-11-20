@@ -1,4 +1,4 @@
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 DO $baseline$
 DECLARE
@@ -36,4 +36,4 @@ BEGIN
 END
 $assert$;
 
-\\echo 'PASS: old owner-scoped lookup reproduces the incorrect already_terminal result.'
+\echo 'PASS: old owner-scoped lookup reproduces the incorrect already_terminal result.'
