@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - eng/infinitex-p0-p1-auth-2026-11-20
+      - feat/phase-51-durable-workflow-engine
 
 permissions:
   contents: read
