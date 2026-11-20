@@ -6,6 +6,7 @@ import { resolveAuthBootstrapState } from "./features/auth/auth-bootstrap.ts";
 import { createSupabaseAuthSessionAdapter } from "./features/auth/supabase-auth-session-adapter";
 import { createBrowserSupabaseClient } from "./lib/supabase/client";
 import { createWorkflowReadService } from "./features/workflows/workflow-read-service";
+import { createWorkflowRunService } from "./features/workflows/workflow-run-service";
 import { createProfileReadService } from "./features/profile/profile-read-service";
 import { createProjectReadService } from "./features/projects/project-read-service";
 import "./styles/global.css";
@@ -23,6 +24,16 @@ const authAdapter =
 const workflowReadService =
   supabaseResult.status === "ready"
     ? createWorkflowReadService(supabaseResult.client)
+    : null;
+
+/**
+ * Queue writes remain disabled until the Phase 84 migration and Edge Function
+ * are explicitly deployed and verified in the target Supabase project.
+ */
+const workflowRunService =
+  supabaseResult.status === "ready" &&
+  import.meta.env.VITE_WORKFLOW_RUN_ENQUEUE_ENABLED === "true"
+    ? createWorkflowRunService(supabaseResult.client)
     : null;
 
 const profileReadService =
@@ -45,6 +56,7 @@ function ConnectedApp() {
       authActions={authActions}
       recoveryMode={recoveryMode}
       workflowReadService={workflowReadService}
+      workflowRunService={workflowRunService}
       profileReadService={profileReadService}
       projectReadService={projectReadService}
     />
