@@ -7,6 +7,7 @@ import {
   executeWithRetry,
   isClaimedRunValid,
   isWorkflowOwnedBy,
+  isAttemptGenerationNewer,
   readJsonBodyLimited,
   validateStepTimeoutSeconds,
   validateRetryLimit,
@@ -118,6 +119,9 @@ Deno.serve(async (req: Request) => {
           attempt: stepAttempt, started_at: new Date().toISOString(), finished_at: null,
         };
         if (previous) {
+          if (!isAttemptGenerationNewer(previous.attempt, stepAttempt)) {
+            throw new Error("workflow_step_attempt_superseded");
+          }
           const { data: startedStep, error: startError } = await admin
             .from("workflow_step_runs").update(stepRunPayload)
             .eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
