@@ -65,3 +65,25 @@ test("empty user identity fails closed", () => {
   assert.equal(state.status, "error");
   assert.equal(isCurrentIdentityEpoch(state, state.identityEpoch), false);
 });
+
+test("repeated anonymous auth events are idempotent", () => {
+  const anonymous = resolveAuthSession(createInitialAuthState(), null);
+  const repeated = resolveAuthSession(anonymous, null);
+
+  assert.equal(repeated.identityEpoch, anonymous.identityEpoch);
+  assert.deepEqual(repeated, anonymous);
+});
+
+test("signing back into the same account after sign-out creates a new identity epoch", () => {
+  const firstSession = resolveAuthSession(createInitialAuthState(), {
+    user: { id: "user-a" },
+  });
+  const signedOut = resolveAuthSession(firstSession, null);
+  const restored = resolveAuthSession(signedOut, {
+    user: { id: "user-a" },
+  });
+
+  assert.equal(restored.status, "authenticated");
+  assert.equal(restored.identityEpoch, signedOut.identityEpoch + 1);
+  assert.equal(isCurrentIdentityEpoch(restored, firstSession.identityEpoch), false);
+});
