@@ -34,7 +34,7 @@ export default function ProfileSummary({ service, userId, identityEpoch }: Props
       return () => { active = false; };
     }
 
-    void service.getOwnProfile(userId).then((result) => {
+    void service.getOwnProfile().then((result) => {
       if (!active) return;
       if (result.status === "success") {
         setState({ key: requestKey, status: "success", result });
