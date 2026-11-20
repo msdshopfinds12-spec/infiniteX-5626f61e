@@ -8,6 +8,8 @@ on:
       - "scripts/verify-recovered-migration-manifest.mjs"
       - "scripts/audit-migration-side-effects.mjs"
       - "tests/database/migration-side-effect-audit.test.mjs"
+      - "tests/database/catalog-capture-readonly.test.mjs"
+      - "supabase/contracts/capture-database-contract.readonly.sql"
       - "tests/database/**"
       - "docs/database/**"
       - ".github/workflows/database-contract.yml"
@@ -36,6 +38,7 @@ jobs:
           node --check scripts/verify-recovered-migration-manifest.mjs
           node --check scripts/audit-migration-side-effects.mjs
           node --check tests/database/migration-side-effect-audit.test.mjs
+          node --check tests/database/catalog-capture-readonly.test.mjs
           node --check tests/database/check-database-contract.test.mjs
           node --check tests/database/check-migration-integrity.test.mjs
           node --check tests/database/platform-api-key-column-grants.test.mjs
@@ -43,6 +46,8 @@ jobs:
         run: node scripts/verify-recovered-migration-manifest.mjs
       - name: Audit recovered migration side effects against reviewed policy
         run: node scripts/audit-migration-side-effects.mjs
+      - name: Run read-only catalog capture regression tests
+        run: node --test tests/database/catalog-capture-readonly.test.mjs
       - name: Run migration side-effect audit regression tests
         run: node --test tests/database/migration-side-effect-audit.test.mjs
       - name: Run database contract validator regression tests
