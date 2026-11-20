@@ -128,8 +128,8 @@ test("validates retry limits as additional attempts with a hard upper bound", ()
   assert.equal(validateRetryLimit(undefined), 0);
   assert.equal(validateRetryLimit(null), 0);
   assert.equal(validateRetryLimit(0), 0);
-  assert.equal(validateRetryLimit(5), 5);
-  for (const value of [-1, 1.5, 6, "2"]) {
+  assert.equal(validateRetryLimit(10), 10);
+  for (const value of [-1, 1.5, 11, "2"]) {
     assert.throws(() => validateRetryLimit(value), /step_retry_limit_invalid/);
   }
 });
@@ -172,7 +172,7 @@ test("stops after initial attempt plus configured retries", async () => {
 });
 
 test("rejects invalid retry configuration and never exceeds delay cap", async () => {
-  await assert.rejects(() => executeWithRetry(async () => "ok", 6), /step_retry_limit_invalid/);
+  await assert.rejects(() => executeWithRetry(async () => "ok", 11), /step_retry_limit_invalid/);
   const delays = [];
   let calls = 0;
   await executeWithRetry(async () => {
