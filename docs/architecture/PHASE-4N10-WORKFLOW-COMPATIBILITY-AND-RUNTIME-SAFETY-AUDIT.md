@@ -140,7 +140,7 @@ Fast pure unit tests may run separately, but they must not substitute for this i
 | Cooperative timeout helper | VERIFIED | Source implementation and explicit limitation |
 | Hard timeout / cancellation | BLOCKED | Synchronous action cannot be preempted |
 | Parent-run transition fence | PARTIAL | Migration source inspected |
-| Authoritative base schema | BLOCKED | Not located in inspected migration tree |
+| Historical migration source | BLOCKED | Original SQL bodies are not tracked in the inspected migration tree; current live schema metadata was subsequently inspected read-only |
 | All workflow state writers | UNASSESSED | Complete RPC/writer inventory pending |
 | Real DB concurrency tests | NOT TESTED | No passing disposable DB run evidence |
 | Production migration / deployment | NOT AUTHORIZED | None performed |
@@ -155,4 +155,113 @@ This audit is a planning and source-inspection artifact. It does not:
 - deploy or publish;
 - claim that the whole repository or production system is fully audited.
 
-**Final decision:** preserve the current branch stack, keep retry execution disabled, recover schema provenance, and test actual database concurrency before any runtime rollout.
+**Final decision:** preserve the current branch stack, keep retry execution disabled, use the read-only live schema snapshot below to validate candidate assumptions, and test actual database concurrency before any runtime rollout.
+
+
+## 10. Read-only live Supabase schema and runtime addendum
+
+**Inspection date:** 2026-11-20  
+**Project:** Ashaa-INX  
+**Method:** Supabase metadata APIs and read-only PostgreSQL catalog queries only. No table rows were selected, no secrets were retrieved, and no database or function configuration was changed.
+
+### 10.1 Live project and migration inventory
+
+- Project status: `ACTIVE_HEALTHY`.
+- PostgreSQL engine: 17.11.
+- Public application tables reported: 14.
+- Applied migration ledger entries: 19.
+- Latest listed migration: `20261103134302_ashaa_backend_credit_ledger`.
+- The Phase 4N.8B migration `20261120000000_phase_4n8b_transactional_step_fencing.sql` is **not** present in the applied migration ledger.
+- The three workflow worker/API-key Edge Functions are reported active.
+
+This confirms that the live database can be inspected as the current schema authority. It does not recover the historical SQL body of every applied migration or prove that the GitHub candidate source matches the deployed functions.
+
+### 10.2 Workflow relation compatibility
+
+The live catalog confirms these relations and the columns referenced by the Phase 4N.8B candidate:
+
+- `workflows`: `id`, `owner_id`, `status`, `trigger_type`, `next_run_at`, timestamps and configuration fields.
+- `workflow_steps`: `id`, `workflow_id`, `step_order`, `action_type`, `config`, `retry_limit`, `timeout_seconds`.
+- `workflow_runs`: `id`, `workflow_id`, `owner_id`, `status`, `attempt`, input/output, error and lifecycle timestamps.
+- `workflow_step_runs`: `id`, `run_id`, `step_id`, `owner_id`, `status`, `attempt`, input/output, error and lifecycle timestamps.
+- `workflow_logs`: owner/workflow/run references, level, event, details and timestamp.
+
+Important live constraints include:
+
+- `workflow_step_runs UNIQUE (run_id, step_id)`.
+- `workflow_steps UNIQUE (workflow_id, step_order)`.
+- `workflow_runs` unique index on `(workflow_id, scheduled_for)`.
+- Foreign keys connect runs to workflows and step runs to both parent runs and workflow steps.
+- The live workflow tables have RLS enabled.
+
+**Compatibility result:** the live relation/column/unique-key metadata matches the specific table references and `ON CONFLICT (run_id, step_id)` assumption used by the Phase 4N.8B candidate migration. This is a schema-compatibility observation, not proof that the migration is safe to apply or that its transaction behavior is correct.
+
+### 10.3 Live row-security policy inventory
+
+The inspected policies currently provide:
+
+- `workflows`: authenticated owners manage rows where `owner_id = auth.uid()`, with matching `WITH CHECK`.
+- `workflow_steps`: authenticated access is scoped through the parent workflow owner.
+- `workflow_runs`: owners can select their rows and insert only when both the run owner and parent workflow owner match the authenticated user.
+- `workflow_step_runs`: owners can select rows by `owner_id`; no authenticated write policy was observed.
+- `workflow_logs`: owners can select rows by `owner_id`.
+- `profiles`: owners can select/update their own profile; update has a matching `WITH CHECK`.
+
+Do not add browser-side write permissions for worker-owned state transitions. Continue to route those transitions through narrowly granted server-side RPCs.
+
+### 10.4 Live RPC and queue-recovery findings
+
+The live catalog contains:
+
+- `private.simula_claim_workflow_runs` and a public wrapper for authenticated owner-scoped claiming.
+- `private.simula_claim_workflow_runs_internal` and a public wrapper executable by `service_role`.
+- `public.simula_verify_worker_secret`, executable by `service_role`.
+
+The internal claim implementation performs stale-run recovery and queue claiming. It marks sufficiently old runs at the attempt ceiling as failed, re-queues older running attempts below the ceiling, then claims queued runs using `FOR UPDATE SKIP LOCKED` and increments the parent attempt.
+
+**Not present in the live catalog:** `simula_transition_workflow_step`. The Phase 4N.8B transactional step-fencing RPC is therefore a repository candidate and is not deployed in the inspected project.
+
+Before rollout, inventory every caller and state writer, confirm a common parent-row lock order with claim/recovery/finalization, and execute the real two-worker race tests against a disposable database.
+
+### 10.5 Live Edge Function drift
+
+Three Edge Functions are reported active. Their deployed source hashes differ from the source files in the isolated PR #46 canonical-source candidate.
+
+Observed source-level differences:
+
+- The deployed authenticated workflow worker uses wildcard CORS; the PR #46 candidate uses the shared origin-allowlist module.
+- The deployed API-key manager uses wildcard CORS; the PR #46 candidate uses the shared origin-allowlist module.
+- The deployed cron worker is configured without platform JWT verification and performs its own worker-secret verification. Keep that endpoint server-to-server only; do not weaken its secret verification.
+- The deployed worker sources do not call the Phase 4N.8B `simula_transition_workflow_step` RPC.
+
+These findings establish source drift. They do not establish exploitability or justify an immediate production deployment. Confirm the approved browser origins and perform a complete diff/security review before any separately approved function rollout.
+
+### 10.6 Security-advisor observation
+
+The security advisor returned one informational finding: `public.billing_webhook_events` has RLS enabled but no policies. This is deny-by-default for ordinary RLS-governed access and may be intentional for a server-only table. Confirm intended access paths and service-role usage; do not add broad policies just to silence the notice.
+
+### 10.7 Data and test boundaries
+
+- The metadata API reported zero rows for the inspected workflow tables at this snapshot. No row contents were read.
+- The Phase 4N.8B migration remains unapplied.
+- The earlier PR #38 report says the mutating disposable-database concurrency test was ignored because fixture variables were not supplied.
+- No real two-worker transactional race has been verified by the evidence inspected here.
+- No migration, function deployment, secret change, production write, merge, or hosting deployment was performed.
+
+### 10.8 Updated status ledger
+
+| Area | Status | Evidence boundary |
+|---|---|---|
+| Current live workflow table/column metadata | VERIFIED | Read-only Supabase catalog/table metadata |
+| Key unique/FK constraints | VERIFIED | Read-only PostgreSQL catalog |
+| Current owner-scoped RLS policies | VERIFIED | Read-only `pg_policies` inventory |
+| Historical SQL bodies for all 19 migrations | BLOCKED | Migration names available; original SQL bodies not recovered |
+| Phase 4N.8B table-reference compatibility | PARTIAL | Referenced columns and conflict key match live metadata |
+| Phase 4N.8B RPC deployed | NOT DEPLOYED | Function absent from live catalog and migration ledger |
+| All queue/recovery/finalization writers | PARTIAL | Claim/recovery RPC inspected; complete writer inventory still required |
+| Deployed Edge Function parity | DRIFT CONFIRMED | Live hashes/source differ from PR #46 candidate |
+| Real database concurrency test | NOT TESTED | Disposable fixture test was previously skipped |
+| Retry execution / durable retry scheduling | NOT IMPLEMENTED / NOT VERIFIED | Pure retry policy is not evidence of durable execution |
+| Production migration / function deployment | NOT AUTHORIZED | No production changes performed |
+
+**Updated decision:** use the recovered live schema metadata to finish a source-to-database compatibility review. Keep PR #35 and PR #46 isolated and in Draft. The next implementation gate is a disposable PostgreSQL/Supabase test environment using a verified schema snapshot, mandatory two-worker concurrency tests, and complete worker-writer review. Do not deploy the candidate functions or apply the fencing migration to the live project as part of this phase.
