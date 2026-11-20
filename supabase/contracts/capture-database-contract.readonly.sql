@@ -34,18 +34,20 @@ table_contract AS (
  ) ORDER BY p.policyname) FROM pg_catalog.pg_policies p
  WHERE p.schemaname=t.schema_name AND p.tablename=t.relname),'[]'::jsonb) AS policies,
  COALESCE((SELECT jsonb_agg(jsonb_build_object(
-  'grantee',CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE r.rolname END,
+  'grantor',grantor_role.rolname,'grantee',CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE r.rolname END,
   'privilege',a.privilege_type,'grantable',a.is_grantable
- ) ORDER BY a.grantee,a.privilege_type,a.is_grantable) FROM pg_catalog.aclexplode(COALESCE(
+ ) ORDER BY a.grantor,a.grantee,a.privilege_type,a.is_grantable) FROM pg_catalog.aclexplode(COALESCE(
   (SELECT c.relacl FROM pg_catalog.pg_class c WHERE c.oid=t.oid),
   pg_catalog.acldefault(CASE WHEN t.relkind='S' THEN 'S'::"char" ELSE 'r'::"char" END,
     (SELECT c.relowner FROM pg_catalog.pg_class c WHERE c.oid=t.oid))
- )) a LEFT JOIN pg_catalog.pg_roles r ON r.oid=a.grantee),'[]'::jsonb) AS grants,
+ )) a LEFT JOIN pg_catalog.pg_roles r ON r.oid=a.grantee
+ LEFT JOIN pg_catalog.pg_roles grantor_role ON grantor_role.oid=a.grantor),'[]'::jsonb) AS grants,
  COALESCE((SELECT jsonb_agg(jsonb_build_object(
-  'column',a.attname,'grantee',CASE WHEN x.grantee=0 THEN 'PUBLIC' ELSE r.rolname END,
+  'column',a.attname,'grantor',grantor_role.rolname,'grantee',CASE WHEN x.grantee=0 THEN 'PUBLIC' ELSE r.rolname END,
   'privilege',x.privilege_type,'grantable',x.is_grantable
- ) ORDER BY a.attnum,x.grantee,x.privilege_type,x.is_grantable) FROM pg_catalog.pg_attribute a
+ ) ORDER BY a.attnum,x.grantor,x.grantee,x.privilege_type,x.is_grantable) FROM pg_catalog.pg_attribute a
  CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) x LEFT JOIN pg_catalog.pg_roles r ON r.oid=x.grantee
+ LEFT JOIN pg_catalog.pg_roles grantor_role ON grantor_role.oid=x.grantor
  WHERE a.attrelid=t.oid AND a.attnum>0 AND NOT a.attisdropped AND a.attacl IS NOT NULL),'[]'::jsonb) AS column_grants,
  COALESCE((SELECT jsonb_agg(jsonb_build_object(
   'name',tr.tgname,'enabled',tr.tgenabled,'definition',pg_catalog.pg_get_triggerdef(tr.oid,true)
@@ -67,18 +69,18 @@ function_contract AS (
    FROM pg_catalog.aclexplode(COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
    LEFT JOIN pg_catalog.pg_roles r ON r.oid=a.grantee WHERE a.privilege_type='EXECUTE'
   ) q WHERE role_name IS NOT NULL),'[]'::jsonb) AS execute_roles,
-  pg_catalog.md5(pg_catalog.pg_get_functiondef(p.oid)) AS definition_md5
- FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+  FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
  JOIN pg_catalog.pg_language l ON l.oid=p.prolang
  WHERE n.nspname IN ('public','private') AND p.prokind IN ('f','p')
 ),
 schema_contract AS (
  SELECT s.nspname AS name,s.owner,
   COALESCE((SELECT jsonb_agg(jsonb_build_object(
-   'grantee',CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE r.rolname END,
+   'grantor',grantor_role.rolname,'grantee',CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE r.rolname END,
    'privilege',a.privilege_type,'grantable',a.is_grantable
-  ) ORDER BY a.grantee,a.privilege_type,a.is_grantable) FROM pg_catalog.aclexplode(COALESCE(n.nspacl,pg_catalog.acldefault('n',n.nspowner))) a
-  LEFT JOIN pg_catalog.pg_roles r ON r.oid=a.grantee),'[]'::jsonb) AS grants
+  ) ORDER BY a.grantor,a.grantee,a.privilege_type,a.is_grantable) FROM pg_catalog.aclexplode(COALESCE(n.nspacl,pg_catalog.acldefault('n',n.nspowner))) a
+  LEFT JOIN pg_catalog.pg_roles r ON r.oid=a.grantee
+  LEFT JOIN pg_catalog.pg_roles grantor_role ON grantor_role.oid=a.grantor),'[]'::jsonb) AS grants
  FROM scope_schemas s JOIN pg_catalog.pg_namespace n ON n.oid=s.oid
 ),
 extension_contract AS (
@@ -137,7 +139,7 @@ SELECT jsonb_build_object(
   'schema',schema_name,'name',function_name,'owner',owner,'language',language,
   'resultType',result_type,'identityArguments',identity_arguments,'securityDefiner',security_definer,
   'searchPath',search_path,'volatility',volatility,'parallelSafety',parallel_safety,
-  'strict',strict,'leakproof',leakproof,'executeRoles',execute_roles,'definitionMd5',definition_md5
+  'strict',strict,'leakproof',leakproof,'executeRoles',execute_roles
  ) ORDER BY schema_name,function_name,identity_arguments) FROM function_contract),'[]'::jsonb),
  'extensions',COALESCE((SELECT jsonb_agg(to_jsonb(e) ORDER BY e.name) FROM extension_contract e),'[]'::jsonb),
  'types',COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY t.schema_name,t.name) FROM type_contract t),'[]'::jsonb),
