@@ -13,14 +13,17 @@ import PasswordRecoveryScreen from "./features/auth/password-recovery-screen";
 import type { AuthActions } from "./features/auth/auth-actions";
 import type { ViewKey } from "./types";
 import type { AuthState } from "./features/auth/auth-state";
+import WorkflowList from "./features/workflows/workflow-list";
+import type { WorkflowReadService } from "./features/workflows/workflow-read-service";
 
 type AppProps = Readonly<{
   authState?: AuthState;
   authActions?: AuthActions;
   recoveryMode?: boolean;
+  workflowReadService?: WorkflowReadService | null;
 }>;
 
-export default function App({ authState, authActions, recoveryMode = false }: AppProps) {
+export default function App({ authState, authActions, recoveryMode = false, workflowReadService = null }: AppProps) {
   const [view, setView] = useState<ViewKey>("overview");
   const [searchTerm, setSearchTerm] = useState("");
   const query = searchTerm.trim().toLocaleLowerCase();
@@ -105,10 +108,11 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
             )}
             {signOutError && <p className="auth-inline-error" role="alert">{signOutError}</p>}
             <div className="demo-notice" role="status">
-              <strong>DEMO MODE</strong>
+              <strong>{authState.status === "authenticated" && workflowReadService ? "LIMITED LIVE" : "DEMO MODE"}</strong>
               <span>
-                Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified.
-                {authState?.status === "authenticated" && " Your session is authenticated, but dashboard data remains demo-only."}
+                {authState.status === "authenticated" && workflowReadService
+                  ? "Your workflow list is read-only live data protected by database RLS. Overview metrics, agents, logs and security posture remain demo or unverified."
+                  : "Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified."}
               </span>
             </div>
             {view === "overview" && (
@@ -155,12 +159,19 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
             {view === "pipelines" && (
               <div className="panel">
                 <div className="panel-head">
-                  <h2><GitBranch size={18} /> Sample Pipeline Board</h2>
-                  <button className="btn btn-primary" type="button" disabled title="Pipeline creation is not connected">
-                    <Play size={14} /> Creation unavailable
-                  </button>
+                  <h2><GitBranch size={18} /> Your Workflows</h2>
+                  <span className="badge badge-neutral">READ ONLY</span>
                 </div>
-                <PipelineBoard expanded searchTerm={query} />
+                {authState.status === "authenticated" ? (
+                  <WorkflowList
+                    service={workflowReadService}
+                    userId={authState.userId}
+                    identityEpoch={authState.identityEpoch}
+                    searchTerm={query}
+                  />
+                ) : (
+                  <p className="muted" role="status">Sign in to view account workflows.</p>
+                )}
               </div>
             )}
             {view === "logs" && (
