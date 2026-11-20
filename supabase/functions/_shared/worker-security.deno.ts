@@ -1,3 +1,4 @@
+import { executeSafeAction } from "./workflow-actions.mjs";
 import {
   assertJsonByteLimit,
   assertStepDeadline,
@@ -11,6 +12,8 @@ import {
   isWorkflowOwnedBy,
   readJsonBodyLimited,
   validateStepTimeoutSeconds,
+  validateRetryLimit,
+  executeWithRetry,
 } from "./worker-security.mjs";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -128,4 +131,35 @@ Deno.test("Deno: attempt generations advance strictly and reject stale writers",
   assert(apply(2, "new-result"), "new generation should commit");
   assert(!apply(1, "stale-result"), "late stale completion should be rejected");
   assertEqual(state, { attempt: 2, output: "new-result" }, "stale completion must not overwrite new result");
+});
+
+Deno.test("Deno: validates bounded retry configuration and retries only transient failures", async () => {
+  assert(validateRetryLimit(0) === 0, "zero retries should be valid");
+  assert(validateRetryLimit(10) === 10, "database-aligned retry cap should be valid");
+  let invalid = false;
+  try { validateRetryLimit(11); } catch { invalid = true; }
+  assert(invalid, "retry limit above database cap should fail closed");
+
+  let calls = 0;
+  const delays: number[] = [];
+  const result = await executeWithRetry(async () => {
+    calls++;
+    if (calls === 1) throw Object.assign(new Error("temporary"), { code: "UPSTREAM_UNAVAILABLE" });
+    return "ok";
+  }, 1, {
+    baseDelayMs: 10,
+    maxDelayMs: 10,
+    random: () => 1,
+    sleep: async (ms: number) => { delays.push(ms); },
+  });
+  assert(result === "ok" && calls === 2, "one transient failure should retry once");
+  assertEqual(delays, [10], "backoff should be deterministic with injected randomness");
+});
+
+Deno.test("Deno: shared safe action executor rejects unsupported and malformed actions", () => {
+  assertEqual(executeSafeAction("uppercase_text", { text: "hello" }, {}), { text: "HELLO" },
+    "uppercase action should transform text");
+  let rejected = false;
+  try { executeSafeAction("delete_everything", {}, {}); } catch { rejected = true; }
+  assert(rejected, "unknown actions must fail closed");
 });
