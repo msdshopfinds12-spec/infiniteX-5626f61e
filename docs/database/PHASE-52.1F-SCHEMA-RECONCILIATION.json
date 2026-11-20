@@ -1,0 +1,157 @@
+{
+  "artifact": "PHASE_52_1F_SCHEMA_RECONCILIATION",
+  "classification": "PRELIMINARY_RECONCILIATION_ASSESSMENT",
+  "status": "PARTIAL_NOT_ACCEPTED",
+  "canonical_schema_contract": false,
+  "contract_v2_readiness": "NOT_ESTABLISHED",
+  "production_change_authorized": false,
+  "release_approval": "NOT_GRANTED",
+  "source_branch": "engineering/phase-52-1e-live-catalog-evidence",
+  "source_commit": "83bf25136ea3d26ba445f9821d510bc29ffba008",
+  "project": {
+    "name": "Ashaa-INX",
+    "ref": "vepacoemkhudamfaccah",
+    "postgres_version": "17.11",
+    "region": "ap-northeast-2"
+  },
+  "comparison": {
+    "purpose": "Assess whether the existing historical live-schema metadata snapshot can be accepted as a current canonical contract.",
+    "observed_aggregate_counts": {
+      "tables": {
+        "historical_snapshot": 14,
+        "live_catalog": 14,
+        "aggregate_match": true
+      },
+      "columns": {
+        "historical_snapshot": 132,
+        "live_catalog": 132,
+        "aggregate_match": true
+      },
+      "constraints": {
+        "historical_snapshot": 85,
+        "live_catalog": 85,
+        "aggregate_match": true
+      },
+      "indexes": {
+        "historical_snapshot": 44,
+        "live_catalog": 44,
+        "aggregate_match": true
+      },
+      "policies": {
+        "historical_snapshot": 19,
+        "live_catalog": 19,
+        "aggregate_match": true
+      },
+      "routines": {
+        "historical_snapshot": 4,
+        "live_catalog": 4,
+        "aggregate_match": true
+      },
+      "non_internal_triggers": {
+        "historical_snapshot": 6,
+        "live_catalog": 6,
+        "aggregate_match": true
+      },
+      "migration_ledger_entries": {
+        "historical_snapshot": 19,
+        "live_catalog": 19,
+        "aggregate_match": true
+      }
+    },
+    "interpretation": "Aggregate counts match, but equal counts do not establish object identity, definition equality, dependency equivalence, privilege equivalence, or migration reproducibility.",
+    "definition_level_status": "NOT_ESTABLISHED",
+    "exact_missing_extra_changed_object_inventory": "NOT_PRODUCED",
+    "deterministic_snapshot_hash_comparison": "NOT_PERFORMED",
+    "canonical_migration_replay": "NOT_ESTABLISHED"
+  },
+  "security_observations": {
+    "all_14_public_tables_have_rls_enabled": true,
+    "force_rls_enabled_on_any_inventoried_table": false,
+    "authenticated_select_on_platform_api_keys_key_hash": true,
+    "anon_select_on_platform_api_keys_key_hash": false,
+    "candidate_hardening_migration": "20261120120000_harden_platform_api_key_column_access.sql",
+    "candidate_migration_live_status": "NOT_APPLIED",
+    "billing_webhook_events_client_select_insert": "NOT_GRANTED_TO_ANON_OR_AUTHENTICATED",
+    "profiles_role_authenticated_update": "NOT_GRANTED"
+  },
+  "required_definition_level_checks": [
+    "relations: exact schema, name, kind, owner, persistence, partition attributes, RLS and FORCE RLS",
+    "columns: ordinal, type, collation, nullability, default/generated/identity attributes",
+    "constraints: name, type, definition, validation and deferrability",
+    "indexes: normalized definition, uniqueness, validity, readiness, predicates and included columns",
+    "policies: command, roles, USING and WITH CHECK expressions",
+    "privileges: table and column grants plus role membership and inheritance context",
+    "routines: identity arguments, return type, language, volatility, security definer flag, search_path and execute grants",
+    "views: normalized definitions and security_invoker/security_barrier attributes",
+    "triggers: timing, events, enabled state, function binding and definition",
+    "extensions: name, version and schema",
+    "migration ledger: versions, checksums or content hashes where available, and repository provenance",
+    "dependencies: foreign keys, referenced objects, routine/view dependencies and ownership"
+  ],
+  "known_blockers": [
+    "Phase 52.1E is a preliminary point-in-time evidence summary, not a complete normalized catalog export.",
+    "The existing historical snapshot was not proven to be captured at the same time or from the same source state as the latest live evidence.",
+    "Aggregate count equality cannot prove schema parity.",
+    "The Phase 52.1D reconstructed baseline remains a disposable fixture and is not canonical production migration history.",
+    "Historical Git blob equivalence for recovered migration statements remains unestablished.",
+    "Function source bodies and complete role membership/inherited privilege graph were intentionally excluded from the Phase 52.1E evidence artifact.",
+    "No canonical clean-room migration replay against an independently verified schema baseline has been accepted."
+  ],
+  "next_actions": [
+    {
+      "id": "52.1F-01",
+      "priority": "P0",
+      "action": "Capture a fresh normalized public-schema catalog from read-only SQL in one consistent transaction or a clearly documented repeatable capture window.",
+      "acceptance": "Every in-scope catalog object has a stable identity and complete definition; capture timestamp and source project are recorded."
+    },
+    {
+      "id": "52.1F-02",
+      "priority": "P0",
+      "action": "Compare normalized live catalog against historical snapshot and migration-derived expected state.",
+      "acceptance": "Machine-readable missing, extra, changed and uncomparable object lists are emitted; no count-only pass."
+    },
+    {
+      "id": "52.1F-03",
+      "priority": "P0",
+      "action": "Review RLS policies, table/column privileges, role inheritance, routine security attributes, ownership and search_path.",
+      "acceptance": "Security review includes positive and negative role-behavior tests in a disposable environment."
+    },
+    {
+      "id": "52.1F-04",
+      "priority": "P1",
+      "action": "Establish migration provenance and clean-room replay using canonical source migrations.",
+      "acceptance": "Replay starts from a known empty disposable database and produces a normalized catalog matching the approved reference."
+    },
+    {
+      "id": "52.1F-05",
+      "priority": "P1",
+      "action": "Generate Contract V2 only after the capture and reconciliation gates pass.",
+      "acceptance": "Schema validator accepts the exact artifact; reviewer signs off on provenance, completeness and diff."
+    },
+    {
+      "id": "52.1F-06",
+      "priority": "P1",
+      "action": "Keep API-key column hardening as a separately gated migration.",
+      "acceptance": "Fresh rehearsal, regression checks, rollback plan and explicit live-migration approval are all present."
+    }
+  ],
+  "acceptance_gate": {
+    "aggregate_count_match": "PASS_PRELIMINARY_ONLY",
+    "definition_level_parity": "NOT_ESTABLISHED",
+    "provenance": "PARTIAL",
+    "repeatability": "NOT_ESTABLISHED",
+    "clean_room_replay": "NOT_ESTABLISHED",
+    "contract_v2": "BLOCKED",
+    "production_migration": "NOT_AUTHORIZED",
+    "deployment_merge_release": "NOT_AUTHORIZED"
+  },
+  "safety": {
+    "database_writes_performed": false,
+    "migrations_applied": false,
+    "schema_changes_performed": false,
+    "application_rows_collected": false,
+    "secret_values_collected": false,
+    "deployment_performed": false,
+    "pull_request_76_modified": false
+  }
+}
