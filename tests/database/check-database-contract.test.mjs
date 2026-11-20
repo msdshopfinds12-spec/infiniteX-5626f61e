@@ -13,7 +13,7 @@ const valid={
  schemaVersion:2,capturedAt:'2026-11-20T00:00:00.000Z',source:'synthetic catalog',projectRef:'synthetic-project',
  databaseName:'postgres',postgresVersion:'17.1',databaseRole:'catalog_reader',reviewStatus:'APPROVED',
  review:{reviewedBy:'reviewer',reviewedAt:'2026-11-20T00:00:00.000Z',reviewEvidence:'synthetic evidence'},
- capture:{scopeSchemas:['public','private'],metadataCategories:['schemas','tables','columns','constraints','indexes','table_grants','column_grants','rls_policies','triggers','functions','extensions','custom_types','role_attributes','role_memberships'],applicationRowsRead:false,functionBodiesRead:false,secretsRead:false,writeStatementsExecuted:false},
+ capture:{scopeSchemas:['public','private'],metadataCategories:['schemas','tables','columns','constraints','indexes','table_grants','column_grants','rls_policies','triggers','functions','extensions','custom_types','role_attributes','role_memberships','default_privileges','partition_dependencies'],applicationRowsRead:false,functionBodiesRead:false,secretsRead:false,writeStatementsExecuted:false},
  schemas:[{name:'public',owner:'postgres',grants:[]},{name:'private',owner:'postgres',grants:[]}],
  tables:[{schema:'public',name:'profiles',relationKind:'r',owner:'postgres',rlsEnabled:true,forceRls:false,
   columns:[{ordinal:1,name:'id',type:'uuid',default:null,notNull:true,identity:'',generated:'',collation:null}],
@@ -25,7 +25,9 @@ const valid={
  extensions:[{name:'pgcrypto',schema:'extensions',version:'1.3'}],
  types:[{schema_name:'public',name:'profile_state',kind:'enum',formatted_type:'profile_state',enum_labels:['active'],base_type:null,not_null:false}],
  roles:[{name:'authenticated',superuser:false,inherit:true,create_role:false,create_db:false,can_login:false,replication:false,bypass_rls:false,connection_limit:-1}],
- roleMemberships:[{member:'authenticated',role:'anon',adminOption:false,inheritOption:true,setOption:true}]
+ roleMemberships:[{member:'authenticated',role:'anon',adminOption:false,inheritOption:true,setOption:true}],
+ defaultPrivileges:[{owner:'postgres',objectType:'TABLES',schema:'public',grants:[{grantor:'postgres',grantee:'authenticated',privilege:'SELECT',grantable:false}]}],
+ partitionDependencies:[{parentSchema:'public',parentTable:'events',childSchema:'public',childTable:'events_2026',sequence:1}]
 };
 test('missing snapshot blocks with exit 2',async t=>{const r=await run(t);assert.equal(r.status,2);assert.match(r.stderr,/not present/);});
 test('pending approval blocks with exit 2',async t=>{const r=await run(t,JSON.stringify({...valid,reviewStatus:'PENDING_HUMAN_REVIEW'}));assert.equal(r.status,2);assert.match(r.stderr,/awaits explicit human approval/);});
@@ -86,4 +88,19 @@ test('ACL grantor is required for relation grants',async t=>{
  const value=structuredClone(valid);delete value.tables[0].grants[0].grantor;
  const r=await run(t,JSON.stringify(value));
  assert.equal(r.status,1);assert.match(r.stderr,/grantor must be a non-empty string/);
+});
+
+test('missing default privilege or partition inventory blocks v2 validation',async t=>{
+ const v=structuredClone(valid);delete v.defaultPrivileges;
+ const a=await run(t,JSON.stringify(v));assert.equal(a.status,1);assert.match(a.stderr,/defaultPrivileges must be an array/);
+ const w=structuredClone(valid);delete w.partitionDependencies;
+ const b=await run(t,JSON.stringify(w));assert.equal(b.status,1);assert.match(b.stderr,/partitionDependencies must be an array/);
+});
+test('partition dependencies cannot escape declared schema scope',async t=>{
+ const v=structuredClone(valid);v.partitionDependencies[0].childSchema='auth';
+ const r=await run(t,JSON.stringify(v));assert.equal(r.status,1);assert.match(r.stderr,/childSchema is outside capture.scopeSchemas/);
+});
+test('default privilege grant metadata requires grantor and explicit grantability',async t=>{
+ const v=structuredClone(valid);delete v.defaultPrivileges[0].grants[0].grantor;
+ const r=await run(t,JSON.stringify(v));assert.equal(r.status,1);assert.match(r.stderr,/grantor must be a non-empty string/);
 });

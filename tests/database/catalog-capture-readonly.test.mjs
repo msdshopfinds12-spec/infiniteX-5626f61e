@@ -17,7 +17,7 @@ test('catalog capture is one read-only SELECT statement', async () => {
 
 test('catalog capture includes required RLS and function security metadata', async () => {
   const sql = await readFile(sqlPath, 'utf8');
-  for (const token of ['pg_policies', 'relrowsecurity', 'pg_proc', 'prosecdef', 'search_path', 'aclexplode', 'PENDING_HUMAN_REVIEW']) {
+  for (const token of ['pg_policies', 'relrowsecurity', 'pg_proc', 'prosecdef', 'search_path', 'aclexplode', 'pg_default_acl', 'pg_inherits', 'PENDING_HUMAN_REVIEW']) {
     assert.ok(sql.includes(token), `missing catalog field or safety marker: ${token}`);
   }
 });
@@ -45,4 +45,13 @@ test('catalog capture does not inspect or hash function bodies', async () => {
   const sql = await readFile(sqlPath, 'utf8');
   assert.equal(sql.includes('pg_get_functiondef'), false);
   assert.equal(sql.includes('definitionMd5'), false);
+});
+
+test('catalog capture includes default privileges and partition dependency inventory', async () => {
+  const sql = await readFile(sqlPath, 'utf8');
+  for (const token of ['default_privilege_contract', 'defaclobjtype', 'defaclrole', 'partition_dependency_contract', 'inhparent', 'inhrelid', 'defaultPrivileges', 'partitionDependencies']) {
+    assert.ok(sql.includes(token), `missing metadata completeness field: ${token}`);
+  }
+  assert.ok(sql.includes("'default_privileges'"));
+  assert.ok(sql.includes("'partition_dependencies'"));
 });

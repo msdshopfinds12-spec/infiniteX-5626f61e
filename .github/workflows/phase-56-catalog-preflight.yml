@@ -1,0 +1,124 @@
+name: Phase 56 Catalog Capture Completeness
+
+on:
+  push:
+    branches:
+      - "engineering/phase-56-catalog-completeness"
+    paths:
+      - ".github/workflows/phase-56-catalog-preflight.yml"
+      - "supabase/contracts/capture-database-contract.readonly.sql"
+      - "scripts/check-database-contract.mjs"
+      - "tests/database/catalog-capture-readonly.test.mjs"
+      - "tests/database/check-database-contract.test.mjs"
+  pull_request:
+    branches:
+      - "engineering/phase-55-disposable-database-replay"
+    paths:
+      - ".github/workflows/phase-56-catalog-preflight.yml"
+      - "supabase/contracts/capture-database-contract.readonly.sql"
+      - "scripts/check-database-contract.mjs"
+      - "tests/database/catalog-capture-readonly.test.mjs"
+      - "tests/database/check-database-contract.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-56-catalog-preflight-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  offline-contract-tests:
+    name: Static read-only and V2 contract validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax-check validator
+        run: node --check scripts/check-database-contract.mjs
+      - name: Test catalog SQL safety and coverage
+        run: node --test tests/database/catalog-capture-readonly.test.mjs
+      - name: Test V2 structural validation
+        run: node --test tests/database/check-database-contract.test.mjs
+
+  disposable-postgres-capture-smoke:
+    name: Execute metadata-only SELECT against disposable PostgreSQL 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Start isolated PostgreSQL fixture
+        run: |
+          docker run -d --name infinitex-phase56-catalog \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=infinitex_catalog_fixture \
+            -p 5432:5432 postgres:17
+          for attempt in $(seq 1 60); do
+            if pg_isready -h 127.0.0.1 -p 5432 -U postgres -d infinitex_catalog_fixture; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs infinitex-phase56-catalog
+          exit 1
+      - name: Seed synthetic catalog metadata only
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -X -h 127.0.0.1 -U postgres -d infinitex_catalog_fixture -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA private;
+          CREATE TABLE public.phase56_partitioned_fixture (
+            id integer NOT NULL,
+            created_at date NOT NULL
+          ) PARTITION BY RANGE (created_at);
+          CREATE TABLE public.phase56_partitioned_fixture_2026
+            PARTITION OF public.phase56_partitioned_fixture
+            FOR VALUES FROM ('2026-01-01') TO ('2027-01-01');
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT SELECT ON TABLES TO PUBLIC;
+          SQL
+      - name: Execute catalog capture SELECT and assert output contract
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_catalog_fixture
+          CAPTURE_SQL: supabase/contracts/capture-database-contract.readonly.sql
+          CAPTURE_OUTPUT: ${{ runner.temp }}/phase56-catalog-capture.json
+        run: |
+          psql -X -A -t -v ON_ERROR_STOP=1 -f "$CAPTURE_SQL" > "$CAPTURE_OUTPUT"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFile } from 'node:fs/promises';
+          const snapshot = JSON.parse(await readFile(process.env.CAPTURE_OUTPUT, 'utf8'));
+          assert.equal(snapshot.schemaVersion, 2);
+          assert.equal(snapshot.reviewStatus, 'PENDING_HUMAN_REVIEW');
+          assert.equal(snapshot.projectRef, 'UNVERIFIED_MANUAL_ENTRY_REQUIRED');
+          assert.deepEqual(snapshot.capture.scopeSchemas, ['public', 'private']);
+          for (const key of ['applicationRowsRead','functionBodiesRead','secretsRead','writeStatementsExecuted']) {
+            assert.equal(snapshot.capture[key], false, key + ' must remain false');
+          }
+          for (const key of ['defaultPrivileges','partitionDependencies']) {
+            assert.ok(Array.isArray(snapshot[key]), key + ' must be an array');
+          }
+          assert.ok(snapshot.defaultPrivileges.some(x => x.schema === 'public' && x.objectType === 'TABLES'),
+            'synthetic default privileges must be present');
+          assert.ok(snapshot.partitionDependencies.some(x => x.childTable === 'phase56_partitioned_fixture_2026'),
+            'synthetic partition dependency must be present');
+          assert.ok(snapshot.schemas.some(x => x.name === 'public'));
+          assert.ok(snapshot.schemas.some(x => x.name === 'private'));
+          console.log('Disposable PostgreSQL catalog capture passed: metadata-only V2 output, default privileges and partition dependency inventory verified.');
+          NODE
+      - name: Remove disposable database
+        if: always()
+        run: docker rm -f infinitex-phase56-catalog || true
