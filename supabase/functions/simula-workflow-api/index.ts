@@ -6,6 +6,7 @@ import {
   parseWorkflowApiRoute,
   validateEnqueueWorkflowRequest,
   validateIdempotencyKey,
+  parseBearerToken,
   toWorkflowRunStatusDto,
   WORKFLOW_API_MAX_BODY_BYTES,
 } from "./workflow-api-contract.mjs";
@@ -42,9 +43,9 @@ Deno.serve(async (req: Request) => {
 
   const userClient = createClient(supabaseUrl, publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: "Bearer " + tokenMatch[1] } },
+    global: { headers: { Authorization: "Bearer " + accessToken } },
   });
-  const { data, error } = await userClient.auth.getUser(tokenMatch[1]);
+  const { data, error } = await userClient.auth.getUser(accessToken);
   if (error || !data.user?.id) return reply(req, 401, { ok: false, error: "invalid_session" });
 
   if (route.resource === "run") {
