@@ -72,3 +72,30 @@ test("rate limits are mapped without exposing provider error text", async () => 
     message: "Too many attempts. Please wait a moment before trying again.",
   });
 });
+
+test("network exceptions are normalized without exposing exception details", async () => {
+  const adapter = createSupabaseAuthSessionAdapter(createClient({
+    signInWithPassword: async () => {
+      throw new Error("Failed to fetch internal endpoint details");
+    },
+  }));
+
+  assert.deepEqual(await adapter.signIn("person@example.com", "password"), {
+    status: "error",
+    code: "network",
+    message: "Unable to reach the authentication service. Check your connection and retry.",
+  });
+});
+
+test("sign-out exceptions are returned as safe results rather than escaping", async () => {
+  const adapter = createSupabaseAuthSessionAdapter(createClient({
+    signOut: async () => {
+      throw new Error("internal provider failure");
+    },
+  }));
+
+  const result = await adapter.signOut();
+  assert.equal(result.status, "error");
+  assert.equal(result.code, "unknown");
+  assert.doesNotMatch(result.message, /internal provider failure/);
+});
