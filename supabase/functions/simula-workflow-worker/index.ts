@@ -64,30 +64,43 @@ async function logEvent(
   if (error) console.error("workflow_log_insert_failed", error.message);
 }
 
-Deno.serve(async (req: Request) => {
+export type AuthenticatedWorkerDependencies = {
+  createClient: typeof createClient;
+  env: { get(name: string): string | undefined };
+  corsHeadersForRequest: typeof corsHeadersForRequest;
+  executeSafeAction: typeof executeSafeAction;
+  now?: () => Date;
+};
+
+export function createAuthenticatedWorkerHandler(deps: AuthenticatedWorkerDependencies) {
+  const { createClient, env, corsHeadersForRequest, executeSafeAction } = deps;
+  const now = deps.now ?? (() => new Date());
+  const respond = (req: Request, status: number, body: JsonRecord) =>
+    new Response(JSON.stringify(body), { status, headers: corsHeadersForRequest(req).headers });
+  return async (req: Request) => {
   const cors = corsHeadersForRequest(req);
   if (!cors.allowed) return new Response("origin_not_allowed", { status: 403, headers: cors.headers });
   if (req.method === "OPTIONS") {
     if (!cors.allowed) return new Response("origin_not_allowed", { status: 403, headers: cors.headers });
     return new Response("ok", { headers: cors.headers });
   }
-  if (req.method !== "POST") return reply(req, 405, { ok: false, error: "method_not_allowed" });
+  if (req.method !== "POST") return respond(req, 405, { ok: false, error: "method_not_allowed" });
 
   const authentication = await authenticateBearerRequest({
     request: req,
-    env: { get: (key: string) => Deno.env.get(key) },
+    env,
     createClient,
   });
   if (!authentication.ok) {
     if (authentication.status === 500) console.error("worker_environment_incomplete");
-    return reply(req, authentication.status, { ok: false, error: authentication.error });
+    return respond(req, authentication.status, { ok: false, error: authentication.error });
   }
   const { userClient, ownerId, supabaseUrl, serviceRoleKey } = authentication;
 
   const bodyResult = await readJsonBodyLimited(req, 2048);
   if (!bodyResult.ok) {
     const status = bodyResult.reason === "payload_too_large" ? 413 : 400;
-    return reply(req, status, { ok: false, error: bodyResult.reason });
+    return respond(req, status, { ok: false, error: bodyResult.reason });
   }
   const body = bodyResult.value;
   const limit = clampBatchLimit(body && typeof body === "object" ? body.limit : undefined);
@@ -98,7 +111,7 @@ Deno.serve(async (req: Request) => {
   );
   if (claimError) {
     console.error("queue_claim_failed", claimError.message);
-    return reply(req, 500, { ok: false, error: "queue_claim_failed" });
+    return respond(req, 500, { ok: false, error: "queue_claim_failed" });
   }
 
   const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -156,7 +169,7 @@ Deno.serve(async (req: Request) => {
           output: null,
           error_message: null,
           attempt: stepAttempt,
-          started_at: new Date().toISOString(),
+          started_at: now().toISOString(),
           finished_at: null,
         };
         if (previousStepRun) {
@@ -222,7 +235,7 @@ Deno.serve(async (req: Request) => {
           const { data: failedStep, error: stepFailureError } = await admin.from("workflow_step_runs").update({
             status: "failed",
             error_message: actionError || "action_failed",
-            finished_at: new Date().toISOString(),
+            finished_at: now().toISOString(),
           }).eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
             .eq("attempt", stepAttempt).select("id").maybeSingle();
           if (stepFailureError) throw new Error("step_run_failure_update_failed");
@@ -237,7 +250,7 @@ Deno.serve(async (req: Request) => {
             status: "succeeded",
             output: actionOutput,
             error_message: null,
-            finished_at: new Date().toISOString(),
+            finished_at: now().toISOString(),
           })
           .eq("run_id", run.id)
           .eq("step_id", step.id)
@@ -261,7 +274,7 @@ Deno.serve(async (req: Request) => {
           status: "succeeded",
           output: record(payload),
           error_message: null,
-          finished_at: new Date().toISOString(),
+          finished_at: now().toISOString(),
         })
         .eq("id", run.id)
         .eq("owner_id", ownerId)
@@ -295,7 +308,7 @@ Deno.serve(async (req: Request) => {
         .update({
           status: "failed",
           error_message: safeMessage,
-          finished_at: new Date().toISOString(),
+          finished_at: now().toISOString(),
         })
         .eq("id", run.id)
         .eq("owner_id", ownerId)
@@ -319,5 +332,15 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  return reply(req, 200, summary);
-});
+  return respond(req, 200, summary);
+  };
+}
+
+if (import.meta.main) {
+  Deno.serve(createAuthenticatedWorkerHandler({
+    createClient,
+    env: { get: (key: string) => Deno.env.get(key) },
+    corsHeadersForRequest,
+    executeSafeAction,
+  }));
+}
