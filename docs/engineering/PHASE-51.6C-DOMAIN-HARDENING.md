@@ -14,12 +14,12 @@
 - This is structural validation, not application-specific business-schema validation. A trusted step definition must still validate its own output contract before persistence.
 
 ### Canonical retry identity
-- Retry idempotency keys are derived from a versioned canonical function of run ID, step ID, and logical attempt number.
+- Retry idempotency keys are derived from a versioned canonical function of run ID, step ID, and logical attempt number. Initial queued attempts are also required to use that exact canonical key.
 - Retry key generation no longer recursively appends suffixes to a previous key.
 - The persistence adapter must enforce uniqueness and reject a reused key whose request fingerprint differs. A pure helper cannot enforce distributed deduplication.
 
 ### Timestamp consistency
-- Heartbeats cannot move earlier than the previous heartbeat.
+- Heartbeats cannot move earlier than the previous heartbeat, and a heartbeat with a shorter requested duration cannot shorten an already-active lease.
 - Completion cannot precede the last heartbeat.
 - Cancellation cannot precede the scheduled time for queued attempts or the last lifecycle timestamp for running attempts.
 - Lease expiry arithmetic remains guarded against unsafe integer overflow.
@@ -56,7 +56,7 @@ No production migration or database mutation is part of this phase.
 ## Acceptance status
 
 - [x] Domain output snapshot implementation\n- [x] Runtime-frozen attempt records
-- [x] Canonical retry key derivation
+- [x] Canonical retry key derivation and initial-attempt enforcement\n- [x] Runtime validation of outcome and failure-kind enums\n- [x] Non-shortening heartbeat lease renewal
 - [x] Lifecycle timestamp monotonicity
 - [x] Adversarial unit regression cases authored
 - [ ] GitHub Actions verification for the new commit head
