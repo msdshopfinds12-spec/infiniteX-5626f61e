@@ -54,7 +54,7 @@ export async function completeWorkflowStepWithOutbox(
     throw new Error("step_run_finish_failed");
   }
 
-  if (response.error !== null) throw new Error("step_run_finish_failed");
+  if (!isRecord(response) || response.error !== null) throw new Error("step_run_finish_failed");
 
   const row = Array.isArray(response.data) ? response.data[0] : response.data;
   if (!isRecord(row) || typeof row.step_run_id !== "string" || !row.step_run_id.trim()) {
