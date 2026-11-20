@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "\${PGHOST:?PGHOST must point to disposable PostgreSQL}"
-: "\${PGDATABASE:?PGDATABASE must be the dedicated Phase 63E database}"
-: "\${PGUSER:?PGUSER must be set}"
+: "${PGHOST:?PGHOST must point to disposable PostgreSQL}"
+: "${PGDATABASE:?PGDATABASE must be the dedicated Phase 63E database}"
+: "${PGUSER:?PGUSER must be set}"
 
 if [[ "$PGDATABASE" != "infinitex_phase63e" ]]; then
   echo "REFUSING: Phase 63E concurrency tests require infinitex_phase63e."
