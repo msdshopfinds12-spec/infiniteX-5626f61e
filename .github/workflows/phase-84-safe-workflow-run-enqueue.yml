@@ -1,0 +1,166 @@
+name: InfiniteX Phase 84 PostgREST Worker HTTP Integration
+
+on:
+  push:
+    branches:
+      - phase-84-safe-workflow-run-enqueue
+    paths:
+      - ".github/workflows/phase-84-safe-workflow-run-enqueue.yml"
+      - "supabase/migrations/**"
+      - "supabase/functions/simula-workflow-worker/**"
+      - "supabase/functions/simula-workflow-run-request/**"
+      - "src/lib/supabase/database.types.ts"
+      - "tests/database/**"
+      - "docs/database/MIGRATION-PROVENANCE-CLASSIFICATION.json"
+      - "docs/engineering/PHASE-84-SAFE-WORKFLOW-RUN-ENQUEUE.md"
+      - "supabase/functions/_shared/**"
+      - "tests/database/phase-81-postgrest-worker-fixtures.sql"
+      - "tests/workers/**"
+      - "scripts/rehearse-migration-chain.mjs"
+      - "scripts/phase-81-generate-jwt.mjs"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    paths:
+      - ".github/workflows/phase-84-safe-workflow-run-enqueue.yml"
+      - "supabase/migrations/**"
+      - "supabase/functions/simula-workflow-worker/**"
+      - "supabase/functions/simula-workflow-run-request/**"
+      - "src/lib/supabase/database.types.ts"
+      - "tests/database/**"
+      - "docs/database/MIGRATION-PROVENANCE-CLASSIFICATION.json"
+      - "docs/engineering/PHASE-84-SAFE-WORKFLOW-RUN-ENQUEUE.md"
+      - "supabase/functions/_shared/**"
+      - "tests/database/phase-81-postgrest-worker-fixtures.sql"
+      - "tests/workers/**"
+      - "scripts/rehearse-migration-chain.mjs"
+      - "scripts/phase-81-generate-jwt.mjs"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-phase-84-safe-workflow-run-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgrest-worker-http:
+    name: Node 22 / Deno worker HTTP to disposable PostgreSQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configure Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Configure Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.2.12
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify existing worker contract and regression gates
+        run: |
+          npm run test:phase-77-contract
+          npm run test:worker-http-boundary
+          npm run test:worker-runtime-parity
+          npm run test:edge-function-security
+          npm test
+
+      - name: Start isolated Supabase PostgreSQL 17
+        shell: bash
+        run: |
+          docker run -d --name infinitex-phase81-postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_USER=supabase_admin \
+            -e POSTGRES_DB=infinitex_rehearsal \
+            -p 5432:5432 -p 3000:3000 \
+            supabase/postgres:17.6.1.136 \
+            postgres -c config_file=/etc/postgresql/postgresql.conf \
+              -c shared_preload_libraries=pg_stat_statements,pgaudit,plpgsql,plpgsql_check,pg_cron,pg_net,pgsodium,auto_explain,pg_tle,plan_filter,supabase_vault \
+              -c pgsodium.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
+              -c vault.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
+              -c cron.database_name=infinitex_rehearsal \
+              -c cron.launch_active_jobs=off
+          for attempt in $(seq 1 60); do
+            if pg_isready -h 127.0.0.1 -p 5432 -U supabase_admin -d infinitex_rehearsal; then exit 0; fi
+            sleep 2
+          done
+          docker logs infinitex-phase81-postgres
+          exit 1
+
+      - name: Replay reviewed migration chain in disposable database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: node scripts/rehearse-migration-chain.mjs
+
+      - name: Seed synthetic identities and workflow fixtures
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-81-postgrest-worker-fixtures.sql
+
+      - name: Generate short-lived local-only JWTs
+        env:
+          PHASE81_JWT_SECRET: phase81-disposable-local-signing-secret-not-production
+        run: node scripts/phase-81-generate-jwt.mjs
+
+      - name: Start disposable PostgREST gateway
+        env:
+          PGRST_JWT_SECRET: phase81-disposable-local-signing-secret-not-production
+        run: |
+          docker run -d --name infinitex-phase81-postgrest \
+            --network container:infinitex-phase81-postgres \
+            -e PGRST_DB_URI=postgres://authenticator:phase81-local-only@127.0.0.1:5432/infinitex_rehearsal \
+            -e PGRST_DB_SCHEMAS=public \
+            -e PGRST_DB_ANON_ROLE=anon \
+            -e PGRST_JWT_SECRET="$PGRST_JWT_SECRET" \
+            -e PGRST_DB_EXTRA_SEARCH_PATH=public,extensions,private \
+            -e PGRST_SERVER_PORT=3000 \
+            postgrest/postgrest:v12.2.12
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker logs infinitex-phase81-postgrest
+          exit 1
+
+      - name: Execute real Deno worker HTTP to PostgREST/PostgreSQL journey
+        env:
+          PHASE81_POSTGREST_URL: http://127.0.0.1:3000
+        run: |
+          deno check --no-lock --node-modules-dir=auto tests/workers/phase-81-postgrest-worker-http.deno.ts
+          deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-81-postgrest-worker-http.deno.ts
+          deno check --no-lock --node-modules-dir=auto tests/workers/phase-82-postgrest-rls.deno.ts
+          deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-82-postgrest-rls.deno.ts
+          deno check --no-lock --node-modules-dir=auto tests/workers/phase-84-workflow-run-request.deno.ts
+          deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-84-workflow-run-request.deno.ts
+
+      - name: Collect disposable service logs
+        if: always()
+        run: |
+          docker logs infinitex-phase81-postgrest 2>&1 | tail -n 160 || true
+          docker logs infinitex-phase81-postgres 2>&1 | tail -n 160 || true
+
+      - name: Remove disposable services
+        if: always()
+        run: |
+          docker rm -f infinitex-phase81-postgrest || true
+          docker rm -f infinitex-phase81-postgres || true

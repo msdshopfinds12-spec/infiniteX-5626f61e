@@ -615,6 +615,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      simula_enqueue_workflow_run: {
+        Args: { p_input?: Json; p_request_id: string; p_workflow_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          replayed: boolean
+          status: string
+        }[]
+      }
       simula_claim_workflow_runs: {
         Args: { p_limit?: number }
         Returns: {

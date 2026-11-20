@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateMigrationInventory } from '../../scripts/verify-migration-provenance.mjs';
+import { validateProvenance } from '../../scripts/rehearse-migration-chain.mjs';
 
 const applied = [{ version: '20260101000000', path: 'supabase/migrations/20260101000000_applied.sql' }];
 const candidate = [{
@@ -60,4 +61,21 @@ test('requires every applied and candidate file to exist in the inventory', () =
   });
   assert.match(errors.join('\n'), /Applied manifest file is missing/);
   assert.match(errors.join('\n'), /Candidate migration file is missing/);
+});
+
+test('migration rehearsal accepts multiple separately classified candidate migrations', () => {
+  const appliedMigrations = Array.from({ length: 19 }, (_, index) => ({
+    version: String(20261025000000 + index),
+    path: `supabase/migrations/applied_${index}.sql`,
+  }));
+  const candidates = [
+    { ...candidate[0], version: '20261120120000', path: 'supabase/migrations/candidate_a.sql' },
+    { ...candidate[0], version: '20261121000100', path: 'supabase/migrations/candidate_b.sql' },
+  ];
+  const files = [...appliedMigrations, ...candidates].map((entry) => entry.path);
+  assert.deepEqual(validateProvenance({
+    manifest: { ledger_entry_count: 19, applied_migrations: appliedMigrations },
+    classification: { schemaVersion: 1, candidateMigrations: candidates },
+    files,
+  }), []);
 });

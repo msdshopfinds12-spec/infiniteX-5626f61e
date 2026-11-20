@@ -12,6 +12,16 @@
       "sha256": "3b05308615ba2753afcc815ea2667ef75c530e9dc916e6fa802531e933e126f5",
       "reason": "Repository candidate only. No verified live migration-ledger evidence establishes application.",
       "productionApproval": "NOT_GRANTED"
+    },
+    {
+      "version": "20261121000100",
+      "name": "simula_safe_workflow_run_enqueue",
+      "path": "supabase/migrations/20261121000100_simula_safe_workflow_run_enqueue.sql",
+      "classification": "PROPOSED_NOT_APPLIED",
+      "sourceStatus": "NOT_VERIFIED_LIVE",
+      "sha256": "6e8e3dba38a27fc752744c362802c688e9496cf3c0c0fca178379450439d5e00",
+      "reason": "Phase 84 candidate only. Rehearsed only in disposable PostgreSQL CI; no live migration evidence or production approval.",
+      "productionApproval": "NOT_GRANTED"
     }
   ]
 }
