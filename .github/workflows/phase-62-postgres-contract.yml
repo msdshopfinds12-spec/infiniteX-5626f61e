@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - feat/phase-60-transactional-retry-orchestration
+      - test/phase-62-postgres-contract-harness
   workflow_dispatch:
 
 permissions:
