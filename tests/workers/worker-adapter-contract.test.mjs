@@ -18,6 +18,10 @@ const sharedActions = readFileSync(
   new URL("../../supabase/functions/_shared/workflow-actions.mjs", import.meta.url),
   "utf8",
 );
+const sharedCompletion = readFileSync(
+  new URL("../../supabase/functions/_shared/workflow-completion.ts", import.meta.url),
+  "utf8",
+);
 
 function assertOrdered(source, first, second, message) {
   const firstIndex = source.indexOf(first);
@@ -105,6 +109,13 @@ test("both adapters fence step and workflow terminal writes by owner and attempt
     assert.match(source, /\.eq\("owner_id", ownerId\)/, `${name} adapter must scope writes to owner`);
     assert.match(source, /attempt_generation_changed/);
   }
+});
+
+test("shared completion helper owns strict RPC generation and result validation", () => {
+  assert.match(sharedCompletion, /simula_complete_step_with_outbox/);
+  assert.match(sharedCompletion, /p_attempt:\\s*input\\.attempt/);
+  assert.match(sharedCompletion, /step_run_finish_failed/);
+  assert.match(sharedCompletion, /workflow_step_attempt_superseded/);
 });
 
 test("both adapters treat a lost terminal compare-and-set as superseded, not success", () => {
