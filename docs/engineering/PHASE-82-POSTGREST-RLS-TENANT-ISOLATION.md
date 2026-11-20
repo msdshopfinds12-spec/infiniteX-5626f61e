@@ -1,6 +1,6 @@
 # Phase 82 — PostgREST RLS Tenant Isolation
 
-**Status:** IMPLEMENTED IN AN ISOLATED CANDIDATE / CI VERIFICATION PENDING  
+**Status:** VERIFIED IN DISPOSABLE CI / DRAFT PR OPEN  
 **Base:** `phase-81/postgrest-worker-http-integration`  
 **Scope:** Disposable PostgreSQL 17 + standalone PostgREST + synthetic JWTs only
 
@@ -21,17 +21,18 @@ Verify that authenticated PostgREST requests are constrained by the checked-in d
 
 The fixture uses deterministic synthetic IDs and non-usable hash strings. It is loaded only into the disposable `infinitex_rehearsal` database by the Phase 81 harness. JWTs are short-lived, signed with a test-only secret, and never sent to the live Supabase project.
 
-## Verification
+## Verified CI result
 
-The Phase 82 workflow first reruns the Phase 81 real worker HTTP → PostgREST → PostgreSQL integration, then runs the new direct authenticated PostgREST RLS checks against the same disposable services.
+- Phase 82 run [44829120986](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44829120986): **SUCCESS**
+- Exact tested commit: `3637a7f345c54deb747e3fe51ce84ed0b64fda20`
+- Phase 82 Deno type-check: passed.
+- Phase 81 worker HTTP → PostgREST → PostgreSQL journey: passed in the same workflow.
+- Tenant A/B own-row visibility and cross-tenant denial assertions: passed.
+- API-key safe metadata projection and secret-column denial: passed (PostgREST returns HTTP 403 for the forbidden `key_hash` projection).
+- Disposable service log collection and unconditional container cleanup: passed.
+- Supporting gates on the same commit: Phase 80 test-source type safety [44829120903](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44829120903) and Phase 68 PostgreSQL replay/security [44829120984](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44829120984): **SUCCESS**.
 
-Required final evidence:
-1. `deno check` passes for the Phase 82 test.
-2. Phase 81 worker HTTP integration still passes.
-3. All two-tenant PostgREST assertions pass.
-4. Unconditional cleanup removes both disposable containers.
-
-CI status is pending until GitHub reports a terminal result. Do not infer success from queued or in-progress jobs.
+The first Phase 82 attempt correctly exposed the database's actual HTTP permission-denied status as 403 rather than the test's initially assumed 400. The test expectation was corrected to the observed PostgREST behavior; no production grant or policy was relaxed.
 
 ## Security boundaries
 
