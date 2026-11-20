@@ -186,6 +186,7 @@ Deno.serve(async (req: Request) => {
               64 * 1024,
             ),
             retryLimit,
+            { maxElapsedMs: timeoutSeconds * 1000 },
           );
         } catch (error) {
           actionError = error instanceof Error ? error.message : "action_failed";
