@@ -75,7 +75,8 @@ Deno.test({
     const workerPort = 8081;
     const server = Deno.serve({ hostname: "127.0.0.1", port: workerPort, onListen() {} }, handler);
     try {
-      const response = await fetch("http://127.0.0.1:" + workerPort + "/functions/v1/simula-workflow-worker", {
+      const endpoint = "http://127.0.0.1:" + workerPort + "/functions/v1/simula-workflow-worker";
+      const request = () => fetch(endpoint, {
         method: "POST",
         headers: {
           "Authorization": "Bearer " + userJwt,
@@ -83,42 +84,60 @@ Deno.test({
         },
         body: JSON.stringify({ limit: 1 }),
       });
-      const body = await response.json();
-      assert(response.status === 200, "worker HTTP endpoint must return 200; got " + response.status);
-      assert(body.claimed === 1 && body.succeeded === 1 && body.failed === 0, "worker must claim and execute exactly one owner-A workflow; summary=" + JSON.stringify(body));
+
+      // Launch two independent HTTP requests at the same time. PostgreSQL's
+      // atomic claim RPC must assign distinct owner-A queue rows to each worker.
+      const responses = await Promise.all([request(), request()]);
+      const bodies = await Promise.all(responses.map((response) => response.json()));
+      assert(responses.every((response) => response.status === 200), "both concurrent worker HTTP requests must return 200");
+      assert(bodies.every((body) => body.claimed === 1 && body.succeeded === 1 && body.failed === 0),
+        "each concurrent worker must claim and complete exactly one owner-A run: " + JSON.stringify(bodies));
+      const claimedIds = bodies.flatMap((body) => body.runs.map((run: { id?: string }) => run.id));
+      assert(claimedIds.length === 2 && new Set(claimedIds).size === 2,
+        "concurrent workers must receive two distinct run IDs: " + JSON.stringify(claimedIds));
+      assert(claimedIds.includes(runId) && claimedIds.includes("81000000-3000-4000-8000-000000000003"),
+        "both seeded owner-A runs must be claimed exactly once");
 
       const admin = createPostgrestClient(url, serviceJwt, {
         auth: { persistSession: false, autoRefreshToken: false },
         global: { headers: { Authorization: "Bearer " + serviceJwt }, fetch: postgrestFetch },
       });
-      const { data: run, error: runError } = await admin
+      const ownerRunIds = [runId, "81000000-3000-4000-8000-000000000003"];
+      const { data: runs, error: runsError } = await admin
         .from("workflow_runs")
         .select("id,owner_id,status,attempt,output")
-        .eq("id", runId)
-        .single();
-      assert(!runError && run, "workflow run must be readable from PostgreSQL: " + (runError?.message ?? ""));
-      assert(run.owner_id === userId && run.status === "succeeded" && run.attempt === 1, "workflow run must persist succeeded state and generation 1");
-      assert(run.output?.phase81 === "http-postgrest" && run.output?.verified === true, "final output must contain both executed step results");
+        .in("id", ownerRunIds);
+      assert(!runsError && runs?.length === 2, "both owner-A workflow runs must be readable from PostgreSQL: " + (runsError?.message ?? ""));
+      assert(runs.every((run) => run.owner_id === userId && run.status === "succeeded" && run.attempt === 1),
+        "both owner-A runs must persist succeeded state at generation 1");
+      assert(runs.every((run) => run.output?.phase81 === "http-postgrest" && run.output?.verified === true),
+        "both runs must persist the complete two-step output");
 
       const { data: steps, error: stepsError } = await admin
         .from("workflow_step_runs")
         .select("run_id,step_id,status,attempt,output")
-        .eq("run_id", runId);
-      assert(!stepsError && steps?.length === 2, "both step-run records must persist in PostgreSQL");
-      assert(steps.every((step) => step.status === "succeeded" && step.attempt === 1), "both persisted steps must succeed at generation 1");
+        .in("run_id", ownerRunIds);
+      assert(!stepsError && steps?.length === 4, "four step-run records (two per workflow) must persist");
+      assert(steps.every((step) => step.status === "succeeded" && step.attempt === 1),
+        "all concurrent step runs must succeed at generation 1");
+      for (const ownerRunId of ownerRunIds) {
+        assert(steps.filter((step) => step.run_id === ownerRunId).length === 2,
+          "each concurrent workflow must persist exactly two step runs");
+      }
 
       const { data: logs, error: logsError } = await admin
         .from("workflow_logs")
         .select("event,run_id")
-        .eq("run_id", runId);
-      assert(!logsError && logs?.length === 3, "two step events and one workflow event must persist");
+        .in("run_id", ownerRunIds);
+      assert(!logsError && logs?.length === 6, "four step events and two workflow events must persist");
 
       const { data: tenantB, error: tenantBError } = await admin
         .from("workflow_runs")
         .select("status,attempt")
         .eq("id", "81000000-3000-4000-8000-000000000002")
         .single();
-      assert(!tenantBError && tenantB?.status === "queued" && tenantB.attempt === 0, "owner A request must not claim owner B queue rows");
+      assert(!tenantBError && tenantB?.status === "queued" && tenantB.attempt === 0,
+        "concurrent owner-A requests must not claim owner-B queue rows");
     } finally {
       await server.shutdown();
     }
