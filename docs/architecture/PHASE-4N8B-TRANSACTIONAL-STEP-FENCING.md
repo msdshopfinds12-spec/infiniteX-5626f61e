@@ -26,3 +26,28 @@ inside the same transaction.
 - Live migration: not performed.
 - Merge/deployment: not performed.
 - The integration test mutates its fixture; use only a disposable local database.
+
+
+## CI fixture contract (fail-closed)
+
+The Deno integration test is mandatory and does not use `ignore`. Missing fixture
+configuration causes a test failure, not a skipped/green result. CI must provision
+a disposable database fixture and pass all six `PHASE_4N8B_TEST_*` / Supabase
+environment values before this job can pass.
+
+Fixture requirements:
+- The run exists, belongs to the supplied owner, is `running`, and has the exact
+  supplied attempt generation.
+- The step exists and its `workflow_id` equals the run's `workflow_id`.
+- No `workflow_step_runs` row exists for the selected run/step pair before the test.
+- The fixture is isolated and disposable. The test creates a step-run row, temporarily
+  increments the parent attempt, then deletes only its own step-run row and restores
+  the original attempt in `finally`.
+- Cleanup attempts both restoration operations even if one fails; any cleanup error
+  fails the test.
+
+**Current CI limitation:** the workflow does not yet provision this fixture. Until a
+dedicated disposable PostgreSQL/Supabase-compatible test environment is wired into
+CI, the integration job is expected to fail closed. Do not add credentials from the
+live project to make it pass. A plain PostgreSQL harness must be labelled as SQL/RPC
+contract testing, not full Supabase Auth/PostgREST/Edge Runtime integration.
