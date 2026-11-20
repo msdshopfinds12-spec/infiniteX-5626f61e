@@ -45,10 +45,11 @@ test("workflow run request does not accept client-owned lifecycle fields", () =>
 });
 
 test("request input is deeply cloned and frozen", () => {
-  const original = { nested: { values: [1, { enabled: true }] } };
+  const nestedValue = { enabled: true };
+  const original = { nested: { values: [1, nestedValue] } };
   const request = createWorkflowRunRequest("workflow-123", original);
 
-  original.nested.values[1].enabled = false;
+  nestedValue.enabled = false;
   original.nested.values.push(2);
 
   assert.deepEqual(request.input, {
@@ -56,11 +57,9 @@ test("request input is deeply cloned and frozen", () => {
   });
   assert.equal(Object.isFrozen(request), true);
   assert.equal(Object.isFrozen(request.input), true);
-  assert.equal(Object.isFrozen((request.input as { nested: Json }).nested), true);
-  assert.equal(
-    Object.isFrozen(((request.input as { nested: { values: Json[] } }).nested).values),
-    true,
-  );
+  const nested = request.input as unknown as { nested: { values: readonly Json[] } };
+  assert.equal(Object.isFrozen(nested.nested), true);
+  assert.equal(Object.isFrozen(nested.nested.values), true);
 });
 
 test("request input rejects circular references", () => {
@@ -110,5 +109,26 @@ test("request input rejects symbol keys", () => {
   assert.throws(
     () => createWorkflowRunRequest("workflow-123", input as unknown as Json),
     /symbol keys/,
+  );
+});
+
+test("request input rejects sparse arrays and array accessors", () => {
+  const sparse = new Array(2);
+  const accessorArray: unknown[] = [];
+  Object.defineProperty(accessorArray, "0", {
+    enumerable: true,
+    get() {
+      throw new Error("array getter must not execute");
+    },
+  });
+  accessorArray.length = 1;
+
+  assert.throws(
+    () => createWorkflowRunRequest("workflow-123", sparse as unknown as Json),
+    /dense JSON arrays/,
+  );
+  assert.throws(
+    () => createWorkflowRunRequest("workflow-123", accessorArray as unknown as Json),
+    /holes or accessors/,
   );
 });
