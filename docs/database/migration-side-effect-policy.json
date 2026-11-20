@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "baseline": "phase-4n20",
+  "source": "19 ledger-recovered SQL statement files",
+  "description": "Exact expected migration versions containing high-impact extension, scheduler, outbound HTTP, Vault, and URL constructs. Update only after human SQL review.",
+  "allowedVersions": {
+    "cron_schedule": [
+      "20261025201001",
+      "20261025202809"
+    ],
+    "cron_unschedule": [
+      "20261025201001"
+    ],
+    "net_http_post": [
+      "20261025202809"
+    ],
+    "vault_reference": [
+      "20261025202741",
+      "20261025202809"
+    ],
+    "extension_ddl": [
+      "20261025201001",
+      "20261025202536",
+      "20261025202644"
+    ],
+    "external_http_url": [
+      "20261025202741"
+    ]
+  }
+}
