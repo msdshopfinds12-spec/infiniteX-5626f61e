@@ -12,6 +12,8 @@ function createClient(overrides: Record<string, unknown> = {}) {
     }),
     signInWithPassword: async () => ({ data: {}, error: null }),
     signUp: async () => ({ data: { session: null }, error: null }),
+    resetPasswordForEmail: async () => ({ error: null }),
+    updateUser: async () => ({ data: { user: { id: "synthetic-user" } }, error: null }),
     signOut: async () => ({ error: null }),
     ...overrides,
   };
@@ -98,4 +100,35 @@ test("sign-out exceptions are returned as safe results rather than escaping", as
   assert.equal(result.status, "error");
   assert.equal(result.code, "unknown");
   assert.doesNotMatch(result.message, /internal provider failure/);
+});
+
+test("password reset returns the same non-enumerating success message", async () => {
+  const adapter = createSupabaseAuthSessionAdapter(createClient());
+  assert.deepEqual(
+    await adapter.requestPasswordReset("person@example.com", "https://example.test/?auth=recovery"),
+    {
+      status: "success",
+      message: "If an account exists for that email, a password reset link will be sent.",
+    },
+  );
+});
+
+test("password reset never exposes provider error details", async () => {
+  const adapter = createSupabaseAuthSessionAdapter(createClient({
+    resetPasswordForEmail: async () => ({
+      error: { status: 429, message: "private provider details" },
+    }),
+  }));
+  const result = await adapter.requestPasswordReset("person@example.com", "https://example.test/?auth=recovery");
+  assert.equal(result.status, "error");
+  assert.equal(result.code, "rate-limited");
+  assert.doesNotMatch(result.message, /private provider details/);
+});
+
+test("password update returns a safe success result", async () => {
+  const adapter = createSupabaseAuthSessionAdapter(createClient());
+  assert.deepEqual(await adapter.updatePassword("new-strong-password"), {
+    status: "success",
+    message: "Your password has been updated. You can continue to your workspace.",
+  });
 });
