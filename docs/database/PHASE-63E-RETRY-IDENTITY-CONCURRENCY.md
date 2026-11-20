@@ -42,9 +42,11 @@ request fingerprint. A cross-owner collision must raise
    either row or creating a third attempt.
 5. **Atomic rollback:** an injected retry transaction failure leaves the original
    attempt running and does not leave a partially inserted next attempt.
-6. **Two-session replay:** an independent PostgreSQL session is observed waiting on
-   the original-attempt row lock; after release, replay resolves to the same next attempt.
-7. **Two-session identity attack:** an independent UPDATE is observed waiting on the
+6. **Concurrent replay:** two independent PostgreSQL sessions are both observed waiting
+   on the original-attempt row lock; after release, both resolve to the same next attempt.
+7. **Conditional claim race:** two independent workers race to claim one queued attempt;
+   exactly one succeeds, one loses, and the lease generation increments exactly once.
+8. **Two-session identity attack:** an independent UPDATE is observed waiting on the
    next-attempt row lock; after release, the immutability trigger rejects the mutation
    and the stored idempotency key remains unchanged.
 
