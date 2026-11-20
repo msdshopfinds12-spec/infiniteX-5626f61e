@@ -30,9 +30,12 @@ Deno.serve(async (req: Request) => {
   if (route.resource === "run" && req.method !== "GET") {
     return reply(req, 405, { ok: false, error: "method_not_allowed" });
   }
+  if (route.resource === "cancel" && req.method !== "POST") {
+    return reply(req, 405, { ok: false, error: "method_not_allowed" });
+  }
 
   const authorization = req.headers.get("Authorization") ?? "";
-  const tokenMatch = authorization.match(/^Bearer\\s+([^\\s]+)$/i);
+  const tokenMatch = authorization.match(/^Bearer\s+([^\s]+)$/i);
   if (!tokenMatch) return reply(req, 401, { ok: false, error: "invalid_session" });
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -50,8 +53,7 @@ Deno.serve(async (req: Request) => {
   if (error || !data.user?.id) return reply(req, 401, { ok: false, error: "invalid_session" });
 
   if (route.resource === "run") {
-    // RLS owner policy is the authorization boundary. Do not use service-role
-    // access for user-facing reads and do not reveal whether another user's ID exists.
+    // User-scoped client + RLS owner policy prevents cross-user status disclosure.
     const { data: run, error: readError } = await userClient
       .from("workflow_runs")
       .select("id,workflow_id,status,output,attempt,created_at,started_at,finished_at,scheduled_for")
@@ -64,6 +66,54 @@ Deno.serve(async (req: Request) => {
     }
     if (!run) return reply(req, 404, { ok: false, error: "run_not_found" });
     return reply(req, 200, { ok: true, run });
+  }
+
+  if (route.resource === "cancel") {
+    // The service role is used only after JWT verification. The owner predicate
+    // is always derived from auth.getUser(), never from request JSON or query data.
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!serviceRoleKey) {
+      console.error("workflow_api_cancel_environment_incomplete");
+      return reply(req, 503, { ok: false, error: "cancel_temporarily_unavailable" });
+    }
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: cancelled, error: cancelError } = await admin
+      .from("workflow_runs")
+      .update({
+        status: "cancelled",
+        error_message: null,
+        finished_at: new Date().toISOString(),
+      })
+      .eq("id", route.runId)
+      .eq("owner_id", data.user.id)
+      .eq("status", "queued")
+      .select("id,status,finished_at")
+      .maybeSingle();
+
+    if (cancelError) {
+      console.error("workflow_run_cancel_failed");
+      return reply(req, 500, { ok: false, error: "internal_error" });
+    }
+    if (cancelled) return reply(req, 200, { ok: true, run: cancelled });
+
+    // A missing row and a non-queued row are handled separately without
+    // disclosing records owned by another user.
+    const { data: current, error: currentError } = await admin
+      .from("workflow_runs")
+      .select("id,status")
+      .eq("id", route.runId)
+      .eq("owner_id", data.user.id)
+      .maybeSingle();
+    if (currentError) return reply(req, 500, { ok: false, error: "internal_error" });
+    if (!current) return reply(req, 404, { ok: false, error: "run_not_found" });
+    return reply(req, 409, {
+      ok: false,
+      error: "run_not_cancellable",
+      status: current.status,
+      message: "Only queued runs can be cancelled; a running action is not force-stopped.",
+    });
   }
 
   if (!(req.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) {
@@ -84,12 +134,12 @@ Deno.serve(async (req: Request) => {
   const validation = validateEnqueueWorkflowRequest(bodyResult.value);
   if (!validation.ok) return reply(req, 400, { ok: false, error: validation.code });
 
-  // Fail closed until the atomic owner-scoped enqueue and database-enforced
-  // idempotency contract is installed and verified in a disposable test database.
+  // Fail closed until atomic owner-scoped persistence and database-enforced
+  // idempotency are installed and verified in a disposable test database.
   return reply(req, 501, {
     ok: false,
     error: "workflow_enqueue_not_enabled",
     phase: "52.1-52.2",
-    message: "Authentication, validation and owner-scoped status reads are ready; enqueue persistence is not enabled.",
+    message: "Authentication, validation, owner-scoped status reads and queued-only cancellation are ready; enqueue persistence is not enabled.",
   });
 });
