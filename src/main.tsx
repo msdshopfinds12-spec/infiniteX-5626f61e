@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { AuthSessionProvider, useAuthActions, useAuthState } from "./features/auth/auth-session-provider";
+import { AuthSessionProvider, useAuthActions, useAuthRecoveryMode, useAuthState } from "./features/auth/auth-session-provider";
 import { createSupabaseAuthSessionAdapter } from "./features/auth/supabase-auth-session-adapter";
 import { createBrowserSupabaseClient } from "./lib/supabase/client";
 import "./styles/global.css";
@@ -19,7 +19,8 @@ const authAdapter =
 function ConnectedApp() {
   const authState = useAuthState();
   const authActions = useAuthActions();
-  return <App authState={authState} authActions={authActions} />;
+  const recoveryMode = useAuthRecoveryMode();
+  return <App authState={authState} authActions={authActions} recoveryMode={recoveryMode} />;
 }
 
 function Root() {
