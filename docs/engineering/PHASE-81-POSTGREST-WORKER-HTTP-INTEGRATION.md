@@ -50,6 +50,21 @@ The JWT signature and database role are still validated by PostgREST. This prove
 - CI repository permission is read-only.
 - Both containers are removed in an `always()` cleanup step.
 
+## Verified execution result
+
+- Workflow run: [44828008391](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44828008391) — **SUCCESS**
+- Exact tested commit: `30169d3ab9bf6bbff37c443368d1dd70e5dee133`
+- Worker HTTP integration job: `136605443794` — **SUCCESS**
+- Existing worker contract and regression gates: passed
+- Disposable PostgreSQL 17 startup and provenance-checked migration replay: passed
+- Synthetic fixture setup and short-lived JWT generation: passed
+- PostgREST gateway startup: passed
+- Real Deno worker HTTP journey: passed
+- Persisted workflow, two step-run rows, three log events, and owner-B isolation assertions: passed
+- Both disposable containers were removed by the unconditional cleanup step
+
+The initial attempts exposed and corrected three test harness defects: the stale source-contract assertion, the standalone PostgREST `/rest/v1` path mismatch, and failure to route the worker-created admin client through the test-only PostgREST fetch adapter. The final successful run includes the corrected default-safe injectable auth boundary, both client adapters, and the full persisted-state assertions.
+
 ## Verification required
 
 The Phase 81 workflow must pass all of the following:
