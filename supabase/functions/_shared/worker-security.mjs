@@ -8,6 +8,12 @@ export function isValidAttempt(value) {
   return Number.isSafeInteger(value) && value > 0;
 }
 
+/** True only when a candidate lease generation is strictly newer than stored state. */
+export function isAttemptGenerationNewer(storedAttempt, candidateAttempt) {
+  return isValidAttempt(storedAttempt) && isValidAttempt(candidateAttempt) &&
+    candidateAttempt > storedAttempt;
+}
+
 export function isClaimedRunValid(run) {
   return run !== null && typeof run === "object" && !Array.isArray(run) &&
     isNonEmptyString(run.id) &&
@@ -149,4 +155,75 @@ export function executeWithinStepBudget(
   assertStepDeadline(deadline, now());
   assertJsonByteLimit(output, maxBytes);
   return output;
+}
+
+
+const RETRYABLE_STEP_ERROR_CODES = new Set([
+  "NETWORK_ERROR",
+  "UPSTREAM_TIMEOUT",
+  "UPSTREAM_UNAVAILABLE",
+  "RATE_LIMITED",
+]);
+
+/** retry_limit means additional attempts after the initial execution; hard cap prevents runaway work. */
+export function validateRetryLimit(value, defaultRetries = 0, maximumRetries = 10) {
+  if (!Number.isInteger(defaultRetries) || defaultRetries < 0 ||
+      !Number.isInteger(maximumRetries) || maximumRetries < defaultRetries) {
+    throw new TypeError("invalid_retry_policy");
+  }
+  if (value === undefined || value === null) return defaultRetries;
+  if (!Number.isInteger(value) || value < 0 || value > maximumRetries) {
+    throw new RangeError("step_retry_limit_invalid");
+  }
+  return value;
+}
+
+/** Only explicitly tagged, allowlisted transient failures are eligible for retry. */
+export function isRetryableStepError(error) {
+  return error !== null && typeof error === "object" &&
+    typeof error.code === "string" &&
+    RETRYABLE_STEP_ERROR_CODES.has(error.code);
+}
+
+/**
+ * Bounded retry with capped exponential full jitter.
+ * The default safe action set is deterministic; it will not retry ordinary
+ * validation/action errors. External actions must opt in by throwing an
+ * allowlisted error code. Sleep and randomness are injectable for tests.
+ */
+export async function executeWithRetry(action, retryLimit, options = {}) {
+  if (typeof action !== "function") throw new TypeError("action_must_be_function");
+  const retries = validateRetryLimit(retryLimit);
+  const baseDelayMs = options.baseDelayMs ?? 100;
+  const maxDelayMs = options.maxDelayMs ?? 1000;
+  const maxElapsedMs = options.maxElapsedMs ?? 30_000;
+  const sleep = options.sleep ?? ((milliseconds) =>
+    new Promise((resolve) => setTimeout(resolve, milliseconds)));
+  const random = options.random ?? Math.random;
+  const now = options.now ?? (() => performance.now());
+  if (!Number.isInteger(baseDelayMs) || baseDelayMs < 0 ||
+      !Number.isInteger(maxDelayMs) || maxDelayMs < baseDelayMs ||
+      !Number.isFinite(maxElapsedMs) || maxElapsedMs < 1 ||
+      typeof sleep !== "function" || typeof random !== "function" || typeof now !== "function") {
+    throw new TypeError("invalid_retry_options");
+  }
+
+  const deadline = now() + maxElapsedMs;
+  for (let attempt = 0; ; attempt++) {
+    if (now() >= deadline) throw new Error("step_timeout_exceeded");
+    try {
+      const result = await action(attempt);
+      if (now() >= deadline) throw new Error("step_timeout_exceeded");
+      return result;
+    } catch (error) {
+      if (attempt >= retries || !isRetryableStepError(error)) throw error;
+      const remainingMs = deadline - now();
+      if (remainingMs <= 0) throw new Error("step_timeout_exceeded");
+      const ceiling = Math.min(maxDelayMs, baseDelayMs * (2 ** attempt));
+      const sample = random();
+      const boundedSample = Number.isFinite(sample) ? Math.max(0, Math.min(1, sample)) : 0;
+      const delayMs = Math.min(Math.floor(ceiling * boundedSample), Math.floor(remainingMs));
+      if (delayMs > 0) await sleep(delayMs);
+    }
+  }
 }

@@ -1,12 +1,16 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { executeSafeAction } from "../_shared/workflow-actions.mjs";
 import {
   clampBatchLimit,
   executeWithinStepBudget,
+  executeWithRetry,
   isClaimedRunValid,
   isWorkflowOwnedBy,
+  isAttemptGenerationNewer,
   readJsonBodyLimited,
   validateStepTimeoutSeconds,
+  validateRetryLimit,
 } from "../_shared/worker-security.mjs";
 
 type JsonRecord = Record<string, unknown>;
@@ -25,41 +29,6 @@ function reply(status: number, body: JsonRecord) {
 function record(value: unknown): JsonRecord {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? { ...(value as JsonRecord) } : { value };
-}
-function requiredString(value: unknown, label: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) throw new Error(label + "_must_be_non_empty_string");
-  return value;
-}
-function executeSafeAction(actionType: string, input: unknown, config: JsonRecord): JsonRecord {
-  const data = record(input);
-  switch (actionType) {
-    case "pass_through": return data;
-    case "set_value": {
-      const key = requiredString(config.key, "config.key");
-      if (!Object.prototype.hasOwnProperty.call(config, "value")) throw new Error("config.value_required");
-      return { ...data, [key]: config.value };
-    }
-    case "merge_json": {
-      const value = config.value;
-      if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error("config.value_must_be_json_object");
-      return { ...data, ...(value as JsonRecord) };
-    }
-    case "uppercase_text":
-    case "lowercase_text":
-    case "append_text":
-    case "prepend_text": {
-      const key = typeof config.key === "string" && config.key.trim() ? config.key : "text";
-      const current = data[key];
-      if (typeof current !== "string") throw new Error("input_text_field_required:" + key);
-      let next = current;
-      if (actionType === "uppercase_text") next = current.toUpperCase();
-      if (actionType === "lowercase_text") next = current.toLowerCase();
-      if (actionType === "append_text") next = current + requiredString(config.text, "config.text");
-      if (actionType === "prepend_text") next = requiredString(config.text, "config.text") + current;
-      return { ...data, [key]: next };
-    }
-    default: throw new Error("unsupported_action_type:" + actionType);
-  }
 }
 async function logEvent(
   admin: SupabaseClient<any, "public", any, any, any>, ownerId: string, workflowId: string, runId: string,
@@ -150,6 +119,9 @@ Deno.serve(async (req: Request) => {
           attempt: stepAttempt, started_at: new Date().toISOString(), finished_at: null,
         };
         if (previous) {
+          if (!isAttemptGenerationNewer(previous.attempt, stepAttempt)) {
+            throw new Error("workflow_step_attempt_superseded");
+          }
           const { data: startedStep, error: startError } = await admin
             .from("workflow_step_runs").update(stepRunPayload)
             .eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
@@ -175,11 +147,16 @@ Deno.serve(async (req: Request) => {
         let actionError = "";
         try {
           const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
-          output = executeWithinStepBudget(
-            () => executeSafeAction(step.action_type, payload, config),
-            { input: payload, config },
-            timeoutSeconds,
-            64 * 1024,
+          const retryLimit = validateRetryLimit(step.retry_limit);
+          output = await executeWithRetry(
+            () => executeWithinStepBudget(
+              () => executeSafeAction(step.action_type, payload, config),
+              { input: payload, config },
+              timeoutSeconds,
+              64 * 1024,
+            ),
+            retryLimit,
+            { maxElapsedMs: timeoutSeconds * 1000 },
           );
         } catch (error) {
           actionError = error instanceof Error ? error.message : "action_failed";
