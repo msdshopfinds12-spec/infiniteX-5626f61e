@@ -1,0 +1,44 @@
+# Phase 71 — Worker HTTP integration boundary
+
+## Scope
+
+This phase extracts the authentication/privilege boundary from the two Deno worker entrypoints into injectable functions. The authenticated worker continues to use a verified user bearer identity and user-scoped claim RPC. The cron worker continues to verify its dedicated secret through the privileged verification RPC before exposing the admin client.
+
+## Implemented on this branch
+
+- `worker-auth-boundary.mjs`: dependency-injected bearer and cron authentication boundaries.
+- `worker-auth-boundary.test.mjs`: executable Node tests using fake environment providers and mock Supabase clients.
+- Authenticated worker delegates bearer parsing, environment validation, and `auth.getUser` to the boundary.
+- Cron worker delegates secret validation and `simula_verify_worker_secret` to the boundary.
+- Existing downstream claim RPCs, owner checks, workflow execution, attempt fencing, and terminal writes remain in their respective adapters.
+
+## Security invariants
+
+1. Missing bearer token is rejected before any client is created.
+2. Authenticated identity must be resolved by `auth.getUser(token)` before the user-scoped claim is reachable.
+3. Missing/short cron secret is rejected before creating a privileged client.
+4. Cron secret verification must return exactly boolean `true` and no RPC error before the admin client is returned to the handler.
+5. Incomplete environment configuration fails closed.
+6. User and cron privilege boundaries remain separate.
+
+## Validation
+
+Run:
+
+```sh
+npm run test:worker-http-boundary
+npm run test:workers
+npm run test:edge-function-security
+npm run lint
+npm run build
+```
+
+The new tests cover the extracted authentication boundary only. They do **not** yet constitute full HTTP-handler integration or complete workflow execution tests. Those remain Phase 71B–71F acceptance work.
+
+## Safety constraints
+
+- No production database writes or migrations.
+- No secrets are read, printed, or changed by these tests.
+- No Edge Function deployment.
+- No merge or promotion of PR #102.
+- Mock clients and synthetic identities only.
