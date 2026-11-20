@@ -6,6 +6,7 @@ on:
       - eng/infinitex-unified-ui-backend-2026-11-20
       - eng/infinitex-p0-p1-auth-2026-11-20
       - feat/phase-50-trusted-authorization
+      - feat/phase-52-trusted-workflow-api-plan
   push:
     branches:
       - eng/infinitex-p0-p1-auth-2026-11-20
