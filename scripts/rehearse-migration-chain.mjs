@@ -192,6 +192,12 @@ async function main() {
           'Reconstructed disposable baseline execution failed: ' + baselineResult.output.slice(-2200), 'phase-52.1D reconstructed baseline');
         return;
       }
+      const assertionPath = path.join(root, 'tests/database/phase-52-1d-assert-workflow-baseline.sql');
+      const assertionResult = runPsql(['-f', assertionPath], env);
+      if (assertionResult.status !== 0) {
+        await finish('FAIL', 1, 'Reconstructed baseline catalog assertions failed: ' + assertionResult.output.slice(-2200), 'phase-52.1D catalog assertions');
+        return;
+      }
       report.reconstructedBaselineExecuted = true;
       console.log('RECONSTRUCTED BASELINE PASS (disposable only; noncanonical)');
     }
