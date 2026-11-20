@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { corsHeadersForRequest } from "../_shared/cors.ts";
 import { parseBearerToken } from "../_shared/bearer-token.mjs";
+import { executeSafeAction, normalizeRecord as record, toSafeActionError } from "../_shared/workflow-actions.mjs";
 import {
   clampBatchLimit,
   executeWithinStepBudget,
@@ -31,63 +32,6 @@ type ClaimedRun = {
 
 function reply(req: Request, status: number, body: JsonRecord) {
   return new Response(JSON.stringify(body), { status, headers: corsHeadersForRequest(req).headers });
-}
-
-function record(value: unknown): JsonRecord {
-  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    return { ...(value as JsonRecord) };
-  }
-  return { value };
-}
-
-function requiredString(value: unknown, label: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(label + "_must_be_non_empty_string");
-  }
-  return value;
-}
-
-function executeSafeAction(actionType: string, input: unknown, config: JsonRecord): JsonRecord {
-  const data = record(input);
-
-  switch (actionType) {
-    case "pass_through":
-      return data;
-
-    case "set_value": {
-      const key = requiredString(config.key, "config.key");
-      if (!Object.prototype.hasOwnProperty.call(config, "value")) {
-        throw new Error("config.value_required");
-      }
-      return { ...data, [key]: config.value };
-    }
-
-    case "merge_json": {
-      const value = config.value;
-      if (value === null || typeof value !== "object" || Array.isArray(value)) {
-        throw new Error("config.value_must_be_json_object");
-      }
-      return { ...data, ...(value as JsonRecord) };
-    }
-
-    case "uppercase_text":
-    case "lowercase_text":
-    case "append_text":
-    case "prepend_text": {
-      const key = typeof config.key === "string" && config.key.trim() ? config.key : "text";
-      const current = data[key];
-      if (typeof current !== "string") throw new Error("input_text_field_required:" + key);
-      let next = current;
-      if (actionType === "uppercase_text") next = current.toUpperCase();
-      if (actionType === "lowercase_text") next = current.toLowerCase();
-      if (actionType === "append_text") next = current + requiredString(config.text, "config.text");
-      if (actionType === "prepend_text") next = requiredString(config.text, "config.text") + current;
-      return { ...data, [key]: next };
-    }
-
-    default:
-      throw new Error("unsupported_action_type:" + actionType);
-  }
 }
 
 async function logEvent(
@@ -261,7 +205,7 @@ Deno.serve(async (req: Request) => {
             64 * 1024,
           );
         } catch (error) {
-          actionError = error instanceof Error ? error.message : "action_failed";
+          actionError = toSafeActionError(error);
         }
 
         if (actionError || !actionOutput) {
