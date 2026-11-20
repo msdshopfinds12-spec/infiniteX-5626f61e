@@ -100,7 +100,10 @@ if(arr(s.tables,'tables')){const tableIds=new Set();for(const [i,t] of s.tables.
 }}
 if(arr(s.functions,'functions')){const seen=new Set();for(const [i,f] of s.functions.entries()){
  if(!obj(f)){errors.push('functions['+i+'] must be an object.');continue;}
- for(const k of ['schema','name','owner','language','resultType','identityArguments','searchPath','volatility','parallelSafety'])str(f[k],'functions['+i+'].'+k,k==='identityArguments'||k==='searchPath');
+ for(const k of ['schema','name','kind','owner','language','identityArguments','searchPath','volatility','parallelSafety'])str(f[k],'functions['+i+'].'+k,k==='identityArguments'||k==='searchPath');
+ if(f.kind==='FUNCTION')str(f.resultType,'functions['+i+'].resultType');
+ else if(f.kind==='PROCEDURE'){if(f.resultType!==null)errors.push('functions['+i+'].resultType must be null for PROCEDURE.');}
+ else errors.push('functions['+i+'].kind must be FUNCTION or PROCEDURE.');
  for(const k of ['securityDefiner','strict','leakproof'])bool(f[k],'functions['+i+'].'+k);
  arr(f.executeRoles,'functions['+i+'].executeRoles');
  if(Array.isArray(f.executeRoles)&&f.executeRoles.some(x=>typeof x!=='string'||!x.trim()))errors.push('functions['+i+'].executeRoles contains invalid role.');
