@@ -4,6 +4,7 @@ export type ViewKey =
   | "overview"
   | "agents"
   | "pipelines"
+  | "projects"
   | "logs"
   | "security"
   | "settings";
