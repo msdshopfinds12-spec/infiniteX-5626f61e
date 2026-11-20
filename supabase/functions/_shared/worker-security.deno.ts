@@ -7,6 +7,7 @@ import {
   isClaimedRunOwnedBy,
   isClaimedRunValid,
   isValidAttempt,
+  isAttemptGenerationNewer,
   isWorkflowOwnedBy,
   readJsonBodyLimited,
   validateStepTimeoutSeconds,
@@ -107,4 +108,24 @@ Deno.test("Deno: executes bounded local actions once and checks the deadline aft
     timedOut = true;
   }
   assert(timedOut, "deadline exceeded during action should be reported after execution");
+});
+
+Deno.test("Deno: attempt generations advance strictly and reject stale writers", () => {
+  assert(isAttemptGenerationNewer(1, 2), "newer generation should be accepted");
+  assert(!isAttemptGenerationNewer(2, 2), "same generation should not reacquire");
+  assert(!isAttemptGenerationNewer(3, 2), "stale generation should be rejected");
+  assert(!isAttemptGenerationNewer(0, 1), "invalid stored generation should fail closed");
+  assert(!isAttemptGenerationNewer(1, 0), "invalid candidate generation should fail closed");
+
+  const state = { attempt: 1, output: null as string | null };
+  const apply = (attempt: number, output: string) => {
+    if (!isValidAttempt(attempt) || state.attempt > attempt ||
+      (state.attempt === attempt && state.output !== null)) return false;
+    state.attempt = attempt;
+    state.output = output;
+    return true;
+  };
+  assert(apply(2, "new-result"), "new generation should commit");
+  assert(!apply(1, "stale-result"), "late stale completion should be rejected");
+  assertEqual(state, { attempt: 2, output: "new-result" }, "stale completion must not overwrite new result");
 });
