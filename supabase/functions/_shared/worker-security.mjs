@@ -150,3 +150,64 @@ export function executeWithinStepBudget(
   assertJsonByteLimit(output, maxBytes);
   return output;
 }
+
+
+const RETRYABLE_STEP_ERROR_CODES = new Set([
+  "NETWORK_ERROR",
+  "UPSTREAM_TIMEOUT",
+  "UPSTREAM_UNAVAILABLE",
+  "RATE_LIMITED",
+]);
+
+/** retry_limit means additional attempts after the initial execution; hard cap prevents runaway work. */
+export function validateRetryLimit(value, defaultRetries = 0, maximumRetries = 5) {
+  if (!Number.isInteger(defaultRetries) || defaultRetries < 0 ||
+      !Number.isInteger(maximumRetries) || maximumRetries < defaultRetries) {
+    throw new TypeError("invalid_retry_policy");
+  }
+  if (value === undefined || value === null) return defaultRetries;
+  if (!Number.isInteger(value) || value < 0 || value > maximumRetries) {
+    throw new RangeError("step_retry_limit_invalid");
+  }
+  return value;
+}
+
+/** Only explicitly tagged, allowlisted transient failures are eligible for retry. */
+export function isRetryableStepError(error) {
+  return error !== null && typeof error === "object" &&
+    typeof error.code === "string" &&
+    RETRYABLE_STEP_ERROR_CODES.has(error.code);
+}
+
+/**
+ * Bounded retry with capped exponential full jitter.
+ * The default safe action set is deterministic; it will not retry ordinary
+ * validation/action errors. External actions must opt in by throwing an
+ * allowlisted error code. Sleep and randomness are injectable for tests.
+ */
+export async function executeWithRetry(action, retryLimit, options = {}) {
+  if (typeof action !== "function") throw new TypeError("action_must_be_function");
+  const retries = validateRetryLimit(retryLimit);
+  const baseDelayMs = options.baseDelayMs ?? 100;
+  const maxDelayMs = options.maxDelayMs ?? 1000;
+  const sleep = options.sleep ?? ((milliseconds) =>
+    new Promise((resolve) => setTimeout(resolve, milliseconds)));
+  const random = options.random ?? Math.random;
+  if (!Number.isInteger(baseDelayMs) || baseDelayMs < 0 ||
+      !Number.isInteger(maxDelayMs) || maxDelayMs < baseDelayMs ||
+      typeof sleep !== "function" || typeof random !== "function") {
+    throw new TypeError("invalid_retry_options");
+  }
+
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await action(attempt);
+    } catch (error) {
+      if (attempt >= retries || !isRetryableStepError(error)) throw error;
+      const ceiling = Math.min(maxDelayMs, baseDelayMs * (2 ** attempt));
+      const sample = random();
+      const boundedSample = Number.isFinite(sample) ? Math.max(0, Math.min(1, sample)) : 0;
+      await sleep(Math.floor(ceiling * boundedSample));
+    }
+  }
+}
