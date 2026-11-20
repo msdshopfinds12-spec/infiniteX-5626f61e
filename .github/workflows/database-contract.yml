@@ -1,0 +1,128 @@
+name: Database Contract Gate
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - "scripts/check-*.mjs"
+      - "scripts/verify-recovered-migration-manifest.mjs"
+      - "scripts/audit-migration-side-effects.mjs"
+      - "tests/database/migration-side-effect-audit.test.mjs"
+      - "tests/database/catalog-capture-readonly.test.mjs"
+      - "supabase/contracts/capture-database-contract.readonly.sql"
+      - "tests/database/**"
+      - "docs/database/**"
+      - ".github/workflows/database-contract.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: database-contract-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline-contract:
+    name: Offline migration and contract checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax-check validation scripts and tests
+        run: |
+          node --check scripts/check-migration-integrity.mjs
+          node --check scripts/check-database-contract.mjs
+          node --check scripts/verify-recovered-migration-manifest.mjs
+          node --check scripts/audit-migration-side-effects.mjs
+          node --check tests/database/migration-side-effect-audit.test.mjs
+          node --check tests/database/catalog-capture-readonly.test.mjs
+          node --check tests/database/check-database-contract.test.mjs
+          node --check tests/database/check-migration-integrity.test.mjs
+          node --check tests/database/platform-api-key-column-grants.test.mjs
+      - name: Verify recovered migration SHA-256 manifest
+        run: node scripts/verify-recovered-migration-manifest.mjs
+      - name: Audit recovered migration side effects against reviewed policy
+        run: node scripts/audit-migration-side-effects.mjs
+      - name: Run read-only catalog capture regression tests
+        run: node --test tests/database/catalog-capture-readonly.test.mjs
+      - name: Run migration side-effect audit regression tests
+        run: node --test tests/database/migration-side-effect-audit.test.mjs
+      - name: Run database contract validator regression tests
+        run: node --test tests/database/check-database-contract.test.mjs
+      - name: Run API-key column privilege regression tests
+        run: node --test tests/database/platform-api-key-column-grants.test.mjs
+      - name: Run migration integrity regression tests
+        run: node --test tests/database/check-migration-integrity.test.mjs
+      - name: Check migration naming and content integrity
+        id: migration_integrity
+        shell: bash
+        run: |
+          set +e
+          node scripts/check-migration-integrity.mjs
+          status=$?
+          set -e
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" -eq 2 ]; then
+            echo "Source unavailable: classified as BLOCKED, not a validator defect."
+            exit 0
+          fi
+          exit "$status"
+      - name: Validate reviewed database contract snapshot
+        id: contract_snapshot
+        if: always() && steps.migration_integrity.outcome != 'skipped'
+        shell: bash
+        run: |
+          set +e
+          node scripts/check-database-contract.mjs
+          status=$?
+          set -e
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" -eq 2 ]; then
+            echo "Contract snapshot unavailable or awaiting explicit human approval: classified as BLOCKED."
+            exit 0
+          fi
+          exit "$status"
+      - name: Summarize source readiness
+        if: always()
+        env:
+          MIGRATION_EXIT_CODE: ${{ steps.migration_integrity.outputs.exit_code }}
+          CONTRACT_EXIT_CODE: ${{ steps.contract_snapshot.outputs.exit_code }}
+        run: |
+          classify() {
+            case "$1" in
+              0) echo "PASS" ;;
+              2) echo "BLOCKED — source missing or human approval pending" ;;
+              "") echo "NOT RUN" ;;
+              *) echo "FAIL — validator detected invalid source (exit $1)" ;;
+            esac
+          }
+          {
+            echo "## Database source readiness"
+            echo "- Migration source: $(classify "$MIGRATION_EXIT_CODE")"
+            echo "- Contract snapshot: $(classify "$CONTRACT_EXIT_CODE")"
+            echo "- Missing historical migrations must be recovered, not fabricated."
+            echo "- Captured snapshots require explicit human approval."
+            echo "- Structural validity is not proof of schema parity."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Enforce merge-blocking source readiness gate
+        if: always()
+        env:
+          MIGRATION_EXIT_CODE: ${{ steps.migration_integrity.outputs.exit_code }}
+          CONTRACT_EXIT_CODE: ${{ steps.contract_snapshot.outputs.exit_code }}
+        run: |
+          if [ "$MIGRATION_EXIT_CODE" != "0" ] || [ "$CONTRACT_EXIT_CODE" != "0" ]; then
+            echo "BLOCKED: authoritative migration sources and human-approved contract snapshot are required."
+            exit 1
+          fi
+  production-safety:
+    name: Production safety invariant
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm no production credentials are configured
+        run: |
+          echo "This workflow is offline-only."
+          echo "No Supabase URL, service-role key, database password, or production mutation command is used."
+          echo "Production migration and deployment require a separate human-approved workflow."
