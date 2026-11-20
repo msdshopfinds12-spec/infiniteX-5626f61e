@@ -48,6 +48,8 @@ export default function WorkflowList({
       } else {
         setState({ key: requestKey, status: "error", code: result.code });
       }
+    }).catch(() => {
+      if (active) setState({ key: requestKey, status: "error", code: "request_failed" });
     });
 
     return () => { active = false; };
