@@ -82,3 +82,16 @@ export function validateEnqueueWorkflowRequest(value) {
     }),
   };
 }
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Parse only the public API routes; reject extra path segments and malformed IDs. */
+export function parseWorkflowApiRoute(pathname) {
+  if (typeof pathname !== "string") return null;
+  const path = pathname.replace(/\\/+$/, "") || "/";
+  const match = path.match(/(?:^|\\/)runs(?:\\/([0-9a-f-]+))?$/i);
+  if (!match) return null;
+  if (!match[1]) return { resource: "runs" };
+  if (!UUID_PATTERN.test(match[1])) return null;
+  return { resource: "run", runId: match[1].toLowerCase() };
+}
