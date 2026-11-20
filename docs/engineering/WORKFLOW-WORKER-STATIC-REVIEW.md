@@ -3,7 +3,7 @@
 **Review target:** `engineering/infinitex-canonical-integration-candidate`  
 **Review basis:** source files fetched from the candidate branch on 2026-11-21  
 **Review mode:** read-only source inspection; this document adds findings only  
-**Status:** PARTIAL — source-level findings verified; database/runtime contracts not verified
+**Status:** PARTIAL — source changes and CI verified; live database concurrency proof and deployed-runtime parity remain pending
 
 ## Executive decision
 
@@ -29,26 +29,26 @@ See [WORKER-RETRY-POLICY.md](./WORKER-RETRY-POLICY.md). Exact-head CI and deploy
 
 **Required fix:** keep the allowlist strictly synchronous and cheap, with bounded input/output; for external or long-running actions use a separately cancellable job boundary with a durable lease, deadline, and idempotency key. Rename/document the current helper as a cooperative budget check if that improves clarity. Add a test proving the contract is explicitly cooperative, not preemptive.
 
-### WF-03 — Step-run compare-and-set depends on unverified database invariants
+### WF-03 — Database identity verified; live concurrency proof still pending
 
-The workers use a unique-conflict recovery path and conditional updates filtered by `run_id`, `step_id`, `owner_id`, and a lower `attempt` generation. The source-level fencing is useful, but correctness depends on a database uniqueness constraint for the intended step-run identity and on claim RPCs monotonically advancing the workflow-run attempt generation.
+The workers use a unique-conflict recovery path and conditional updates filtered by `run_id`, `step_id`, `owner_id`, and a lower `attempt` generation. The database review has now verified `UNIQUE (run_id, step_id)` and the claim RPC's atomic queue-claim/attempt-increment behavior. Both candidate workers now perform an early strict-generation check against the previously read step-run and retain the database conditional update (`attempt < candidate`) as the authoritative compare-and-set. The runtime report documents the verified schema and RPC contract.
 
 **Impact:** without the matching unique constraint and claim-generation semantics, duplicate rows or stale-worker races may not be prevented as intended.
 
-**Required verification:** inspect actual database constraints/indexes and the definitions/privileges of:
+**Remaining verification:** reproduce concurrent claims, lease expiry/reclaim, insert races, and late stale completions against an isolated PostgreSQL/Supabase environment. Also retain the verified definitions/privileges of:
 - `simula_claim_workflow_runs`
 - `simula_claim_workflow_runs_internal`
 - `simula_verify_worker_secret`
 
 Verify the unique key for `workflow_step_runs` (expected candidate: `run_id, step_id`), atomic queue claiming, lease expiry/reclaim behavior, attempt increment semantics, and function EXECUTE grants. Do not infer these properties from TypeScript types.
 
-### WF-04 — Worker parity must remain explicit
+### WF-04 — Shared action executor extracted; state-machine parity remains
 
-The authenticated worker and cron worker duplicate the action executor and much of the run/step state machine. Their trust models differ: the authenticated worker validates a user bearer token and claims through the user client; the cron worker validates a worker secret and uses the service-role client.
+The authenticated worker and cron worker now import the same runtime-neutral `workflow-actions.mjs` action executor, with independent unit tests. They still duplicate much of the run/step persistence state machine. Their trust models differ: the authenticated worker validates a user bearer token and claims through the user client; the cron worker validates a worker secret and uses the service-role client.
 
 **Impact:** fixes applied to only one worker can cause divergent behavior or security posture.
 
-**Required fix:** extract shared pure action/state-transition logic into a tested runtime-neutral module where feasible, while keeping authentication, claim RPC selection, and privilege boundaries separate. Add parity tests that run the same action and failure cases against both adapters.
+**Remaining work:** keep authentication, claim RPC selection, and privilege boundaries separate; add adapter-level parity/integration tests for the same action and failure cases. Do not unify privileged database adapters merely to remove duplication.
 
 ## Existing positive controls observed
 
@@ -66,8 +66,8 @@ The authenticated worker and cron worker duplicate the action executor and much 
 
 1. Capture genuine read-only database metadata from the intended Supabase project and independently compare it with `src/lib/supabase/database.types.ts`.
 2. Verify indexes, constraints, RLS policies, function definitions, function grants, and worker-secret storage/rotation design.
-3. Add worker integration tests using an isolated local/test database or deterministic RPC fakes; cover concurrent claims and lease expiry.
-4. Add explicit retry semantics and tests before claiming `retry_limit` works.
+3. Add worker integration tests using an isolated local/test database or deterministic RPC fakes; cover concurrent claims and lease expiry. Current deterministic concurrency-model tests are contract tests, not PostgreSQL concurrency proof.
+4. Retry semantics are now implemented and covered by Node/Deno tests; external action adapters still need idempotency and integration tests before retrying real upstream calls.
 5. Add tests for malformed claim RPC rows, duplicate step-run insertion races, stale generations, partial failure, and logging failures.
 6. Run all candidate CI checks on the exact resulting commit.
 7. Keep deployment blocked until a human approves a separate release plan.
