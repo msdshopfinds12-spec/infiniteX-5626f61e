@@ -29,13 +29,13 @@ See [WORKER-RETRY-POLICY.md](./WORKER-RETRY-POLICY.md). Exact-head CI and deploy
 
 **Required fix:** keep the allowlist strictly synchronous and cheap, with bounded input/output; for external or long-running actions use a separately cancellable job boundary with a durable lease, deadline, and idempotency key. Rename/document the current helper as a cooperative budget check if that improves clarity. Add a test proving the contract is explicitly cooperative, not preemptive.
 
-### WF-03 — Database identity verified; live concurrency proof still pending
+### WF-03 — Claim RPC and uniqueness contract verified; live concurrency proof blocked
 
-The workers use a unique-conflict recovery path and conditional updates filtered by `run_id`, `step_id`, `owner_id`, and a lower `attempt` generation. The database review has now verified `UNIQUE (run_id, step_id)` and the claim RPC's atomic queue-claim/attempt-increment behavior. Both candidate workers now perform an early strict-generation check against the previously read step-run and retain the database conditional update (`attempt < candidate`) as the authoritative compare-and-set. The runtime report documents the verified schema and RPC contract.
+The workers use a unique-conflict recovery path and conditional updates filtered by `run_id`, `step_id`, `owner_id`, and a lower `attempt` generation. The live catalog confirms `UNIQUE (run_id, step_id)`, both claim RPCs use `FOR UPDATE SKIP LOCKED`, and status transition plus attempt increment occur in one update. The internal claim function also requeues running leases older than 15 minutes below attempt 5 and fails those at/above attempt 5. Both candidate workers perform an early strict-generation check and retain the conditional database update (`attempt < candidate`) as the authoritative compare-and-set. However, the candidate repository has no `supabase/config.toml` or migration directory despite 19 migrations applied to the connected database, so a faithful local integration test cannot yet be constructed.
 
 **Impact:** without the matching unique constraint and claim-generation semantics, duplicate rows or stale-worker races may not be prevented as intended.
 
-**Remaining verification:** reproduce concurrent claims, lease expiry/reclaim, insert races, and late stale completions against an isolated PostgreSQL/Supabase environment. Also retain the verified definitions/privileges of:
+**Remaining verification:** recover the exact 19 migration sources and Supabase config into the candidate repo, then reproduce concurrent claims, lease expiry/reclaim, insert races, and late stale completions against an isolated PostgreSQL/Supabase environment. The read-only live catalog inspection confirmed the definitions/privileges of:
 - `simula_claim_workflow_runs`
 - `simula_claim_workflow_runs_internal`
 - `simula_verify_worker_secret`
