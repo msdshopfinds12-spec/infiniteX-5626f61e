@@ -275,7 +275,7 @@ BEGIN
     SET status = v_status, lock_token = NULL, lease_until = NULL,
         last_error = nullif(p_error, ''),
         available_at = CASE WHEN v_status = 'pending'
-          THEN pg_catalog.now() + make_interval(secs => least(3600, 5 * (2 ^ greatest(v_row.attempts - 1, 0))::integer))
+          THEN pg_catalog.now() + pg_catalog.make_interval(secs => least(3600, 5 * pg_catalog.power(2::numeric, greatest(v_row.attempts - 1, 0))::integer))
           ELSE available_at END,
         updated_at = pg_catalog.now()
     WHERE id = p_id AND lock_token = p_lock_token;
