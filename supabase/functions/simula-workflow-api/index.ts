@@ -6,6 +6,7 @@ import {
   parseWorkflowApiRoute,
   validateEnqueueWorkflowRequest,
   validateIdempotencyKey,
+  toWorkflowRunStatusDto,
   WORKFLOW_API_MAX_BODY_BYTES,
 } from "./workflow-api-contract.mjs";
 
@@ -29,7 +30,7 @@ Deno.serve(async (req: Request) => {
   if (route.resource === "cancel" && req.method !== "POST") return reply(req, 405, { ok: false, error: "method_not_allowed" });
 
   const authorization = req.headers.get("Authorization") ?? "";
-  const tokenMatch = authorization.match(/^Bearer\s+([^\s]+)$/i);
+  const tokenMatch = authorization.match(/^Bearer\\s+([^\\s]+)$/i);
   if (!tokenMatch) return reply(req, 401, { ok: false, error: "invalid_session" });
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -48,9 +49,10 @@ Deno.serve(async (req: Request) => {
 
   if (route.resource === "run") {
     // User-scoped client + RLS owner policy prevents cross-user status disclosure.
+    // Never return raw output, input, owner IDs, or internal error fields to the browser.
     const { data: run, error: readError } = await userClient
       .from("workflow_runs")
-      .select("id,workflow_id,status,output,attempt,created_at,started_at,finished_at,scheduled_for")
+      .select("id,workflow_id,status,attempt,created_at,started_at,finished_at")
       .eq("id", route.runId)
       .maybeSingle();
     if (readError) {
@@ -58,7 +60,12 @@ Deno.serve(async (req: Request) => {
       return reply(req, 500, { ok: false, error: "internal_error" });
     }
     if (!run) return reply(req, 404, { ok: false, error: "run_not_found" });
-    return reply(req, 200, { ok: true, run });
+    const safeRun = toWorkflowRunStatusDto(run);
+    if (!safeRun) {
+      console.error("workflow_run_status_projection_invalid");
+      return reply(req, 500, { ok: false, error: "internal_error" });
+    }
+    return reply(req, 200, { ok: true, run: safeRun });
   }
 
   if (route.resource === "cancel") {
