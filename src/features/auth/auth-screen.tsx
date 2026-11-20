@@ -213,7 +213,7 @@ export default function AuthScreen({ actions }: AuthScreenProps) {
         </div>
         <p className="auth-setup-note">
           Email confirmation and password recovery depend on the Supabase project’s Auth settings.
-          Password recovery UI will be enabled after its secure callback flow is implemented.
+          Password recovery uses a verified Supabase recovery event; the redirect URL must also be allow-listed in Supabase Auth settings.
         </p>
       </section>
       <aside className="auth-side" aria-label="InfiniteX platform principles">
