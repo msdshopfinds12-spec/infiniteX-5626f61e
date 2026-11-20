@@ -23,22 +23,30 @@
 
 ## Verification evidence
 
-Current PR head SHA: `02943de2cf2299e705ec1db45f23d9a22072d2c3`
+Latest full CI verification before this documentation update: commit `47932898ac4c6072302435e9a0e43679b5d73382`, GitHub Actions run #36: [44682694122](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44682694122).
 
-GitHub Actions run #30 on this exact head: [44682132729](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44682132729)
-
-- Node.js: v22.23.5; npm: 10.9.9.
-- `npm ci`: PASS — 30 packages installed from the committed lockfile.
-- `npm audit`: PASS — 0 vulnerabilities reported.
+- Node.js 22 / npm CI workflow: PASS.
+- `npm ci`: PASS.
+- `npm audit`: PASS.
 - `npm run lint`: PASS.
-- `npm test`: PASS — 58 tests, 58 passed, 0 failed.
-- `npm run build`: PASS — Vite production bundle generated.
+- `npm test`: PASS.
+- `npm run build`: PASS.
 - Build artifact uploaded to GitHub Actions artifact storage; it was not deployed.
-- The artifact is a build output only; it does not establish live authentication or production readiness.
 
 A first CI run exposed that Node test modules were included in the browser TypeScript project without Node type declarations. The application tsconfig now excludes `src/**/*.test.ts`, leaving those tests under the Node test runner.
 
-The exact current PR head has now passed the full CI workflow. This verifies the existing demo/application build and regression suite only; it does not verify a live Supabase authentication integration.
+### SDK lockfile generation experiment
+
+A temporary, read-only GitHub Actions workflow used Node.js 22 and the official npm resolver to generate a candidate manifest/lockfile artifact for `@supabase/supabase-js`.
+
+- Resolved SDK version: `2.119.2`.
+- `npm ci --ignore-scripts`: PASS.
+- `npm audit`: PASS — 0 vulnerabilities reported.
+- Artifact: [workflow run #3](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44682539105), artifact ID `14604862693`.
+
+The temporary workflow was removed and the repository's `package.json` was restored so the committed package manifest and lockfile remain synchronized. The generated candidate lockfile is not committed. This experiment proves npm can resolve and install the SDK in CI; it does not complete the SDK integration or replace the repository lockfile.
+
+These checks verify the existing application build and regression suite, not live Supabase authentication or production readiness.
 
 ## P1 integration blocker
 
