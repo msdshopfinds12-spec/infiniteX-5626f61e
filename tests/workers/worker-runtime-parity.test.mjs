@@ -37,8 +37,8 @@ for (const [name, path] of [
     assert.ok(stepGenerationGuards >= 1, "step failure must match the claimed generation");
     assert.match(source, /simula_complete_step_with_outbox/);
     assert.match(source, /p_attempt:\s*stepAttempt/);
-    assert.doesNotMatch(source, /\.update\(\{[\s\S]{0,180}?status:\s*["\x27]succeeded/,
-      "successful step completion must use the transactional RPC, not a direct update");
+    assert.doesNotMatch(source, /\.from\(["']workflow_step_runs["']\)[\s\S]{0,220}?\.update\(\{[\s\S]{0,120}?status:\s*["']succeeded/,
+      "successful step completion must use the transactional RPC, not a direct step update");
     assert.ok(runGenerationGuards >= 2, "run completion/failure must match the claimed generation");
     assert.match(source, /workflow_step_attempt_superseded/);
     assert.match(source, /workflow_run_attempt_superseded/);
