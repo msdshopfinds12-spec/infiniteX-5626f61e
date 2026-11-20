@@ -199,3 +199,57 @@ Do not resolve conflicts by choosing one entire branch side. Review semantic own
 This phase is a decomposition plan and inventory only. It does not copy or rewrite the 106 source files, modify PR #77, run migrations, access Supabase, change secrets/grants/RLS/cron, merge PRs, or deploy.
 
 **Phase 64 result: INVENTORY PASS; EXTRACTION NOT STARTED.** The next implementation action is Slice A exact-byte extraction, followed by its own integrity CI.
+
+## 9. Cross-cutting E assignment — completed
+
+The 25 Group E paths have now been assigned exactly once to their owning slices and extracted with exact source/destination Git blob SHA equality.
+
+### E → A — migration provenance and recovery (7 paths)
+
+- `docs/database/PHASE-4N10-GITHUB-EVIDENCE-AND-RECOVERY-REPORT.md`
+- `docs/database/PHASE-4N16-MIGRATION-INTEGRITY-DEEP-FIX.md`
+- `docs/database/PHASE-4N17-CROSS-BRANCH-ARTIFACT-PROVENANCE.md`
+- `docs/database/PHASE-4N18-CI-SOURCE-READINESS-CLASSIFICATION.md`
+- `docs/database/PHASE-4N20-LIVE-LEDGER-RECOVERY.md`
+- `docs/database/PHASE-52.1I-HISTORICAL-SOURCE-RECOVERY.json`
+- `docs/database/PHASE-52.1I-HISTORICAL-SOURCE-RECOVERY.md`
+
+Destination: PR #96 / `engineering/phase-64a-migration-provenance`.
+
+### E → B — disposable replay and security (8 paths)
+
+- `docs/database/PHASE-52.1J-CANONICAL-BOOTSTRAP-INVESTIGATION.json`
+- `docs/database/PHASE-52.1J-CANONICAL-BOOTSTRAP-INVESTIGATION.md`
+- `docs/database/PHASE-52.1N-DISPOSABLE-CI-EVIDENCE.json`
+- `docs/database/PHASE-52.1N-DISPOSABLE-CI-EVIDENCE.md`
+- `tests/database/phase-52-1b-postgres-security.sql`
+- `tests/database/phase-52-1b-postgres-security.test.mjs`
+- `tests/database/phase-52-1c-migration-rehearsal.test.mjs`
+- `tests/database/phase-52-1c-platform-bootstrap.sql`
+
+Destination: PR #97 / `engineering/phase-64b-disposable-replay`.
+
+### E → C — schema contract and catalog evidence (10 paths)
+
+- `docs/database/PHASE-4N14-CONTRACT-VALIDATOR-HARDENING.md`
+- `docs/database/PHASE-52.1F-SCHEMA-RECONCILIATION.json`
+- `docs/database/PHASE-52.1F-SCHEMA-RECONCILIATION.md`
+- `docs/database/PHASE-52.1G-SCHEMA-DIFF.json`
+- `docs/database/PHASE-52.1O-ROUTINE-METADATA-CI-EVIDENCE.json`
+- `docs/database/PHASE-52.1O-ROUTINE-METADATA-CI-EVIDENCE.md`
+- `docs/database/SCHEMA-PROVENANCE.md`
+- `supabase/contracts/README.md`
+- `tests/database/catalog-capture-readonly.test.mjs`
+- `tests/database/platform-api-key-column-grants.test.mjs`
+
+Destination: PR #98 / `engineering/phase-64c-schema-contract-v2`.
+
+### Boundary notes
+
+- The original 16-path C inventory includes `live-schema-metadata.snapshot.json`; it was extracted with B as an explicit C dependency and is inherited unchanged by C. It is not a second E artifact.
+- `.github/workflows/phase-64b-disposable-replay.yml` is a newly authored B-slice CI workflow, not one of the 106 source paths.
+- The 19-path D inventory is independent and remains in PR #99.
+- No E artifact is a standalone merge unit. All 25 have an owner and exact extraction evidence.
+
+**E assignment result: 25/25 assigned exactly once; no unassigned source paths remain.**
+
