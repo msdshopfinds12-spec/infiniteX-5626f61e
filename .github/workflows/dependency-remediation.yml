@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: phase-54-dependency-remediation-${{ github.ref }}
@@ -73,6 +73,19 @@ jobs:
 
       - name: Verify production entry point
         run: test -s dist/index.html
+
+      - name: Commit verified patched dependency manifests
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "Dependency manifests already match the verified target; no commit required."
+          else
+            git commit -m "fix(security): upgrade Vite toolchain and lock patched dependencies"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
 
       - name: Upload generated manifests and verification evidence
         if: always()
