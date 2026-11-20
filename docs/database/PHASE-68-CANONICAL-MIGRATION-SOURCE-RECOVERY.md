@@ -2,7 +2,7 @@
 
 **Source branch:** `engineering/phase-64c-schema-contract-v2`  
 **Target branch:** `engineering/infinitex-canonical-integration-candidate`  
-**Status:** Ledger-recovered migration artifacts restored to candidate; candidate-head replay pending.
+**Status:** Ledger-recovered artifacts restored; disposable PostgreSQL replay, concurrency contract, and candidate quality gates PASS on commit `37863d751532e8293a0a4f69c9fb16d1a7b7c278`.
 
 ## Recovery finding
 
@@ -31,3 +31,14 @@ The candidate-specific workflow `.github/workflows/infinitex-phase-68-database-r
 - Never apply recovered SQL to production as a repair; these statements are already represented in the live ledger.
 - Never promote the reconstructed fixture to a migration.
 - No hosted DDL/DML, secrets, cron, grants, billing, deployment, or merge changes are authorized by this phase.
+
+## Exact candidate-head CI evidence
+
+- [Push disposable replay, row-lock concurrency, lease recovery, generation fencing, and security suite — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795384056)
+- [PR disposable replay, row-lock concurrency, lease recovery, generation fencing, and security suite — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795393676)
+- [Push candidate quality gates — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795384077)
+- [PR candidate quality gates — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795393670)
+
+The concurrency test runs only against the isolated PostgreSQL 17 replay database with synthetic rows. It deliberately holds the oldest queue row in one database session, verifies a separate service-role claim skips that row, then verifies the released row can be claimed at a distinct attempt generation. It also verifies 15-minute lease recovery, terminal failure at attempt 5, unique step-run identity, and stale-generation terminal update rejection.
+
+This is real database-session evidence, but not a high-volume stress test or proof of deployed Edge Function behavior.
