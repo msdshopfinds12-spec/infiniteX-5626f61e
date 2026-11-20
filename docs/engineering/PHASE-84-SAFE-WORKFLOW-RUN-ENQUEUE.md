@@ -78,3 +78,13 @@ The Phase 84 disposable CI test verifies:
 ## Next phase
 
 Phase 85 should wire a browser workflow-run service and UI state to this endpoint, then verify worker dispatch and eventual run-history updates. The UI must distinguish `queued`, `running`, `succeeded`, and `failed`, and must not show success until persisted worker results are read back.
+
+## Phase 85 UI follow-on (separate draft candidate)
+
+The Phase 85 branch adds a typed browser adapter and gated queue form:
+- Browser code invokes only the authenticated `simula-workflow-run-request` Edge Function.
+- Queue UI generates an idempotency UUID and reuses it for uncertain retries.
+- Accepted requests refresh safe run history.
+- The UI distinguishes queued from executed; worker execution is not claimed.
+- `VITE_WORKFLOW_RUN_ENQUEUE_ENABLED` defaults to disabled. The browser service is constructed only when an operator explicitly sets it to `true` after the migration and Edge Function are deployed and verified in the target environment.
+- No live migration, function deployment, flag activation, merge, or production release is included.

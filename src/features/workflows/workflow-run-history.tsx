@@ -12,6 +12,7 @@ type Props = Readonly<{
   workflowId: string;
   userId: string;
   identityEpoch: number;
+  refreshToken?: number;
 }>;
 
 function formatTime(value: string | null): string {
@@ -26,6 +27,7 @@ export default function WorkflowRunHistory({
   workflowId,
   userId,
   identityEpoch,
+  refreshToken = 0,
 }: Props) {
   const requestKey = [userId, identityEpoch, workflowId].join(":");
   const [retryCount, setRetryCount] = useState(0);
@@ -53,7 +55,7 @@ export default function WorkflowRunHistory({
     });
 
     return () => { active = false; };
-  }, [service, requestKey, workflowId, retryCount]);
+  }, [service, requestKey, workflowId, retryCount, refreshToken]);
 
   const currentState = state.key === requestKey
     ? state

@@ -7,6 +7,7 @@ const root = new URL("../src/", import.meta.url);
 const allowedPublicVariables = new Set([
   "VITE_SUPABASE_URL",
   "VITE_SUPABASE_PUBLISHABLE_KEY",
+  "VITE_WORKFLOW_RUN_ENQUEUE_ENABLED",
 ]);
 
 async function collectSourceFiles(directory) {
@@ -20,7 +21,7 @@ async function collectSourceFiles(directory) {
   return files;
 }
 
-test("browser source references only approved public Supabase environment variables", async () => {
+test("browser source references only explicitly approved public environment variables", async () => {
   const files = await collectSourceFiles(root.pathname);
   const violations = [];
 

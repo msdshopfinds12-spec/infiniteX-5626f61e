@@ -15,6 +15,7 @@ import type { ViewKey } from "./types";
 import type { AuthState } from "./features/auth/auth-state";
 import WorkflowList from "./features/workflows/workflow-list";
 import type { WorkflowReadService } from "./features/workflows/workflow-read-service";
+import type { WorkflowRunService } from "./features/workflows/workflow-run-service";
 import ProfileSummary from "./features/profile/profile-summary";
 import type { ProfileReadService } from "./features/profile/profile-read-service";
 import ProjectList from "./features/projects/project-list";
@@ -25,6 +26,7 @@ type AppProps = Readonly<{
   authActions?: AuthActions;
   recoveryMode?: boolean;
   workflowReadService?: WorkflowReadService | null;
+  workflowRunService?: WorkflowRunService | null;
   profileReadService?: ProfileReadService | null;
   projectReadService?: ProjectReadService | null;
 }>;
@@ -34,6 +36,7 @@ export default function App({
   authActions,
   recoveryMode = false,
   workflowReadService = null,
+  workflowRunService = null,
   profileReadService = null,
   projectReadService = null,
 }: AppProps) {
@@ -122,11 +125,13 @@ export default function App({
             )}
             {signOutError && <p className="auth-inline-error" role="alert">{signOutError}</p>}
             <div className="demo-notice" role="status">
-              <strong>{authState.status === "authenticated" && (workflowReadService || projectReadService || profileReadService) ? "READ-ONLY INTEGRATION" : "DEMO MODE"}</strong>
+              <strong>{authState.status === "authenticated" && workflowRunService ? "WORKFLOW QUEUE ENABLED" : authState.status === "authenticated" && (workflowReadService || projectReadService || profileReadService) ? "READ-ONLY INTEGRATION" : "DEMO MODE"}</strong>
               <span>
-                {authState.status === "authenticated" && (workflowReadService || projectReadService || profileReadService)
-                  ? "Available workflow, project, and profile services use authenticated read-only Supabase queries protected by database RLS. Project content is not loaded; overview metrics, agents, sample logs, and security posture remain demo or unverified."
-                  : "Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified."}
+                {authState.status === "authenticated" && workflowRunService
+                  ? "Workflow, project, and profile reads use authenticated Supabase queries protected by database RLS. Workflow requests use a server-side enqueue boundary; a queued response does not prove worker execution. Worker dispatch, AI agents, overview metrics, sample logs, and security posture remain unverified."
+                  : authState.status === "authenticated" && (workflowReadService || projectReadService || profileReadService)
+                    ? "Available workflow, project, and profile services use authenticated read-only Supabase queries protected by database RLS. Workflow queueing is disabled until the Phase 84 migration and Edge Function are explicitly deployed and verified. Project content is not loaded; overview metrics, agents, sample logs, and security posture remain demo or unverified."
+                    : "Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified."}
               </span>
             </div>
             {view === "overview" && (
@@ -197,6 +202,7 @@ export default function App({
                 {authState.status === "authenticated" ? (
                   <WorkflowList
                     service={workflowReadService}
+                    runService={workflowRunService}
                     userId={authState.userId}
                     identityEpoch={authState.identityEpoch}
                     searchTerm={query}
