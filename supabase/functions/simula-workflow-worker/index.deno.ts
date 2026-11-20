@@ -416,3 +416,66 @@ Deno.test("authenticated worker rejects a claimed run owned by another user with
   assert(actions === 0, "owner mismatch must never execute workflow actions");
   assert(db.tables.workflow_step_runs.length === 0, "owner mismatch must not persist step execution");
 });
+
+
+Deno.test("authenticated worker cannot commit a step after a newer generation takes over mid-execution", async () => {
+  const db = new StatefulDatabase();
+  let actionCalls = 0;
+  const handler = createAuthenticatedWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    corsHeadersForRequest: cors,
+    executeSafeAction: (async (actionType: string, input: unknown, config: Record<string, unknown>) => {
+      actionCalls++;
+      // Simulate lease expiry/reclaim while the old action is still in flight.
+      db.tables.workflow_runs[0].attempt = 2;
+      db.tables.workflow_runs[0].status = "running";
+      db.tables.workflow_step_runs[0].attempt = 2;
+      db.tables.workflow_step_runs[0].status = "running";
+      return transformAction(actionType, input, config);
+    }) as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST", headers: { Authorization: "Bearer valid-token" }, body: "{}",
+  }));
+  const body = await response.json();
+  assert(response.status === 200, "mid-flight supersession is a safe batch outcome");
+  assert(body.superseded === 1 && body.succeeded === 0, "old generation must be marked superseded");
+  assert(actionCalls === 1, "old generation must stop before executing later steps");
+  assert(db.tables.workflow_runs[0].attempt === 2 && db.tables.workflow_runs[0].status === "running",
+    "newer run generation must remain authoritative");
+  assert(db.tables.workflow_step_runs[0].attempt === 2 && db.tables.workflow_step_runs[0].status === "running",
+    "newer step generation must not be overwritten by stale completion");
+  assert(db.tables.workflow_logs.length === 0, "stale generation must not write success logs");
+});
+
+Deno.test("cron worker cannot commit a step after a newer generation takes over mid-execution", async () => {
+  const db = new StatefulDatabase();
+  let actionCalls = 0;
+  const handler = createCronWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    executeSafeAction: (async (actionType: string, input: unknown, config: Record<string, unknown>) => {
+      actionCalls++;
+      db.tables.workflow_runs[0].attempt = 2;
+      db.tables.workflow_runs[0].status = "running";
+      db.tables.workflow_step_runs[0].attempt = 2;
+      db.tables.workflow_step_runs[0].status = "running";
+      return transformAction(actionType, input, config);
+    }) as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST", headers: { "x-simula-worker-secret": "s".repeat(40) }, body: "{}",
+  }));
+  const body = await response.json();
+  assert(response.status === 200, "mid-flight supersession is a safe batch outcome");
+  assert(body.superseded === 1 && body.succeeded === 0, "old cron generation must be marked superseded");
+  assert(actionCalls === 1, "old cron generation must stop before executing later steps");
+  assert(db.tables.workflow_runs[0].attempt === 2 && db.tables.workflow_runs[0].status === "running",
+    "newer cron run generation must remain authoritative");
+  assert(db.tables.workflow_step_runs[0].attempt === 2 && db.tables.workflow_step_runs[0].status === "running",
+    "newer cron step generation must not be overwritten by stale completion");
+  assert(db.tables.workflow_logs.length === 0, "stale cron generation must not write success logs");
+});
