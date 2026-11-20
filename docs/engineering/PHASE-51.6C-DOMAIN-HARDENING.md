@@ -7,7 +7,7 @@
 
 ### Immutable output snapshots
 - Successful output is restricted to JSON-compatible values.
-- Output is copied into a detached snapshot and recursively frozen before it is attached to a terminal attempt.
+- Output is copied into a detached snapshot and recursively frozen before it is attached to a terminal attempt. Attempt records returned by domain transitions are also runtime-frozen at the top level.
 - Accessors are rejected without invoking getters.
 - Functions, symbols, bigint, undefined, non-finite numbers, exotic prototypes, cycles, sparse arrays, symbol keys, and non-enumerable/accessor properties fail closed.
 - Resource limits bound nesting depth, node count, and serialized character count.
@@ -55,7 +55,7 @@ No production migration or database mutation is part of this phase.
 
 ## Acceptance status
 
-- [x] Domain output snapshot implementation
+- [x] Domain output snapshot implementation\n- [x] Runtime-frozen attempt records
 - [x] Canonical retry key derivation
 - [x] Lifecycle timestamp monotonicity
 - [x] Adversarial unit regression cases authored
