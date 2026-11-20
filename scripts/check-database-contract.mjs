@@ -43,10 +43,21 @@ else{
  if(Array.isArray(s.capture.scopeSchemas))for(const x of ['public','private'])if(!s.capture.scopeSchemas.includes(x))errors.push('capture.scopeSchemas missing '+x+'.');
 }
 named(s.schemas,'schemas',['name'],[['owner','string']]);
+const declaredScopeSchemas=new Set(Array.isArray(s.capture?.scopeSchemas)?s.capture.scopeSchemas:[]);
 if(Array.isArray(s.schemas)){
  const capturedSchemaNames=new Set(s.schemas.filter(obj).map(schema=>schema.name));
  for(const requiredSchema of ['public','private']){
   if(!capturedSchemaNames.has(requiredSchema))errors.push('schemas missing required captured schema: '+requiredSchema+'.');
+ }
+ for(const schema of s.schemas.filter(obj)){
+  if(!declaredScopeSchemas.has(schema.name))errors.push('schemas contains record outside capture.scopeSchemas: '+schema.name+'.');
+ }
+}
+for(const [collection,field] of [['tables','schema'],['functions','schema'],['types','schema_name']]){
+ if(Array.isArray(s[collection]))for(const [i,entry] of s[collection].entries()){
+  if(obj(entry)&&typeof entry[field]==='string'&&!declaredScopeSchemas.has(entry[field])){
+   errors.push(collection+'['+i+'].'+field+' is outside capture.scopeSchemas: '+entry[field]+'.');
+  }
  }
 }
 if(arr(s.schemas,'schemas'))for(const [i,schema] of s.schemas.entries()){
