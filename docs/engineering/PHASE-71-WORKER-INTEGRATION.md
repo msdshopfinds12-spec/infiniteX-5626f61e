@@ -9,6 +9,7 @@ This phase extracts the authentication/privilege boundary from the two Deno work
 - `worker-auth-boundary.mjs`: dependency-injected bearer and cron authentication boundaries.
 - `worker-auth-boundary.test.mjs`: executable Node tests using fake environment providers and mock Supabase clients.
 - Authenticated worker delegates bearer parsing, environment validation, and `auth.getUser` to the boundary.
+- Both worker entrypoints now export injectable `createAuthenticatedWorkerHandler` / `createCronWorkerHandler` factories; Deno serving is restricted to `import.meta.main` startup.
 - Cron worker delegates secret validation and `simula_verify_worker_secret` to the boundary.
 - Bearer parsing trims HTTP optional whitespace and requires exactly one non-whitespace token; malformed schemes and multi-token values are rejected.
 - A regression was found during code review: the initial parser regex was double-escaped. It has been corrected and malformed-header cases were added to the test suite.
@@ -28,6 +29,7 @@ This phase extracts the authentication/privilege boundary from the two Deno work
 Run:
 
 ```sh
+deno test --no-check supabase/functions/simula-workflow-worker/index.test.ts
 npm run test:worker-http-boundary
 npm run test:workers
 npm run test:edge-function-security
