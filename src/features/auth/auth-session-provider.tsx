@@ -19,13 +19,14 @@ import type { AuthActions } from "./auth-actions.ts";
 export type AuthSessionAdapter = AuthActions & Readonly<{
   getSession: () => Promise<AuthSessionIdentity | null>;
   onAuthStateChange: (
-    listener: (session: AuthSessionIdentity | null) => void,
+    listener: (session: AuthSessionIdentity | null, event?: string) => void,
   ) => () => void;
 }>;
 
 type AuthContextValue = Readonly<{
   state: AuthState;
   actions: AuthActions;
+  recoveryMode: boolean;
 }>;
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -45,6 +46,7 @@ export function AuthSessionProvider({
 }: AuthSessionProviderProps) {
   const coordinator = useMemo(() => createAuthSessionCoordinator(), [adapter]);
   const [state, setState] = useState<AuthState>(() => coordinator.getState());
+  const [recoveryMode, setRecoveryMode] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -54,8 +56,10 @@ export function AuthSessionProvider({
     let unsubscribe: (() => void) | undefined;
 
     try {
-      unsubscribe = adapter.onAuthStateChange((session) => {
+      unsubscribe = adapter.onAuthStateChange((session, event) => {
         if (!active) return;
+        if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
+        if (event === "SIGNED_OUT" || event === "USER_UPDATED") setRecoveryMode(false);
         setState(coordinator.applyAuthEvent(session));
       });
     } catch {
@@ -87,8 +91,8 @@ export function AuthSessionProvider({
   }, [adapter, coordinator]);
 
   const contextValue = useMemo(
-    () => ({ state, actions: adapter }),
-    [state, adapter],
+    () => ({ state, actions: adapter, recoveryMode }),
+    [state, adapter, recoveryMode],
   );
 
   return (
@@ -114,4 +118,9 @@ export function useAuthState(): AuthState {
 /** Explicit auth actions; no credentials are persisted by this hook. */
 export function useAuthActions(): AuthActions {
   return useAuthContext().actions;
+}
+
+/** True only after the SDK confirms a PASSWORD_RECOVERY auth event. */
+export function useAuthRecoveryMode(): boolean {
+  return useAuthContext().recoveryMode;
 }
