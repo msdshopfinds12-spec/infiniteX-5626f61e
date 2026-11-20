@@ -587,6 +587,8 @@ Deno.test("shared completion helper fails closed for RPC errors, thrown errors, 
       { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 1, output: {} }),
     () => completeWorkflowStepWithOutbox(async () => ({ data: [{ outbox_id: null }], error: null }),
       { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 1, output: {} }),
+    () => completeWorkflowStepWithOutbox(async () => undefined as never,
+      { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 1, output: {} }),
   ];
   const messages: string[] = [];
   for (const failure of failures) {
@@ -594,9 +596,10 @@ Deno.test("shared completion helper fails closed for RPC errors, thrown errors, 
       messages.push(error instanceof Error ? error.message : "unknown");
     }
   }
-  assert(messages.length === 3, "all invalid completion paths must reject");
+  assert(messages.length === 4, "all invalid completion paths must reject");
   assert(messages[0] === "step_run_finish_failed" && messages[1] === "step_run_finish_failed",
     "database and transport errors must be sanitized");
   assert(messages[2] === "workflow_step_attempt_superseded",
     "missing completion identity must fail as superseded");
+  assert(messages[3] === "step_run_finish_failed", "malformed RPC envelopes must fail with a sanitized error");
 });
