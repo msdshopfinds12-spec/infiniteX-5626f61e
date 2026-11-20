@@ -18,31 +18,67 @@ try {
 }
 
 const errors = [];
+const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+if (!isRecord(snapshot)) {
+  console.error('Database contract snapshot INVALID: root must be a JSON object.');
+  process.exit(1);
+}
+
 if (snapshot.schemaVersion !== 1) errors.push('schemaVersion must equal 1.');
-if (!snapshot.capturedAt || Number.isNaN(Date.parse(snapshot.capturedAt))) errors.push('capturedAt must be a valid ISO-8601 timestamp.');
-if (!snapshot.source || typeof snapshot.source !== 'string') errors.push('source must identify the capture provenance.');
+if (typeof snapshot.capturedAt !== 'string' || !snapshot.capturedAt || Number.isNaN(Date.parse(snapshot.capturedAt))) {
+  errors.push('capturedAt must be a valid ISO-8601 timestamp.');
+}
+if (typeof snapshot.source !== 'string' || !snapshot.source.trim()) errors.push('source must identify the capture provenance.');
 if (!Array.isArray(snapshot.tables)) errors.push('tables must be an array.');
 if (!Array.isArray(snapshot.functions)) errors.push('functions must be an array.');
 
 const tableNames = new Set();
-for (const table of snapshot.tables ?? []) {
-  const key = `${table.schema}.${table.name}`;
-  if (!table.schema || !table.name) errors.push('Every table requires schema and name.');
-  if (tableNames.has(key)) errors.push(`Duplicate table entry: ${key}.`);
-  tableNames.add(key);
-  if (typeof table.rlsEnabled !== 'boolean') errors.push(`${key}: rlsEnabled must be boolean.`);
-  if (!Array.isArray(table.policies)) errors.push(`${key}: policies must be an array (empty is valid).`);
+if (Array.isArray(snapshot.tables)) {
+  for (const [index, table] of snapshot.tables.entries()) {
+    if (!isRecord(table)) {
+      errors.push(`tables[${index}] must be a JSON object.`);
+      continue;
+    }
+    const validIdentity = typeof table.schema === 'string' && table.schema.trim()
+      && typeof table.name === 'string' && table.name.trim();
+    if (!validIdentity) errors.push(`tables[${index}] requires non-empty string schema and name.`);
+    const key = validIdentity ? `${table.schema}.${table.name}` : `tables[${index}]`;
+    if (validIdentity && tableNames.has(key)) errors.push(`Duplicate table entry: ${key}.`);
+    if (validIdentity) tableNames.add(key);
+    if (typeof table.rlsEnabled !== 'boolean') errors.push(`${key}: rlsEnabled must be boolean.`);
+    if (!Array.isArray(table.policies)) errors.push(`${key}: policies must be an array (empty is valid).`);
+  }
 }
 
 const functionKeys = new Set();
-for (const fn of snapshot.functions ?? []) {
-  const key = `${fn.schema}.${fn.name}(${fn.identityArguments ?? ''})`;
-  if (!fn.schema || !fn.name) errors.push('Every function requires schema and name.');
-  if (functionKeys.has(key)) errors.push(`Duplicate function overload: ${key}.`);
-  functionKeys.add(key);
-  if (typeof fn.securityDefiner !== 'boolean') errors.push(`${key}: securityDefiner must be boolean.`);
-  if (!Array.isArray(fn.executeRoles)) errors.push(`${key}: executeRoles must be an array.`);
-  if (fn.securityDefiner && !Object.hasOwn(fn, 'searchPath')) errors.push(`${key}: SECURITY DEFINER function must record searchPath (use empty string when unset).`);
+if (Array.isArray(snapshot.functions)) {
+  for (const [index, fn] of snapshot.functions.entries()) {
+    if (!isRecord(fn)) {
+      errors.push(`functions[${index}] must be a JSON object.`);
+      continue;
+    }
+    const validIdentity = typeof fn.schema === 'string' && fn.schema.trim()
+      && typeof fn.name === 'string' && fn.name.trim();
+    if (!validIdentity) errors.push(`functions[${index}] requires non-empty string schema and name.`);
+    if (fn.identityArguments !== undefined && typeof fn.identityArguments !== 'string') {
+      errors.push(`functions[${index}].identityArguments must be a string when provided.`);
+    }
+    const key = validIdentity
+      ? `${fn.schema}.${fn.name}(${typeof fn.identityArguments === 'string' ? fn.identityArguments : ''})`
+      : `functions[${index}]`;
+    if (validIdentity && functionKeys.has(key)) errors.push(`Duplicate function overload: ${key}.`);
+    if (validIdentity) functionKeys.add(key);
+    if (typeof fn.securityDefiner !== 'boolean') errors.push(`${key}: securityDefiner must be boolean.`);
+    if (!Array.isArray(fn.executeRoles) || fn.executeRoles.some((role) => typeof role !== 'string' || !role.trim())) {
+      errors.push(`${key}: executeRoles must be an array of non-empty role names.`);
+    }
+    if (fn.securityDefiner && !Object.hasOwn(fn, 'searchPath')) {
+      errors.push(`${key}: SECURITY DEFINER function must record searchPath (use empty string when unset).`);
+    }
+    if (Object.hasOwn(fn, 'searchPath') && typeof fn.searchPath !== 'string') {
+      errors.push(`${key}: searchPath must be a string.`);
+    }
+  }
 }
 
 if (errors.length) {
