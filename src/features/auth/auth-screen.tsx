@@ -1,13 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Eye, EyeOff, Fingerprint, LockKeyhole, Mail, ShieldCheck, Zap } from "lucide-react";
 import type { AuthActions, AuthActionResult } from "./auth-actions.ts";
-import { normalizeEmail, validateEmail, validatePassword } from "./auth-actions.ts";
+import { createPasswordRecoveryRedirect, normalizeEmail, validateEmail, validatePassword } from "./auth-actions.ts";
 
 type AuthScreenProps = Readonly<{
   actions: AuthActions;
 }>;
 
-type Mode = "sign-in" | "sign-up";
+type Mode = "sign-in" | "sign-up" | "forgot-password";
 
 function resultMessage(result: AuthActionResult): string {
   if (result.status === "success") return result.message;
@@ -29,7 +29,9 @@ export default function AuthScreen({ actions }: AuthScreenProps) {
 
     const normalizedEmail = normalizeEmail(email);
     const emailError = validateEmail(normalizedEmail);
-    const passwordError = validatePassword(password, mode === "sign-up" ? 8 : 1);
+    const passwordError = mode === "forgot-password"
+      ? null
+      : validatePassword(password, mode === "sign-up" ? 8 : 1);
     const validationError = emailError ?? passwordError;
     if (validationError) {
       setFeedback({ kind: "error", message: validationError });
@@ -43,14 +45,19 @@ export default function AuthScreen({ actions }: AuthScreenProps) {
     setBusy(true);
     setFeedback(null);
     try {
-      const result = mode === "sign-in"
-        ? await actions.signIn(normalizedEmail, password)
-        : await actions.signUp(normalizedEmail, password);
+      const result = mode === "forgot-password"
+        ? await actions.requestPasswordReset(
+            normalizedEmail,
+            createPasswordRecoveryRedirect(window.location.origin),
+          )
+        : mode === "sign-in"
+          ? await actions.signIn(normalizedEmail, password)
+          : await actions.signUp(normalizedEmail, password);
       setFeedback({
         kind: result.status === "success" ? "success" : "error",
         message: resultMessage(result),
       });
-      if (result.status === "success" && mode === "sign-up") {
+      if (result.status === "success" && mode !== "sign-in") {
         setPassword("");
         setConfirmPassword("");
       }
@@ -74,15 +81,17 @@ export default function AuthScreen({ actions }: AuthScreenProps) {
 
         <div className="auth-hero">
           <div className="auth-eyebrow"><ShieldCheck size={14} /> SECURE WORKSPACE ACCESS</div>
-          <h1 id="auth-title">{mode === "sign-in" ? "Welcome back." : "Build without limits."}</h1>
+          <h1 id="auth-title">{mode === "sign-in" ? "Welcome back." : mode === "sign-up" ? "Build without limits." : "Reset your password."}</h1>
           <p>
             {mode === "sign-in"
               ? "Sign in to continue to your InfiniteX engineering workspace."
-              : "Create your account to start setting up your engineering workspace."}
+              : mode === "sign-up"
+                ? "Create your account to start setting up your engineering workspace."
+                : "Enter your account email and we will send a secure recovery link if an account exists."}
           </p>
         </div>
 
-        <div className="auth-tabs" role="tablist" aria-label="Authentication method">
+        {mode !== "forgot-password" && <div className="auth-tabs" role="tablist" aria-label="Authentication method">
           <button
             type="button"
             role="tab"
@@ -101,7 +110,7 @@ export default function AuthScreen({ actions }: AuthScreenProps) {
           >
             Create account
           </button>
-        </div>
+        </div>}
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <label className="auth-label" htmlFor="auth-email">Email address</label>
@@ -124,6 +133,7 @@ export default function AuthScreen({ actions }: AuthScreenProps) {
             />
           </div>
 
+          {mode !== "forgot-password" && <>
           <label className="auth-label" htmlFor="auth-password">Password</label>
           <div className="auth-input-wrap">
             <LockKeyhole size={17} aria-hidden="true" />
@@ -173,6 +183,13 @@ export default function AuthScreen({ actions }: AuthScreenProps) {
             </>
           )}
 
+          {mode === "sign-in" && (
+            <button className="auth-recovery-link" type="button" onClick={() => { setMode("forgot-password"); setFeedback(null); }}>
+              Forgot password?
+            </button>
+          )}
+          </>}
+
           {feedback && (
             <div className={`auth-feedback ${feedback.kind}`} role={feedback.kind === "error" ? "alert" : "status"}>
               {feedback.message}
@@ -180,10 +197,15 @@ export default function AuthScreen({ actions }: AuthScreenProps) {
           )}
 
           <button className="auth-submit" type="submit" disabled={busy}>
-            {busy ? "Please wait…" : mode === "sign-in" ? "Sign in securely" : "Create account"}
+            {busy ? "Please wait…" : mode === "sign-in" ? "Sign in securely" : mode === "sign-up" ? "Create account" : "Send recovery link"}
             {!busy && <ArrowRight size={17} aria-hidden="true" />}
           </button>
         </form>
+        {mode === "forgot-password" && (
+          <button className="auth-recovery-link" type="button" onClick={() => { setMode("sign-in"); setFeedback(null); }}>
+            Back to sign in
+          </button>
+        )}
 
         <div className="auth-footnote">
           <LockKeyhole size={13} aria-hidden="true" />
