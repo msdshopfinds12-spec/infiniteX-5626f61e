@@ -97,7 +97,7 @@ Deno test to fail closed.
 When the readiness variable is absent or false, CI records **NOT RUN** in the
 GitHub Actions step summary. A successful source/build job in that mode is not
 evidence of database concurrency correctness. The configured endpoint must be a
-dedicated disposable test project, never the production Supabase project.
+local loopback Supabase stack only; all remote project endpoints are rejected.
 Fixture provisioning, teardown automation, and proof that the endpoint is isolated
 remain release gates.
 
