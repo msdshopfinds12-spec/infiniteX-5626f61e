@@ -28,6 +28,7 @@ export default function WorkflowList({
     key: "",
     status: "loading",
   });
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -48,7 +49,7 @@ export default function WorkflowList({
     });
 
     return () => { active = false; };
-  }, [service, requestKey]);
+  }, [service, requestKey, retryCount]);
 
   const currentState = state.key === requestKey
     ? state
@@ -60,9 +61,12 @@ export default function WorkflowList({
 
   if (currentState.status === "error") {
     return (
-      <p className="workflow-state-error" role="alert">
-        Your workflows could not be loaded. Check your connection and try again. ({currentState.code})
-      </p>
+      <div className="workflow-state-error" role="alert">
+        <p>Your workflows could not be loaded. The request failed safely ({currentState.code}).</p>
+        <button className="btn btn-ghost" type="button" onClick={() => setRetryCount((count) => count + 1)}>
+          Retry
+        </button>
+      </div>
     );
   }
 
