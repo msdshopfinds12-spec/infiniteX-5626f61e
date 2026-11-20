@@ -64,7 +64,7 @@ jobs:
         run: node --test tests/database/platform-api-key-column-grants.test.mjs
       - name: Run Phase 52.1B PostgreSQL harness guard tests
         run: node --test tests/database/phase-52-1b-postgres-security.test.mjs
-      - name: Run Phase 52.1C migration rehearsal regression tests
+      - name: Run Phase 52.1C and 52.1D migration rehearsal regression tests
         run: node --test tests/database/phase-52-1c-migration-rehearsal.test.mjs
       - name: Run migration integrity regression tests
         run: node --test tests/database/check-migration-integrity.test.mjs
@@ -229,7 +229,10 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Start isolated Supabase PostgreSQL 17 container with scheduled jobs disabled
+        shell: bash
         run: |
+          # Match the Supabase image's supported key-script configuration.
+          # Its bundled script creates a fresh disposable root key file when absent.
           docker run -d --name infinitex-rehearsal-db \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_USER=supabase_admin \
@@ -237,7 +240,9 @@ jobs:
             -p 5432:5432 \
             supabase/postgres:17.6.1.136 \
             postgres -c config_file=/etc/postgresql/postgresql.conf \
-              -c shared_preload_libraries=pg_cron \
+              -c shared_preload_libraries=pg_stat_statements,pgaudit,plpgsql,plpgsql_check,pg_cron,pg_net,pgsodium,auto_explain,pg_tle,plan_filter,supabase_vault \
+              -c pgsodium.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
+              -c vault.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
               -c cron.database_name=infinitex_rehearsal \
               -c cron.launch_active_jobs=off
           for attempt in $(seq 1 60); do
@@ -256,16 +261,7 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: infinitex_rehearsal
         shell: bash
-        run: |
-          set +e
-          node scripts/rehearse-migration-chain.mjs
-          status=$?
-          set -e
-          if [ "$status" -eq 2 ]; then
-            echo "::warning::Migration replay BLOCKED by missing authoritative platform or application baseline. See report; no schema was fabricated."
-            exit 0
-          fi
-          exit "$status"
+        run: node scripts/rehearse-migration-chain.mjs
       - name: Collect disposable database container logs
         if: always()
         run: docker logs infinitex-rehearsal-db 2>&1 | tail -n 200 || true
