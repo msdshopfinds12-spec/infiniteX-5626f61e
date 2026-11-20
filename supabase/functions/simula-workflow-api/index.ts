@@ -24,15 +24,9 @@ Deno.serve(async (req: Request) => {
 
   const route = parseWorkflowApiRoute(new URL(req.url).pathname);
   if (!route) return reply(req, 404, { ok: false, error: "route_not_found" });
-  if (route.resource === "runs" && req.method !== "POST") {
-    return reply(req, 405, { ok: false, error: "method_not_allowed" });
-  }
-  if (route.resource === "run" && req.method !== "GET") {
-    return reply(req, 405, { ok: false, error: "method_not_allowed" });
-  }
-  if (route.resource === "cancel" && req.method !== "POST") {
-    return reply(req, 405, { ok: false, error: "method_not_allowed" });
-  }
+  if (route.resource === "runs" && req.method !== "POST") return reply(req, 405, { ok: false, error: "method_not_allowed" });
+  if (route.resource === "run" && req.method !== "GET") return reply(req, 405, { ok: false, error: "method_not_allowed" });
+  if (route.resource === "cancel" && req.method !== "POST") return reply(req, 405, { ok: false, error: "method_not_allowed" });
 
   const authorization = req.headers.get("Authorization") ?? "";
   const tokenMatch = authorization.match(/^Bearer\s+([^\s]+)$/i);
@@ -59,7 +53,6 @@ Deno.serve(async (req: Request) => {
       .select("id,workflow_id,status,output,attempt,created_at,started_at,finished_at,scheduled_for")
       .eq("id", route.runId)
       .maybeSingle();
-
     if (readError) {
       console.error("workflow_run_status_read_failed");
       return reply(req, 500, { ok: false, error: "internal_error" });
@@ -69,8 +62,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (route.resource === "cancel") {
-    // The service role is used only after JWT verification. The owner predicate
-    // is always derived from auth.getUser(), never from request JSON or query data.
+    // Service-role access is limited to a JWT-verified, owner-scoped, queued-only transition.
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!serviceRoleKey) {
       console.error("workflow_api_cancel_environment_incomplete");
@@ -91,15 +83,12 @@ Deno.serve(async (req: Request) => {
       .eq("status", "queued")
       .select("id,status,finished_at")
       .maybeSingle();
-
     if (cancelError) {
       console.error("workflow_run_cancel_failed");
       return reply(req, 500, { ok: false, error: "internal_error" });
     }
     if (cancelled) return reply(req, 200, { ok: true, run: cancelled });
 
-    // A missing row and a non-queued row are handled separately without
-    // disclosing records owned by another user.
     const { data: current, error: currentError } = await admin
       .from("workflow_runs")
       .select("id,status")
@@ -116,7 +105,8 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const mediaType = (req.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();\n  if (mediaType !== "application/json") {
+  const mediaType = (req.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  if (mediaType !== "application/json") {
     return reply(req, 415, { ok: false, error: "unsupported_media_type" });
   }
 
