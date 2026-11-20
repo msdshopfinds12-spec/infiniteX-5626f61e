@@ -39,7 +39,7 @@ concurrency:
 jobs:
   frontend-runtime:
     name: Node 22 / Auth and frontend regression
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout exact commit
