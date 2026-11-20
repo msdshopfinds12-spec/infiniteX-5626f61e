@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - eng/infinitex-unified-ui-backend-2026-11-20
+      - eng/infinitex-p0-p1-auth-2026-11-20
   push:
     branches:
       - eng/infinitex-p0-p1-auth-2026-11-20
