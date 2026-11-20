@@ -128,12 +128,22 @@ test("retry limit zero fails terminally without another attempt", async () => {
 });
 
 test("permanent and cancelled failures never create retries", async () => {
-  for (const failureKind of ["permanent", "cancelled"] as const) {
+  for (const failureKind of ["permanent"] as const) {
     const store = new MemoryRetryStore([runningAttempt()]);
     const result = await failAndScheduleRetryAtomically(store, input({ failureKind }));
     assert.equal(result.kind, "failed");
     assert.equal(store.snapshot().attempts.size, 1);
   }
+});
+
+
+test("cancellation is not misclassified as a failed retryable execution", async () => {
+  const store = new MemoryRetryStore([runningAttempt()]);
+  await assert.rejects(
+    failAndScheduleRetryAtomically(store, input({ failureKind: "cancelled" })),
+    /cancellation_requires_cancel_operation/,
+  );
+  assert.equal(store.snapshot().attempts.get("attempt-1")?.status, "running");
 });
 
 test("stale lease generation fails closed without mutating state", async () => {
