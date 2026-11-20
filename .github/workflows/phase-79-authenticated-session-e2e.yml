@@ -68,6 +68,10 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Production build
+        env:
+          # Synthetic browser-only configuration. Playwright intercepts all Auth requests.
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_phase79_synthetic_test_key
         run: npm run build
 
       - name: Start isolated production preview
