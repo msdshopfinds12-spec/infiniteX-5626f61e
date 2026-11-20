@@ -514,3 +514,36 @@ Deno.test("cron worker cannot commit a step after a newer generation takes over 
     "newer cron step generation must not be overwritten by stale completion");
   assert(db.tables.workflow_logs.length === 0, "stale cron generation must not write success logs");
 });
+
+
+Deno.test("cron worker fails closed when transactional completion RPC fails", async () => {
+  const db = new StatefulDatabase();
+  db.failures["rpc:simula_complete_step_with_outbox"] = {
+    code: "XX000",
+    message: "synthetic RPC failure",
+  };
+  const handler = createCronWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    executeSafeAction: transformAction as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST",
+    headers: { "x-simula-worker-secret": "s".repeat(40) },
+    body: JSON.stringify({ limit: 1 }),
+  }));
+  const body = await response.json();
+
+  assert(response.status === 200, "cron reports per-run failure in its batch summary");
+  assert(body.claimed === 1 && body.failed === 1 && body.succeeded === 0,
+    "cron RPC failure must never be counted as workflow success");
+  assert(db.completionCalls.length === 1,
+    "cron must attempt transactional completion exactly once");
+  assert(db.tables.workflow_step_runs.length === 1,
+    "the first step-run record must remain available for failure-state inspection");
+  assert(db.tables.workflow_step_runs[0].status === "running",
+    "failed completion RPC must not be bypassed with a direct succeeded update");
+  assert(db.tables.workflow_runs[0].status === "failed",
+    "cron must fail the workflow rather than mark it succeeded");
+});
