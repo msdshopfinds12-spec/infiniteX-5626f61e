@@ -35,6 +35,8 @@ export default function WorkflowLogList({ service, runId, userId, identityEpoch 
       } else {
         setState({ key: requestKey, status: "error", code: result.code });
       }
+    }).catch(() => {
+      if (active) setState({ key: requestKey, status: "error", code: "request_failed" });
     });
 
     return () => { active = false; };
