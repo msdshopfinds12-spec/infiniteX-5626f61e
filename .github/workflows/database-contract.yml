@@ -37,9 +37,13 @@ jobs:
           node --check scripts/check-migration-integrity.mjs
           node --check scripts/check-database-contract.mjs
           node --check tests/database/check-database-contract.test.mjs
+          node --check tests/database/check-migration-integrity.test.mjs
 
       - name: Run database contract validator regression tests
         run: node --test tests/database/check-database-contract.test.mjs
+
+      - name: Run migration integrity regression tests
+        run: node --test tests/database/check-migration-integrity.test.mjs
 
       - name: Check migration naming and content integrity
         id: migration_integrity
