@@ -69,15 +69,26 @@ export function validateEnqueueWorkflowRequest(value) {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/** Strictly parse collection, status, and queued-cancel routes. */
+/** Parse only the function's exact routes; reject unrelated paths and extra segments. */
 export function parseWorkflowApiRoute(pathname) {
   if (typeof pathname !== "string") return null;
-  const path = pathname.replace(/\/+$/, "") || "/";
-  const match = path.match(/(?:^|\/)runs(?:\/([0-9a-f-]+)(?:\/(cancel))?)?$/i);
-  if (!match) return null;
-  if (!match[1]) return { resource: "runs" };
-  if (!UUID_PATTERN.test(match[1])) return null;
-  return match[2]
-    ? { resource: "cancel", runId: match[1].toLowerCase() }
-    : { resource: "run", runId: match[1].toLowerCase() };
+  const segments = pathname.split("/").filter(Boolean);
+  let routeSegments = segments;
+
+  if (segments[0] === "functions") {
+    if (segments.length < 4 ||
+        segments[1] !== "v1" ||
+        segments[2] !== "simula-workflow-api" ||
+        segments[3] !== "runs") return null;
+    routeSegments = segments.slice(3);
+  }
+
+  if (routeSegments[0] !== "runs") return null;
+  if (routeSegments.length === 1) return { resource: "runs" };
+  if (routeSegments.length > 3 || !UUID_PATTERN.test(routeSegments[1])) return null;
+
+  const runId = routeSegments[1].toLowerCase();
+  if (routeSegments.length === 2) return { resource: "run", runId };
+  if (routeSegments[2] === "cancel") return { resource: "cancel", runId };
+  return null;
 }
