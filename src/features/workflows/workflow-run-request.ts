@@ -44,7 +44,9 @@ function cloneAndFreezeJson(value: unknown, ancestors: WeakSet<object>): Json {
         }
         result.push(cloneAndFreezeJson(descriptor.value, ancestors));
       }
-      return Object.freeze(result);
+
+      // Runtime freezing is intentional; the generated Json type is mutable.
+      return Object.freeze(result) as unknown as Json;
     }
 
     const prototype = Object.getPrototypeOf(value);
