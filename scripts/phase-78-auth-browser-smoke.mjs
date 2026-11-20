@@ -15,22 +15,32 @@ try {
     const request = route.request();
     const url = new URL(request.url());
     authCalls.push({ method: request.method(), path: url.pathname, grant: url.searchParams.get("grant_type") });
+    const corsHeaders = {
+      "access-control-allow-origin": "http://127.0.0.1:4174",
+      "access-control-allow-headers": "apikey, authorization, content-type, x-client-info",
+      "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    };
+    if (request.method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: corsHeaders });
+      return;
+    }
 
     if (url.pathname.endsWith("/token") && url.searchParams.get("grant_type") === "password") {
       await route.fulfill({
         status: 400,
         contentType: "application/json",
+        headers: corsHeaders,
         body: JSON.stringify({ code: "invalid_credentials", message: "Invalid login credentials" }),
       });
       return;
     }
 
     if (url.pathname.endsWith("/recover")) {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+      await route.fulfill({ status: 200, contentType: "application/json", headers: corsHeaders, body: "{}" });
       return;
     }
 
-    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ message: "Unmocked auth endpoint" }) });
+    await route.fulfill({ status: 404, contentType: "application/json", headers: corsHeaders, body: JSON.stringify({ message: "Unmocked auth endpoint" }) });
   });
 
   const response = await page.goto(baseURL, { waitUntil: "networkidle" });
