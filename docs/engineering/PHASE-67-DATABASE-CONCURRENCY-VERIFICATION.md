@@ -74,43 +74,60 @@ Both candidate workers now:
 
 The pre-read helper is an early rejection only. The conditional SQL update is the authoritative compare-and-set.
 
-## 5. Critical reproducibility blocker
+## 5. Reproducible migration source — restored
 
-The candidate GitHub branch contains no `supabase/config.toml` and no `supabase/migrations/` directory. The connected live database reports 19 applied migration versions, including the workflow schema, queue claims, private-schema hardening, cron scheduling, stale-run recovery, and related security work.
+The migration source was found on historical repository recovery branches and restored into the active candidate from exact Git blob references.
 
-Therefore:
+- 19 SQL files represent ledger-recovered applied statements.
+- The checked-in manifest preserves all 19 SHA-256 digests and provenance fields.
+- Original historical Git-file equivalence remains NOT_VERIFIED.
+- The 20th SQL file remains a separately classified proposed candidate, not applied to the live database.
+- The reconstructed workflow baseline remains a noncanonical disposable fixture.
+- The candidate has a dedicated PostgreSQL 17 replay workflow. No hosted Supabase database is used by this workflow.
 
-- A fresh local Supabase stack cannot currently recreate the connected database from this repository.
-- A pgTAP test file alone would not be runnable against a faithful local schema.
-- A hand-written replacement schema or copied approximation would risk testing a different implementation.
-- Running `supabase test db` against the hosted project is not an acceptable shortcut: current Supabase CLI v3 documentation says hosted testing can enable and later drop pgTAP, so it is not a strictly read-only verification path.
+## 6. Isolated PostgreSQL 17 execution results
 
-**Required next step:** recover and review the exact migration source corresponding to the 19 applied versions, commit the canonical migration history and compatible Supabase config to the candidate branch, and prove a clean local database can be reconstructed before writing runnable database integration tests.
+<badge>PASS — candidate head `37863d751532e8293a0a4f69c9fb16d1a7b7c278`</badge>
 
-## 6. Phase 68 test acceptance criteria
+The Phase 68 disposable replay and concurrency workflow passed on the exact candidate head:
 
-After schema source is reproducible, run isolated PostgreSQL/Supabase tests with synthetic rows and no production data:
+- [Push replay + concurrency + security — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795384056)
+- [PR replay + concurrency + security — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795393676)
+- [Push candidate quality gates — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795384077)
+- [PR candidate quality gates — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795393670)
 
-1. Two concurrent internal claim calls never return the same run ID.
-2. A locked queued row is skipped by the second claimant.
-3. Each successful claim increments attempt exactly once.
-4. Expired running rows below attempt 5 are requeued and claimed with a strictly newer generation.
-5. Expired running rows at attempt 5 become failed and are not reclaimed.
-6. Two concurrent step-run inserts produce exactly one `(run_id, step_id)` row.
-7. A stale generation cannot overwrite a newer step-run result.
-8. A worker whose lease was reclaimed cannot finish or fail the workflow run.
-9. Authenticated claim cannot claim another owner's queue row.
-10. Internal claim and secret verification are denied to anon/authenticated roles.
+The replay job completed:
+1. Provenance and migration-rehearsal tests.
+2. Startup of an isolated Supabase PostgreSQL 17 container with scheduled jobs disabled.
+3. Execution of all 19 ledger-recovered applied statements and the separately classified candidate migration in the disposable database.
+4. Real multi-session row-lock contention: one session holds the oldest queued row; a separate service-role claim skips the locked row and claims the next row; after release, a subsequent claim receives the first row with its own generation.
+5. Fifteen-minute stale-lease recovery below attempt 5 and terminal failure at attempt 5.
+6. Duplicate step-run identity and stale-generation terminal-update checks.
+7. Separate disposable security behavior suite and container cleanup.
 
-Use a disposable local database or isolated test project only. Do not point destructive or extension-mutating test commands at the production project.
+**Precision note:** the concurrency harness uses real PostgreSQL sessions and row locks, not a pure in-memory model. The two claim calls are sequential around a deliberately held row lock; this proves the `SKIP LOCKED` behavior and distinct claims under contention, but it is not a stress test of many simultaneous claim RPCs or a full deployed-worker race reproduction.
 
-## 7. Safety and release boundary
+## 7. Remaining acceptance criteria
 
-- Catalog reads only; no production DDL or DML.
-- No migration, grant, RLS, secret, cron, or function changes.
-- No production worker deployment.
-- No merge or release.
-- No hosted pgTAP execution.
-- No claims of live concurrency success.
+| Check | Status |
+|---|---|
+| All 19 ledger-recovered SQL files present and checksummed | PASS |
+| Disposable PostgreSQL 17 migration replay | PASS |
+| Real row-lock contention / `SKIP LOCKED` behavior | PASS |
+| Lease reclaim below attempt 5 | PASS |
+| Terminal failure at attempt 5 | PASS |
+| Step-run uniqueness and stale-generation CAS behavior | PASS |
+| Disposable security behavior suite | PASS |
+| High-volume concurrent claim stress test | NOT TESTED |
+| Full deployed Edge Function end-to-end workflow | NOT TESTED |
+| Live catalog parity with disposable replay | NOT ESTABLISHED |
+| Production worker rollout | NOT AUTHORIZED |
 
-**Phase 67 decision:** database contracts are verified from live catalog definitions; live concurrent execution is NOT TESTED. The missing migration source in GitHub is the immediate blocker to a trustworthy repeatable integration test.
+## 8. Safety and release boundary
+
+- All database writes in this phase occurred only in the isolated PostgreSQL 17 CI container using synthetic rows.
+- Connected Ashaa-INX inspection remained read-only.
+- No hosted production DDL/DML, migration, grant, RLS, secret, cron, or function changes.
+- No production worker deployment, merge, or release.
+
+**Phase 67 decision:** the previous migration-source blocker is resolved for candidate reproducibility. Core claim, lease-recovery, uniqueness, and generation-fencing behaviors now have isolated PostgreSQL execution evidence. High-volume contention, full live catalog parity, and deployed runtime parity remain open.
