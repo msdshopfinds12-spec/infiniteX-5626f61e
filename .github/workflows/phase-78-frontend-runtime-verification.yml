@@ -1,0 +1,88 @@
+name: InfiniteX Phase 78 Frontend Runtime Verification
+
+on:
+  push:
+    branches:
+      - phase-78/frontend-runtime-verification
+    paths:
+      - ".github/workflows/phase-78-frontend-runtime-verification.yml"
+      - "src/**"
+      - "tests/**"
+      - "supabase/functions/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "vite.config.*"
+  pull_request:
+    branches:
+      - main
+      - eng/infinitex-unified-ui-backend-2026-11-20
+    paths:
+      - ".github/workflows/phase-78-frontend-runtime-verification.yml"
+      - "src/**"
+      - "tests/**"
+      - "supabase/functions/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "vite.config.*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-phase-78-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-runtime:
+    name: Node 22 / Auth and frontend regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Configure Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Record runtime versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Install reproducibly from lockfile
+        run: npm ci
+
+      - name: TypeScript and project lint
+        run: npm run lint
+
+      - name: Complete unit and regression suite
+        run: npm test
+
+      - name: Auth lifecycle regression
+        run: node --experimental-strip-types --test src/features/auth
+
+      - name: Authenticated read-service regression
+        run: node --experimental-strip-types --test src/features/profile src/features/projects src/features/workflows
+
+      - name: Browser secret boundary regression
+        run: node --test tests/browser-secret-boundary.test.mjs
+
+      - name: Edge Function and worker security regression
+        run: npm run test:edge-function-security
+
+      - name: Production bundle compilation
+        run: npm run build
+
+      - name: Upload build artifact for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: infinitex-phase-78-dist-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
