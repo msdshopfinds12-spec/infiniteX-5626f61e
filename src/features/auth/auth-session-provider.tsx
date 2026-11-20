@@ -65,7 +65,7 @@ export function AuthSessionProvider({
       };
     }
 
-    void adapter.getSession().then(
+    void Promise.resolve().then(() => adapter.getSession()).then(
       (session) => {
         if (!active) return;
         const result = coordinator.applyInitialSession(revision, session);
