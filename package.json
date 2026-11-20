@@ -14,7 +14,8 @@
     "test:edge-function-security": "npm run test:edge-function-cors && npm run test:edge-worker-security",
     "test:worker-http-boundary": "node --test tests/workers/worker-auth-boundary.test.mjs",
     "test:workers": "node --experimental-strip-types --test tests/workers",
-    "verify:phase-73c": "node scripts/verify-phase-73c-provenance.mjs"
+    "verify:phase-73c": "node scripts/verify-phase-73c-provenance.mjs",
+    "verify:phase-73d": "node scripts/verify-phase-73d-read-only.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.2",
