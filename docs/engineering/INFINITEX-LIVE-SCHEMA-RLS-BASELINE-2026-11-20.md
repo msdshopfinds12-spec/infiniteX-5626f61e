@@ -13,7 +13,7 @@ This document records live schema metadata, generated type parity, RLS policies,
 
 - Project status: `ACTIVE_HEALTHY`.
 - PostgreSQL major version: 17.
-- 13 public tables were returned by verbose schema introspection; all 13 report RLS enabled.
+- 14 public tables were returned by verbose schema introspection; all 14 report RLS enabled.
 - The existing `src/lib/supabase/database.types.ts` was compared against freshly generated Supabase TypeScript schema types. After removing the repository's three-line provenance header, the type bodies matched exactly (21,508 characters). No duplicate type file or overwrite is required.
 - The generated types report PostgREST version `14.18`.
 
