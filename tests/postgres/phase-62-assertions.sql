@@ -232,6 +232,45 @@ $phase62$;
 
 SELECT 'phase-62-sql-contract-tests-passed' AS result;
 
+-- A globally unique retry key owned by another tenant must be rejected on failed replay.
+-- The owner-scoped lookup previously missed this row and returned already_terminal.
+INSERT INTO workflow_step_attempts(
+  id, owner_id, run_id, step_id, attempt_number, idempotency_key,
+  request_fingerprint, status, scheduled_at, finished_at, failure_kind
+) VALUES
+  ('attempt-conflict-owner-1', 'owner-a', 'run-cross-owner', 'step-j', 1,
+   'step-attempt:v1:run-cross-owner:step-j:1', 'fingerprint-owner',
+   'failed', clock_timestamp() - interval '2 seconds', clock_timestamp(), 'transient'),
+  ('attempt-conflict-owner-2', 'owner-b', 'run-cross-owner', 'step-j', 2,
+   'step-attempt:v1:run-cross-owner:step-j:2', 'fingerprint-owner',
+   'queued', clock_timestamp(), NULL, NULL);
+DO $phase62$
+DECLARE result text;
+BEGIN
+  BEGIN
+    result := phase62.fail_and_schedule_retry(
+      'attempt-conflict-owner-1', 'owner-a', 1, clock_timestamp(), 3,
+      'transient', 'unused-conflict-owner'
+    );
+    RAISE EXCEPTION 'expected retry_idempotency_conflict for cross-owner key; got %', result;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'retry_idempotency_conflict' THEN RAISE; END IF;
+  END;
+  IF (SELECT status FROM phase62.workflow_step_attempts
+       WHERE id = 'attempt-conflict-owner-1') <> 'failed' THEN
+    RAISE EXCEPTION 'cross-owner replay modified original failed attempt';
+  END IF;
+  IF (SELECT status FROM phase62.workflow_step_attempts
+       WHERE id = 'attempt-conflict-owner-2') <> 'queued' THEN
+    RAISE EXCEPTION 'cross-owner replay modified colliding tenant attempt';
+  END IF;
+  IF EXISTS (SELECT 1 FROM phase62.workflow_step_attempts
+             WHERE id = 'unused-conflict-owner') THEN
+    RAISE EXCEPTION 'cross-owner replay created an unexpected attempt';
+  END IF;
+END;
+$phase62$;
+
 -- A colliding retry key bound to a different step identity must fail closed.
 INSERT INTO workflow_step_attempts(
   id, owner_id, run_id, step_id, attempt_number, idempotency_key,
