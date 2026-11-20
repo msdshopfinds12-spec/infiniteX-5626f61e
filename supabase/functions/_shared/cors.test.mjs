@@ -62,3 +62,11 @@ test("allows non-browser server requests without an Origin header but emits no A
   assert.equal(result.allowed, true);
   assert.equal(result.headers.has("Access-Control-Allow-Origin"), false);
 });
+
+test("allows the workflow enqueue idempotency header during browser preflight", () => {
+  const result = createCorsHeaders(PRODUCTION_ORIGIN, PRODUCTION_ORIGIN);
+  const allowedHeaders = (result.headers.get("Access-Control-Allow-Headers") ?? "")
+    .split(",").map((value) => value.trim().toLowerCase());
+  assert.equal(allowedHeaders.includes("idempotency-key"), true);
+  assert.equal(allowedHeaders.includes("authorization"), true);
+});
