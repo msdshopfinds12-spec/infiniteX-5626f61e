@@ -1,6 +1,6 @@
 # InfiniteX Workflow Worker Retry Policy
 
-**Status:** Implemented in the candidate branch; implementation CI verified on commit `60883052e45aac062197b49f26982bc6e57c7f39`  
+**Status:** Implemented in candidate branch; expanded Node/Deno CI and worker type-checks verified on commit `f727d4fc9aff9b16b0c4a811db276128143538ae`  
 **Scope:** Authenticated and cron workflow workers  
 **Persistence:** Existing `workflow_step_runs.attempt` remains the workflow-claim generation fence; no schema change was made
 
@@ -10,7 +10,10 @@ The implementation passed the candidate push and pull-request quality gates on c
 - [Push quality gates — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44792666068)
 - [Pull request quality gates — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44792675408)
 
-Verified steps: exact lockfile installation, dependency audit, TypeScript lint, unit/regression tests, Edge Function/worker security tests, and production build.
+Verified steps: exact lockfile installation, dependency audit, TypeScript lint, unit/regression tests, Edge Function/worker security tests, Deno worker regression suite, Deno type-checks for both workflow workers, and production build.
+
+- [Expanded push quality gates — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44793350089)
+- The pull-request quality gate for this same head was queued when this document was updated.
 
 ## Contract
 
