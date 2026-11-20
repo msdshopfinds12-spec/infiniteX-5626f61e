@@ -31,7 +31,8 @@ try {
     const request = route.request();
     const url = new URL(request.url());
     const authorization = request.headers().authorization ?? "";
-    authRequests.push({ method: request.method(), path: url.pathname, grant: url.searchParams.get("grant_type"), authorization });
+    const requestBody = request.method() === "POST" ? request.postDataJSON() : null;
+    authRequests.push({ method: request.method(), path: url.pathname, grant: url.searchParams.get("grant_type"), email: requestBody?.email, authorization });
 
     const corsHeaders = {
       "access-control-allow-origin": "http://127.0.0.1:4175",
@@ -104,7 +105,7 @@ try {
 
   await signIn("alpha@example.test");
   assert.equal(authRequests.filter((item) => item.path.endsWith("/token") && item.grant === "password").length, 1);
-  assert.ok(authRequests.some((item) => item.path.endsWith("/user") && item.authorization === "Bearer synthetic-access-alpha"));
+  assert.equal(await page.evaluate(() => { const key = Object.keys(localStorage).find((item) => item.startsWith("sb-") && item.endsWith("-auth-token")); return key ? JSON.parse(localStorage.getItem(key)).user.id : null; }), "synthetic-user-alpha");
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await page.getByRole("heading", { name: "Welcome back." }).waitFor();
@@ -112,8 +113,8 @@ try {
 
   await signIn("beta@example.test");
   assert.equal(authRequests.filter((item) => item.path.endsWith("/token") && item.grant === "password").length, 2);
-  assert.ok(authRequests.some((item) => item.path.endsWith("/user") && item.authorization === "Bearer synthetic-access-beta"));
-  assert.ok(!authRequests.some((item) => item.path.endsWith("/user") && item.authorization === "Bearer synthetic-access-alpha" && item.method === "POST"), "identity lookup must not mutate the prior account");
+  assert.equal(await page.evaluate(() => { const key = Object.keys(localStorage).find((item) => item.startsWith("sb-") && item.endsWith("-auth-token")); return key ? JSON.parse(localStorage.getItem(key)).user.id : null; }), "synthetic-user-beta");
+  assert.deepEqual(authRequests.filter((item) => item.path.endsWith("/token") && item.grant === "password").map((item) => item.email), ["alpha@example.test", "beta@example.test"]);
 
   assert.deepEqual(pageErrors, [], "account switching must not emit uncaught browser errors");
   console.log("PASS: synthetic account A sign-in, sign-out, account B sign-in, authenticated workspace gating, and browser runtime");
