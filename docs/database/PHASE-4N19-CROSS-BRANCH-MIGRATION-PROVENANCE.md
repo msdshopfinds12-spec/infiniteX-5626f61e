@@ -74,3 +74,9 @@ The read-only preflight is a useful next evidence-gathering artifact, but it has
 ## Safety
 
 No Supabase connection was opened in this phase. No production query, row read, migration, grant change, secret change, merge, or deployment was performed. The candidate remains repository-only and unapproved.
+
+## Pull-request history cross-check
+
+The repository returned 51 pull requests across all states. File lists were additionally inspected for 10 relevant backend/database/workflow PRs (#34, #36, #38, #46, #53, #49, #30, #29, #20, and #19). No additional Supabase migration SQL or canonical schema snapshot was found in those PR file lists. PR #20 contains a read-only database deployment audit document, not migration SQL. PR #35 is the transactional feature migration candidate described above.
+
+This PR inventory is a second cross-check, not proof that no unreferenced commit or deleted branch ever contained other SQL. The recovery decision remains unchanged: only one candidate feature migration has been positively recovered; historical baseline remains blocked.
