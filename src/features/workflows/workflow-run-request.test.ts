@@ -19,6 +19,10 @@ test("workflow run request contains only workflow id and input", () => {
   assert.deepEqual(Object.keys(request).sort(), ["input", "workflow_id"]);
 });
 
+test("omitted workflow input defaults to an empty JSON object", () => {
+  assert.deepEqual(createWorkflowRunRequest("workflow-123").input, {});
+});
+
 test("workflow run request rejects an empty workflow id", () => {
   assert.throws(
     () => createWorkflowRunRequest("   "),
