@@ -1,7 +1,8 @@
 export const WORKFLOW_API_MAX_BODY_BYTES = 16 * 1024;
 export const WORKFLOW_API_MAX_JSON_DEPTH = 12;
 export const WORKFLOW_API_MAX_JSON_NODES = 1_000;
-export const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;\nconst UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const isRecord = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -43,9 +44,7 @@ export function validateEnqueueWorkflowRequest(value) {
   if (Object.keys(value).some((key) => key !== "workflow_id" && key !== "input")) {
     return { ok: false, code: "unknown_or_forbidden_field" };
   }
-  if (typeof value.workflow_id !== "string" ||
-      value.workflow_id.trim().length === 0 ||
-      value.workflow_id.length > 128) {
+  if (typeof value.workflow_id !== "string" || !UUID_PATTERN.test(value.workflow_id.trim())) {
     return { ok: false, code: "invalid_workflow_id" };
   }
   const input = value.input === undefined ? {} : value.input;
@@ -67,14 +66,11 @@ export function validateEnqueueWorkflowRequest(value) {
   };
 }
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 /** Parse only the function's exact routes; reject unrelated paths and extra segments. */
 export function parseWorkflowApiRoute(pathname) {
   if (typeof pathname !== "string") return null;
   const segments = pathname.split("/").filter(Boolean);
   let routeSegments = segments;
-
   if (segments[0] === "functions") {
     if (segments.length < 4 ||
         segments[1] !== "v1" ||
@@ -82,11 +78,9 @@ export function parseWorkflowApiRoute(pathname) {
         segments[3] !== "runs") return null;
     routeSegments = segments.slice(3);
   }
-
   if (routeSegments[0] !== "runs") return null;
   if (routeSegments.length === 1) return { resource: "runs" };
   if (routeSegments.length > 3 || !UUID_PATTERN.test(routeSegments[1])) return null;
-
   const runId = routeSegments[1].toLowerCase();
   if (routeSegments.length === 2) return { resource: "run", runId };
   if (routeSegments[2] === "cancel") return { resource: "cancel", runId };
