@@ -1,0 +1,232 @@
+{
+  "recovery_version": "phase-4n20",
+  "project_ref": "vepacoemkhudamfaccah",
+  "source": "Read-only extraction from supabase_migrations.schema_migrations.statements",
+  "recovered_at": "2026-11-20",
+  "ledger_entry_count": 19,
+  "applied_migrations": [
+    {
+      "version": "20261025182821",
+      "name": "simula_app_factory_core_schema_rls",
+      "path": "supabase/migrations/20261025182821_simula_app_factory_core_schema_rls.sql",
+      "statement_count": 1,
+      "sha256": "1cc5c50b9e5e056eb601e2f60aa997283587d55b93ae44475665c24e2bcc8960",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025183121",
+      "name": "simula_fk_indexes_and_integrity_review",
+      "path": "supabase/migrations/20261025183121_simula_fk_indexes_and_integrity_review.sql",
+      "statement_count": 1,
+      "sha256": "4fd3837f84dd538c50df3313765605b77f0dc1a2d4da5954bdb316e4ddc733c9",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025183834",
+      "name": "remove_seven_unused_nonconstraint_indexes",
+      "path": "supabase/migrations/20261025183834_remove_seven_unused_nonconstraint_indexes.sql",
+      "statement_count": 1,
+      "sha256": "523eb20ee7435364afb73731744212fc490cafd77dc660aae20a7071cb6b1aae",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025183942",
+      "name": "add_foreign_key_supporting_indexes",
+      "path": "supabase/migrations/20261025183942_add_foreign_key_supporting_indexes.sql",
+      "statement_count": 1,
+      "sha256": "6ab69a341a5cc645f6fdd69bb01c81eb8a95432c76af7afbfa7696d65030dfb0",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025201001",
+      "name": "simula_workflow_cron_scheduler",
+      "path": "supabase/migrations/20261025201001_simula_workflow_cron_scheduler.sql",
+      "statement_count": 1,
+      "sha256": "5e76f063d089415e82528c7a505c59cc4433dcf53d5a3d12f1ce99a64f5b03ea",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025201032",
+      "name": "simula_workflow_scheduler_safe_interval_validation",
+      "path": "supabase/migrations/20261025201032_simula_workflow_scheduler_safe_interval_validation.sql",
+      "statement_count": 1,
+      "sha256": "4ebddeff08cacf2901c96b3c44a8dc03b6eeeb6cf758a1b2ccc09f38bdec9ad3",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025201831",
+      "name": "simula_secure_workflow_run_claiming",
+      "path": "supabase/migrations/20261025201831_simula_secure_workflow_run_claiming.sql",
+      "statement_count": 1,
+      "sha256": "7e6e273adfc14aa41ffc2d5576918ba77782d27e8a8b13bcc1721167daae2c2e",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025201906",
+      "name": "simula_move_claim_definer_to_private_schema",
+      "path": "supabase/migrations/20261025201906_simula_move_claim_definer_to_private_schema.sql",
+      "statement_count": 1,
+      "sha256": "bf472cc1a57f7f801f200bd28e57cc2b3c411649f267e9a28ccd70d0dceb3153",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025201915",
+      "name": "simula_allow_authenticated_claim_wrapper_access",
+      "path": "supabase/migrations/20261025201915_simula_allow_authenticated_claim_wrapper_access.sql",
+      "statement_count": 1,
+      "sha256": "c5de796cffa4e2bd755ca48c457ec1011cf656fa7483733f0efc5472cd542420",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025202536",
+      "name": "simula_worker_foundation_indexes_and_pg_net",
+      "path": "supabase/migrations/20261025202536_simula_worker_foundation_indexes_and_pg_net.sql",
+      "statement_count": 1,
+      "sha256": "dc6d4171e93b4d2911727a74562ddf362aba3e83aeb6bc90c9b44db3ca951b73",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025202606",
+      "name": "simula_internal_worker_queue_claiming",
+      "path": "supabase/migrations/20261025202606_simula_internal_worker_queue_claiming.sql",
+      "statement_count": 1,
+      "sha256": "7c959fc03a5888732008e54ecc5c670036209872aeee6794e08dda4051803965",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025202644",
+      "name": "simula_pg_net_extension_schema_hardening",
+      "path": "supabase/migrations/20261025202644_simula_pg_net_extension_schema_hardening.sql",
+      "statement_count": 1,
+      "sha256": "e6048e60b798a55af7a14736f9f63679c32daef2b087860ce13af82041e27e79",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025202741",
+      "name": "simula_secure_cron_worker_auth_and_vault",
+      "path": "supabase/migrations/20261025202741_simula_secure_cron_worker_auth_and_vault.sql",
+      "statement_count": 1,
+      "sha256": "1d5de90b2e1c689d2e82724388154ddc333ca9ea60f78f39a993727fb65f1fe3",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025202809",
+      "name": "simula_schedule_secure_cron_worker",
+      "path": "supabase/migrations/20261025202809_simula_schedule_secure_cron_worker.sql",
+      "statement_count": 1,
+      "sha256": "0d2f990f554f29beb48dc2c3a335509e4ca69f13d9bb2bb2eaa35b30f4122cdc",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025202850",
+      "name": "simula_worker_stale_run_recovery",
+      "path": "supabase/migrations/20261025202850_simula_worker_stale_run_recovery.sql",
+      "statement_count": 1,
+      "sha256": "48806ef011d82caea2daf935f0a97b29b4fb692cd16e4a9111bed231e8f7d5c8",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025204429",
+      "name": "restrict_workflow_table_client_privileges",
+      "path": "supabase/migrations/20261025204429_restrict_workflow_table_client_privileges.sql",
+      "statement_count": 1,
+      "sha256": "46f86f2b09e66232a4e6d2d4413abaa037c8cfc665973be07a5979e2e80c1293",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261025204844",
+      "name": "harden_workflow_run_inserts_and_profile_updates",
+      "path": "supabase/migrations/20261025204844_harden_workflow_run_inserts_and_profile_updates.sql",
+      "statement_count": 1,
+      "sha256": "56247a8074dd6d5824f34d0fea243b91429d1fd84771776d3c9d55f534718e20",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261103134251",
+      "name": "ashaa_backend_api_keys_and_webhook_idempotency",
+      "path": "supabase/migrations/20261103134251_ashaa_backend_api_keys_and_webhook_idempotency.sql",
+      "statement_count": 1,
+      "sha256": "448eb42d542a6d96a4f1d1d0ab070a5353a91e9d549f29cd0322b5cd1265f314",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    },
+    {
+      "version": "20261103134302",
+      "name": "ashaa_backend_credit_ledger",
+      "path": "supabase/migrations/20261103134302_ashaa_backend_credit_ledger.sql",
+      "statement_count": 1,
+      "sha256": "40472f79e811938b0bd2c301ca57c6d0b2ba3ab78e33ebf6b0940f1b5a1de6c3",
+      "rollback_statement_count": null,
+      "rollback_available": false,
+      "original_git_blob_equivalence": "NOT_VERIFIED",
+      "ledger_statement_to_recovered_file_exact_match": "VERIFIED_EXACT_STRING_MATCH"
+    }
+  ],
+  "candidate_20261120000000_recorded": false,
+  "security_scan": {
+    "common_credential_patterns_detected": 0,
+    "scope": "JWT-like values, Supabase secret-key prefixes, AWS access keys, private-key blocks, password-bearing database URLs, credential assignments, bearer tokens",
+    "limitation": "Pattern scan is not a substitute for human SQL review."
+  },
+  "important_limitations": [
+    "Files reproduce statement payloads stored in the applied database migration ledger.",
+    "They are not proven byte-identical to historical source-control files.",
+    "The ledger contains no rollback SQL bodies for these entries.",
+    "Do not replay this recovered chain against the source production database.",
+    "Rehearse on a disposable PostgreSQL 17 database and compare catalog parity first."
+  ],
+  "recovery_commit": "6f4f6d73868c040ee32e0f779ba29bcfbd1e218c"
+}

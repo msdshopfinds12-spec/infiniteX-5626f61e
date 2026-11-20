@@ -1,0 +1,154 @@
+{
+  "artifact": "PHASE_52_1E_LIVE_CATALOG_EVIDENCE",
+  "classification": "PRELIMINARY_LIVE_CATALOG_EVIDENCE",
+  "canonical_schema_contract": false,
+  "contract_v2_readiness": "NOT_ESTABLISHED",
+  "production_change_authorized": false,
+  "captured_at_utc": "2026-11-20T14:41:16.077599Z",
+  "project": {
+    "name": "Ashaa-INX",
+    "ref": "vepacoemkhudamfaccah",
+    "database": "postgres",
+    "postgres_version": "17.11",
+    "project_status": "ACTIVE_HEALTHY",
+    "region": "ap-northeast-2"
+  },
+  "capture_scope": {
+    "schema": "public",
+    "included": [
+      "public relation inventory and RLS flags",
+      "public column metadata and data types",
+      "public constraints and indexes",
+      "public policies and client role grants",
+      "public routine security attributes",
+      "public trigger inventory",
+      "installed extension names and versions",
+      "Supabase migration ledger versions"
+    ],
+    "excluded": [
+      "all application row data",
+      "secret values, API tokens, credentials, and Vault contents",
+      "auth, storage, realtime, net, vault, and other platform-managed schema definitions",
+      "function source bodies",
+      "full role membership and inherited privilege graph",
+      "runtime request traces and workload sampling"
+    ]
+  },
+  "public_catalog_counts": {
+    "tables": 14,
+    "columns": 132,
+    "constraints": 85,
+    "indexes": 44,
+    "policies": 19,
+    "routines": 4,
+    "triggers": 6
+  },
+  "public_tables": [
+    {"name":"billing_webhook_events","rls_enabled":true,"force_rls":false},
+    {"name":"credit_ledger","rls_enabled":true,"force_rls":false},
+    {"name":"payments","rls_enabled":true,"force_rls":false},
+    {"name":"platform_api_keys","rls_enabled":true,"force_rls":false},
+    {"name":"profiles","rls_enabled":true,"force_rls":false},
+    {"name":"subscriptions","rls_enabled":true,"force_rls":false},
+    {"name":"tools","rls_enabled":true,"force_rls":false},
+    {"name":"usage_logs","rls_enabled":true,"force_rls":false},
+    {"name":"user_projects","rls_enabled":true,"force_rls":false},
+    {"name":"workflow_logs","rls_enabled":true,"force_rls":false},
+    {"name":"workflow_runs","rls_enabled":true,"force_rls":false},
+    {"name":"workflow_step_runs","rls_enabled":true,"force_rls":false},
+    {"name":"workflow_steps","rls_enabled":true,"force_rls":false},
+    {"name":"workflows","rls_enabled":true,"force_rls":false}
+  ],
+  "extensions": [
+    {"name":"pg_cron","version":"1.6.4","schema":"pg_catalog"},
+    {"name":"pg_net","version":"0.20.4","schema":"extensions"},
+    {"name":"pg_stat_statements","version":"1.11","schema":"extensions"},
+    {"name":"pgcrypto","version":"1.3","schema":"extensions"},
+    {"name":"plpgsql","version":"1.0","schema":"pg_catalog"},
+    {"name":"supabase_vault","version":"0.3.1","schema":"vault"},
+    {"name":"uuid-ossp","version":"1.1","schema":"extensions"}
+  ],
+  "migration_ledger": {
+    "entry_count": 19,
+    "versions": [
+      "20261025182821","20261025183121","20261025183834","20261025183942",
+      "20261025201001","20261025201032","20261025201831","20261025201906",
+      "20261025201915","20261025202536","20261025202606","20261025202644",
+      "20261025202741","20261025202809","20261025202850","20261025204429",
+      "20261025204844","20261103134251","20261103134302"
+    ],
+    "candidate_20261120120000_harden_platform_api_key_column_access": "NOT_APPLIED"
+  },
+  "privilege_checks": {
+    "platform_api_keys.key_hash": {
+      "anon_select": false,
+      "authenticated_select": true,
+      "assessment": "LEAST_PRIVILEGE_HARDENING_REQUIRED"
+    },
+    "billing_webhook_events": {
+      "anon_select": false,
+      "anon_insert": false,
+      "authenticated_select": false,
+      "authenticated_insert": false,
+      "assessment": "CLIENT_ROLES_HAVE_NO_TABLE_SELECT_OR_INSERT"
+    },
+    "profiles.role": {
+      "authenticated_update": false,
+      "assessment": "NO_DIRECT_AUTHENTICATED_COLUMN_UPDATE_GRANT_OBSERVED"
+    }
+  },
+  "known_findings": [
+    {
+      "id": "DB-KEYHASH-001",
+      "severity": "HIGH_PRIORITY_HARDENING",
+      "status": "VERIFIED_LIVE_PRIVILEGE",
+      "finding": "authenticated has SELECT privilege on public.platform_api_keys.key_hash; anon does not.",
+      "recommended_action": "Review and apply the already-reviewed candidate column-grant hardening migration only after separate explicit approval and a fresh disposable rehearsal."
+    },
+    {
+      "id": "DB-WEBHOOK-001",
+      "severity": "INFO",
+      "status": "VERIFIED_LIVE_PRIVILEGE",
+      "finding": "anon and authenticated have no SELECT or INSERT table privilege on public.billing_webhook_events.",
+      "recommended_action": "Preserve the service-only access model unless application requirements and a reviewed threat model prove otherwise."
+    },
+    {
+      "id": "DB-ROLE-001",
+      "severity": "INFO",
+      "status": "VERIFIED_LIVE_PRIVILEGE",
+      "finding": "authenticated lacks direct UPDATE privilege on public.profiles.role.",
+      "recommended_action": "Retain server-controlled role assignment; do not add client write access."
+    },
+    {
+      "id": "DB-RLS-001",
+      "severity": "REVIEW",
+      "status": "VERIFIED_CATALOG_FLAGS",
+      "finding": "All 14 inventoried public tables have RLS enabled; none has FORCE ROW LEVEL SECURITY.",
+      "recommended_action": "Review policies, grants, ownership, SECURITY DEFINER functions, and actual role behavior; RLS enabled alone is not a complete security proof."
+    }
+  ],
+  "provenance": {
+    "method": "Read-only PostgreSQL catalog queries through the connected Supabase project integration.",
+    "no_database_writes": true,
+    "no_schema_changes": true,
+    "no_secret_values_collected": true,
+    "migration_history_source": "supabase_migrations.schema_migrations",
+    "related_recovery_manifest": "docs/database/MIGRATION-LEDGER-RECOVERY-MANIFEST.json",
+    "related_reconstructed_baseline": "docs/database/PHASE-52.1D-RECONSTRUCTED-BASELINE.md"
+  },
+  "limitations": [
+    "This is a point-in-time metadata evidence summary, not a canonical, exhaustive, replayable schema contract.",
+    "The catalog capture did not persist every column, constraint, index, policy, grant, routine, and trigger definition as a complete normalized artifact.",
+    "Platform-managed schemas are intentionally excluded.",
+    "RLS enablement does not prove policy correctness or prevent privileged-role bypass.",
+    "The candidate API-key migration has not been applied to the live project.",
+    "The reconstructed Phase 52.1D baseline remains disposable-only and noncanonical.",
+    "No application data, secret values, production changes, deployment, or live migration was performed."
+  ],
+  "next_required_phase": "52.1F_SCHEMA_RECONCILIATION",
+  "acceptance_gate": {
+    "authoritative_v2_contract": "BLOCKED_PENDING_COMPLETE_NORMALIZED_CATALOG_CAPTURE_AND_REVIEW",
+    "production_migration_approval": "NOT_GRANTED",
+    "release_approval": "NOT_GRANTED"
+  }
+}

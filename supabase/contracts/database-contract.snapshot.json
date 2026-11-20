@@ -1,0 +1,3164 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-11-20 02:21:58.728459+00",
+  "source": "authorized-read-only-supabase-catalog-capture",
+  "reviewStatus": "PENDING_HUMAN_REVIEW",
+  "projectRef": "vepacoemkhudamfaccah",
+  "postgresVersion": "17.11",
+  "databaseRole": "postgres",
+  "tables": [
+    {
+      "schema": "public",
+      "name": "billing_webhook_events",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "provider_event_id",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "processing_status",
+          "type": "text",
+          "default": "'received'::text",
+          "notNull": true
+        },
+        {
+          "name": "retry_count",
+          "type": "integer",
+          "default": "0",
+          "notNull": true
+        },
+        {
+          "name": "last_error",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        },
+        {
+          "name": "processed_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "billing_webhook_events_pkey",
+          "definition": "CREATE UNIQUE INDEX billing_webhook_events_pkey ON public.billing_webhook_events USING btree (id)"
+        },
+        {
+          "name": "billing_webhook_events_provider_event_unique",
+          "definition": "CREATE UNIQUE INDEX billing_webhook_events_provider_event_unique ON public.billing_webhook_events USING btree (provider, provider_event_id)"
+        },
+        {
+          "name": "billing_webhook_events_status_received_idx",
+          "definition": "CREATE INDEX billing_webhook_events_status_received_idx ON public.billing_webhook_events USING btree (processing_status, received_at)"
+        }
+      ],
+      "policies": [],
+      "constraints": [
+        {
+          "name": "billing_webhook_events_event_type_check",
+          "type": "c",
+          "definition": "CHECK (char_length(event_type) >= 1 AND char_length(event_type) <= 160)"
+        },
+        {
+          "name": "billing_webhook_events_last_error_check",
+          "type": "c",
+          "definition": "CHECK (last_error IS NULL OR char_length(last_error) <= 2000)"
+        },
+        {
+          "name": "billing_webhook_events_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "billing_webhook_events_processing_status_check",
+          "type": "c",
+          "definition": "CHECK (processing_status = ANY (ARRAY['received'::text, 'processing'::text, 'processed'::text, 'failed'::text, 'ignored'::text]))"
+        },
+        {
+          "name": "billing_webhook_events_provider_check",
+          "type": "c",
+          "definition": "CHECK (char_length(provider) >= 1 AND char_length(provider) <= 40)"
+        },
+        {
+          "name": "billing_webhook_events_provider_event_id_check",
+          "type": "c",
+          "definition": "CHECK (char_length(provider_event_id) >= 1 AND char_length(provider_event_id) <= 255)"
+        },
+        {
+          "name": "billing_webhook_events_provider_event_unique",
+          "type": "u",
+          "definition": "UNIQUE (provider, provider_event_id)"
+        },
+        {
+          "name": "billing_webhook_events_retry_count_check",
+          "type": "c",
+          "definition": "CHECK (retry_count >= 0 AND retry_count <= 100)"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "schema": "public",
+      "name": "credit_ledger",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "delta",
+          "type": "integer",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "reference_type",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "reference_id",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "idempotency_key",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "credit_ledger_owner_created_idx",
+          "definition": "CREATE INDEX credit_ledger_owner_created_idx ON public.credit_ledger USING btree (owner_id, created_at DESC)"
+        },
+        {
+          "name": "credit_ledger_owner_idempotency_unique",
+          "definition": "CREATE UNIQUE INDEX credit_ledger_owner_idempotency_unique ON public.credit_ledger USING btree (owner_id, idempotency_key)"
+        },
+        {
+          "name": "credit_ledger_pkey",
+          "definition": "CREATE UNIQUE INDEX credit_ledger_pkey ON public.credit_ledger USING btree (id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "credit_ledger_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = owner_id)",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "credit_ledger_delta_check",
+          "type": "c",
+          "definition": "CHECK (delta <> 0)"
+        },
+        {
+          "name": "credit_ledger_idempotency_key_check",
+          "type": "c",
+          "definition": "CHECK (char_length(idempotency_key) >= 1 AND char_length(idempotency_key) <= 255)"
+        },
+        {
+          "name": "credit_ledger_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "credit_ledger_owner_idempotency_unique",
+          "type": "u",
+          "definition": "UNIQUE (owner_id, idempotency_key)"
+        },
+        {
+          "name": "credit_ledger_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "credit_ledger_reason_check",
+          "type": "c",
+          "definition": "CHECK (char_length(reason) >= 1 AND char_length(reason) <= 80)"
+        },
+        {
+          "name": "credit_ledger_reference_id_check",
+          "type": "c",
+          "definition": "CHECK (reference_id IS NULL OR char_length(reference_id) <= 255)"
+        },
+        {
+          "name": "credit_ledger_reference_type_check",
+          "type": "c",
+          "definition": "CHECK (reference_type IS NULL OR char_length(reference_type) <= 80)"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "schema": "public",
+      "name": "payments",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "subscription_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "provider_payment_id",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "amount_minor",
+          "type": "bigint",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'pending'::text",
+          "notNull": true
+        },
+        {
+          "name": "paid_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "payments_pkey",
+          "definition": "CREATE UNIQUE INDEX payments_pkey ON public.payments USING btree (id)"
+        },
+        {
+          "name": "payments_provider_payment_id_key",
+          "definition": "CREATE UNIQUE INDEX payments_provider_payment_id_key ON public.payments USING btree (provider_payment_id)"
+        },
+        {
+          "name": "payments_subscription_id_fkey_idx",
+          "definition": "CREATE INDEX payments_subscription_id_fkey_idx ON public.payments USING btree (subscription_id)"
+        },
+        {
+          "name": "payments_user_id_fkey_idx",
+          "definition": "CREATE INDEX payments_user_id_fkey_idx ON public.payments USING btree (user_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "payments_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "payments_amount_minor_check",
+          "type": "c",
+          "definition": "CHECK (amount_minor >= 0)"
+        },
+        {
+          "name": "payments_currency_check",
+          "type": "c",
+          "definition": "CHECK (currency ~ '^[A-Z]{3}$'::text)"
+        },
+        {
+          "name": "payments_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "payments_provider_payment_id_key",
+          "type": "u",
+          "definition": "UNIQUE (provider_payment_id)"
+        },
+        {
+          "name": "payments_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'refunded'::text, 'canceled'::text]))"
+        },
+        {
+          "name": "payments_subscription_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "payments_user_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "schema": "public",
+      "name": "platform_api_keys",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "key_prefix",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "key_hash",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "scopes",
+          "type": "text[]",
+          "default": "ARRAY['api:read'::text]",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "platform_api_keys_key_hash_key",
+          "definition": "CREATE UNIQUE INDEX platform_api_keys_key_hash_key ON public.platform_api_keys USING btree (key_hash)"
+        },
+        {
+          "name": "platform_api_keys_owner_created_idx",
+          "definition": "CREATE INDEX platform_api_keys_owner_created_idx ON public.platform_api_keys USING btree (owner_id, created_at DESC)"
+        },
+        {
+          "name": "platform_api_keys_pkey",
+          "definition": "CREATE UNIQUE INDEX platform_api_keys_pkey ON public.platform_api_keys USING btree (id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "platform_api_keys_revoke_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = owner_id)",
+          "command": "w",
+          "with_check": "(( SELECT auth.uid() AS uid) = owner_id)"
+        },
+        {
+          "name": "platform_api_keys_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = owner_id)",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "platform_api_keys_key_hash_check",
+          "type": "c",
+          "definition": "CHECK (char_length(key_hash) = 64)"
+        },
+        {
+          "name": "platform_api_keys_key_hash_key",
+          "type": "u",
+          "definition": "UNIQUE (key_hash)"
+        },
+        {
+          "name": "platform_api_keys_key_prefix_check",
+          "type": "c",
+          "definition": "CHECK (char_length(key_prefix) >= 4 AND char_length(key_prefix) <= 24)"
+        },
+        {
+          "name": "platform_api_keys_label_check",
+          "type": "c",
+          "definition": "CHECK (char_length(label) >= 1 AND char_length(label) <= 100)"
+        },
+        {
+          "name": "platform_api_keys_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "platform_api_keys_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "platform_api_keys_scopes_nonempty",
+          "type": "c",
+          "definition": "CHECK (cardinality(scopes) > 0)"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "schema": "public",
+      "name": "profiles",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "avatar_url",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "default": "'user'::text",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "profiles_pkey",
+          "definition": "CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "profiles_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = id)",
+          "command": "r",
+          "with_check": null
+        },
+        {
+          "name": "profiles_update_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = id)",
+          "command": "w",
+          "with_check": "(( SELECT auth.uid() AS uid) = id)"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "profiles_avatar_url_check",
+          "type": "c",
+          "definition": "CHECK (avatar_url IS NULL OR char_length(avatar_url) <= 2048)"
+        },
+        {
+          "name": "profiles_display_name_check",
+          "type": "c",
+          "definition": "CHECK (display_name IS NULL OR char_length(display_name) <= 100)"
+        },
+        {
+          "name": "profiles_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "profiles_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "profiles_role_check",
+          "type": "c",
+          "definition": "CHECK (role = ANY (ARRAY['user'::text, 'admin'::text]))"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": [
+        {
+          "name": "profiles_set_updated_at",
+          "definition": "CREATE TRIGGER profiles_set_updated_at BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION private.set_updated_at()"
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "subscriptions",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "plan_code",
+          "type": "text",
+          "default": "'free'::text",
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'active'::text",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "provider_customer_id",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "provider_subscription_id",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "current_period_start",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "current_period_end",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "cancel_at_period_end",
+          "type": "boolean",
+          "default": "false",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "subscriptions_pkey",
+          "definition": "CREATE UNIQUE INDEX subscriptions_pkey ON public.subscriptions USING btree (id)"
+        },
+        {
+          "name": "subscriptions_provider_subscription_id_key",
+          "definition": "CREATE UNIQUE INDEX subscriptions_provider_subscription_id_key ON public.subscriptions USING btree (provider_subscription_id)"
+        },
+        {
+          "name": "subscriptions_user_id_fkey_idx",
+          "definition": "CREATE INDEX subscriptions_user_id_fkey_idx ON public.subscriptions USING btree (user_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "subscriptions_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "subscriptions_check",
+          "type": "c",
+          "definition": "CHECK (current_period_end IS NULL OR current_period_start IS NULL OR current_period_end >= current_period_start)"
+        },
+        {
+          "name": "subscriptions_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "subscriptions_plan_code_check",
+          "type": "c",
+          "definition": "CHECK (plan_code = ANY (ARRAY['free'::text, 'pro'::text, 'business'::text]))"
+        },
+        {
+          "name": "subscriptions_provider_subscription_id_key",
+          "type": "u",
+          "definition": "UNIQUE (provider_subscription_id)"
+        },
+        {
+          "name": "subscriptions_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['trialing'::text, 'active'::text, 'past_due'::text, 'canceled'::text, 'expired'::text]))"
+        },
+        {
+          "name": "subscriptions_user_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": [
+        {
+          "name": "subscriptions_set_updated_at",
+          "definition": "CREATE TRIGGER subscriptions_set_updated_at BEFORE UPDATE ON subscriptions FOR EACH ROW EXECUTE FUNCTION private.set_updated_at()"
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "tools",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "default": "''::text",
+          "notNull": true
+        },
+        {
+          "name": "is_active",
+          "type": "boolean",
+          "default": "false",
+          "notNull": true
+        },
+        {
+          "name": "public_config",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "tools_pkey",
+          "definition": "CREATE UNIQUE INDEX tools_pkey ON public.tools USING btree (id)"
+        },
+        {
+          "name": "tools_slug_key",
+          "definition": "CREATE UNIQUE INDEX tools_slug_key ON public.tools USING btree (slug)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "tools_select_active",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "is_active",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "tools_name_check",
+          "type": "c",
+          "definition": "CHECK (char_length(name) >= 1 AND char_length(name) <= 120)"
+        },
+        {
+          "name": "tools_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "tools_public_config_check",
+          "type": "c",
+          "definition": "CHECK (jsonb_typeof(public_config) = 'object'::text)"
+        },
+        {
+          "name": "tools_slug_check",
+          "type": "c",
+          "definition": "CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text)"
+        },
+        {
+          "name": "tools_slug_key",
+          "type": "u",
+          "definition": "UNIQUE (slug)"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": [
+        {
+          "name": "tools_set_updated_at",
+          "definition": "CREATE TRIGGER tools_set_updated_at BEFORE UPDATE ON tools FOR EACH ROW EXECUTE FUNCTION private.set_updated_at()"
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "usage_logs",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "tool_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "units",
+          "type": "integer",
+          "default": "1",
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'success'::text",
+          "notNull": true
+        },
+        {
+          "name": "request_id",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "usage_logs_pkey",
+          "definition": "CREATE UNIQUE INDEX usage_logs_pkey ON public.usage_logs USING btree (id)"
+        },
+        {
+          "name": "usage_logs_tool_id_fkey_idx",
+          "definition": "CREATE INDEX usage_logs_tool_id_fkey_idx ON public.usage_logs USING btree (tool_id)"
+        },
+        {
+          "name": "usage_logs_user_id_fkey_idx",
+          "definition": "CREATE INDEX usage_logs_user_id_fkey_idx ON public.usage_logs USING btree (user_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "usage_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "usage_logs_action_check",
+          "type": "c",
+          "definition": "CHECK (char_length(action) >= 1 AND char_length(action) <= 100)"
+        },
+        {
+          "name": "usage_logs_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "usage_logs_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['success'::text, 'failed'::text, 'blocked'::text]))"
+        },
+        {
+          "name": "usage_logs_tool_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (tool_id) REFERENCES tools(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "usage_logs_units_check",
+          "type": "c",
+          "definition": "CHECK (units >= 0 AND units <= 1000000)"
+        },
+        {
+          "name": "usage_logs_user_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "schema": "public",
+      "name": "user_projects",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "tool_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "project_type",
+          "type": "text",
+          "default": "'general'::text",
+          "notNull": true
+        },
+        {
+          "name": "content",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "user_projects_pkey",
+          "definition": "CREATE UNIQUE INDEX user_projects_pkey ON public.user_projects USING btree (id)"
+        },
+        {
+          "name": "user_projects_tool_id_fkey_idx",
+          "definition": "CREATE INDEX user_projects_tool_id_fkey_idx ON public.user_projects USING btree (tool_id)"
+        },
+        {
+          "name": "user_projects_user_id_fkey_idx",
+          "definition": "CREATE INDEX user_projects_user_id_fkey_idx ON public.user_projects USING btree (user_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "projects_delete_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "d",
+          "with_check": null
+        },
+        {
+          "name": "projects_insert_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": null,
+          "command": "a",
+          "with_check": "(( SELECT auth.uid() AS uid) = user_id)"
+        },
+        {
+          "name": "projects_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "r",
+          "with_check": null
+        },
+        {
+          "name": "projects_update_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "w",
+          "with_check": "(( SELECT auth.uid() AS uid) = user_id)"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "user_projects_content_check",
+          "type": "c",
+          "definition": "CHECK (jsonb_typeof(content) = 'object'::text)"
+        },
+        {
+          "name": "user_projects_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "user_projects_project_type_check",
+          "type": "c",
+          "definition": "CHECK (char_length(project_type) <= 80)"
+        },
+        {
+          "name": "user_projects_title_check",
+          "type": "c",
+          "definition": "CHECK (char_length(title) >= 1 AND char_length(title) <= 200)"
+        },
+        {
+          "name": "user_projects_tool_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (tool_id) REFERENCES tools(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "user_projects_user_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "UPDATE",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": [
+        {
+          "name": "projects_set_updated_at",
+          "definition": "CREATE TRIGGER projects_set_updated_at BEFORE UPDATE ON user_projects FOR EACH ROW EXECUTE FUNCTION private.set_updated_at()"
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "workflow_logs",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "workflow_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "level",
+          "type": "text",
+          "default": "'info'::text",
+          "notNull": true
+        },
+        {
+          "name": "event",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "details",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "workflow_logs_owner_created_idx",
+          "definition": "CREATE INDEX workflow_logs_owner_created_idx ON public.workflow_logs USING btree (owner_id, created_at DESC)"
+        },
+        {
+          "name": "workflow_logs_pkey",
+          "definition": "CREATE UNIQUE INDEX workflow_logs_pkey ON public.workflow_logs USING btree (id)"
+        },
+        {
+          "name": "workflow_logs_run_id_idx",
+          "definition": "CREATE INDEX workflow_logs_run_id_idx ON public.workflow_logs USING btree (run_id)"
+        },
+        {
+          "name": "workflow_logs_workflow_id_idx",
+          "definition": "CREATE INDEX workflow_logs_workflow_id_idx ON public.workflow_logs USING btree (workflow_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "Owners view workflow logs",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(owner_id = ( SELECT auth.uid() AS uid))",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "workflow_logs_level_check",
+          "type": "c",
+          "definition": "CHECK (level = ANY (ARRAY['debug'::text, 'info'::text, 'warning'::text, 'error'::text]))"
+        },
+        {
+          "name": "workflow_logs_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflow_logs_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "workflow_logs_run_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (run_id) REFERENCES workflow_runs(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "workflow_logs_workflow_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE SET NULL"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "schema": "public",
+      "name": "workflow_runs",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "workflow_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'queued'::text",
+          "notNull": true
+        },
+        {
+          "name": "input",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "notNull": true
+        },
+        {
+          "name": "output",
+          "type": "jsonb",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "attempt",
+          "type": "integer",
+          "default": "0",
+          "notNull": true
+        },
+        {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        },
+        {
+          "name": "scheduled_for",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "workflow_runs_owner_created_idx",
+          "definition": "CREATE INDEX workflow_runs_owner_created_idx ON public.workflow_runs USING btree (owner_id, created_at DESC)"
+        },
+        {
+          "name": "workflow_runs_pkey",
+          "definition": "CREATE UNIQUE INDEX workflow_runs_pkey ON public.workflow_runs USING btree (id)"
+        },
+        {
+          "name": "workflow_runs_queue_idx",
+          "definition": "CREATE INDEX workflow_runs_queue_idx ON public.workflow_runs USING btree (created_at) WHERE (status = 'queued'::text)"
+        },
+        {
+          "name": "workflow_runs_workflow_scheduled_for_uidx",
+          "definition": "CREATE UNIQUE INDEX workflow_runs_workflow_scheduled_for_uidx ON public.workflow_runs USING btree (workflow_id, scheduled_for)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "Owners create workflow runs",
+          "roles": [
+            "authenticated"
+          ],
+          "using": null,
+          "command": "a",
+          "with_check": "((owner_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1\n   FROM workflows w\n  WHERE ((w.id = workflow_runs.workflow_id) AND (w.owner_id = ( SELECT auth.uid() AS uid))))))"
+        },
+        {
+          "name": "Owners view workflow runs",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(owner_id = ( SELECT auth.uid() AS uid))",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "workflow_runs_attempt_check",
+          "type": "c",
+          "definition": "CHECK (attempt >= 0)"
+        },
+        {
+          "name": "workflow_runs_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflow_runs_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "workflow_runs_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text]))"
+        },
+        {
+          "name": "workflow_runs_workflow_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": [
+        {
+          "name": "enforce_workflow_run_insert_defaults",
+          "definition": "CREATE TRIGGER enforce_workflow_run_insert_defaults BEFORE INSERT ON workflow_runs FOR EACH ROW EXECUTE FUNCTION private.enforce_workflow_run_insert_defaults()"
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "workflow_step_runs",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "step_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'queued'::text",
+          "notNull": true
+        },
+        {
+          "name": "input",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "notNull": true
+        },
+        {
+          "name": "output",
+          "type": "jsonb",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "attempt",
+          "type": "integer",
+          "default": "0",
+          "notNull": true
+        },
+        {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "workflow_step_runs_owner_id_idx",
+          "definition": "CREATE INDEX workflow_step_runs_owner_id_idx ON public.workflow_step_runs USING btree (owner_id)"
+        },
+        {
+          "name": "workflow_step_runs_pkey",
+          "definition": "CREATE UNIQUE INDEX workflow_step_runs_pkey ON public.workflow_step_runs USING btree (id)"
+        },
+        {
+          "name": "workflow_step_runs_run_id_step_id_key",
+          "definition": "CREATE UNIQUE INDEX workflow_step_runs_run_id_step_id_key ON public.workflow_step_runs USING btree (run_id, step_id)"
+        },
+        {
+          "name": "workflow_step_runs_run_idx",
+          "definition": "CREATE INDEX workflow_step_runs_run_idx ON public.workflow_step_runs USING btree (run_id, created_at)"
+        },
+        {
+          "name": "workflow_step_runs_step_id_idx",
+          "definition": "CREATE INDEX workflow_step_runs_step_id_idx ON public.workflow_step_runs USING btree (step_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "Owners view step runs",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(owner_id = ( SELECT auth.uid() AS uid))",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "workflow_step_runs_attempt_check",
+          "type": "c",
+          "definition": "CHECK (attempt >= 0)"
+        },
+        {
+          "name": "workflow_step_runs_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflow_step_runs_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "workflow_step_runs_run_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (run_id) REFERENCES workflow_runs(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflow_step_runs_run_id_step_id_key",
+          "type": "u",
+          "definition": "UNIQUE (run_id, step_id)"
+        },
+        {
+          "name": "workflow_step_runs_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text, 'skipped'::text]))"
+        },
+        {
+          "name": "workflow_step_runs_step_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (step_id) REFERENCES workflow_steps(id) ON DELETE CASCADE"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "schema": "public",
+      "name": "workflow_steps",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "workflow_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "step_order",
+          "type": "integer",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "action_type",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "config",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "notNull": true
+        },
+        {
+          "name": "retry_limit",
+          "type": "integer",
+          "default": "3",
+          "notNull": true
+        },
+        {
+          "name": "timeout_seconds",
+          "type": "integer",
+          "default": "60",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "workflow_steps_order_idx",
+          "definition": "CREATE INDEX workflow_steps_order_idx ON public.workflow_steps USING btree (workflow_id, step_order)"
+        },
+        {
+          "name": "workflow_steps_pkey",
+          "definition": "CREATE UNIQUE INDEX workflow_steps_pkey ON public.workflow_steps USING btree (id)"
+        },
+        {
+          "name": "workflow_steps_workflow_id_step_order_key",
+          "definition": "CREATE UNIQUE INDEX workflow_steps_workflow_id_step_order_key ON public.workflow_steps USING btree (workflow_id, step_order)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "Owners manage workflow steps",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(EXISTS ( SELECT 1\n   FROM workflows w\n  WHERE ((w.id = workflow_steps.workflow_id) AND (w.owner_id = ( SELECT auth.uid() AS uid)))))",
+          "command": "*",
+          "with_check": "(EXISTS ( SELECT 1\n   FROM workflows w\n  WHERE ((w.id = workflow_steps.workflow_id) AND (w.owner_id = ( SELECT auth.uid() AS uid)))))"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "workflow_steps_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "workflow_steps_retry_limit_check",
+          "type": "c",
+          "definition": "CHECK (retry_limit >= 0 AND retry_limit <= 10)"
+        },
+        {
+          "name": "workflow_steps_step_order_check",
+          "type": "c",
+          "definition": "CHECK (step_order > 0)"
+        },
+        {
+          "name": "workflow_steps_timeout_seconds_check",
+          "type": "c",
+          "definition": "CHECK (timeout_seconds >= 1 AND timeout_seconds <= 3600)"
+        },
+        {
+          "name": "workflow_steps_workflow_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflow_steps_workflow_id_step_order_key",
+          "type": "u",
+          "definition": "UNIQUE (workflow_id, step_order)"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "UPDATE",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "schema": "public",
+      "name": "workflows",
+      "relationKind": "r",
+      "rlsEnabled": true,
+      "forceRls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "notNull": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'draft'::text",
+          "notNull": true
+        },
+        {
+          "name": "trigger_type",
+          "type": "text",
+          "default": "'manual'::text",
+          "notNull": true
+        },
+        {
+          "name": "trigger_config",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "notNull": true
+        },
+        {
+          "name": "settings",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "notNull": true
+        },
+        {
+          "name": "next_run_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "notNull": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "workflows_owner_idx",
+          "definition": "CREATE INDEX workflows_owner_idx ON public.workflows USING btree (owner_id)"
+        },
+        {
+          "name": "workflows_pkey",
+          "definition": "CREATE UNIQUE INDEX workflows_pkey ON public.workflows USING btree (id)"
+        },
+        {
+          "name": "workflows_schedule_idx",
+          "definition": "CREATE INDEX workflows_schedule_idx ON public.workflows USING btree (next_run_at) WHERE ((status = 'active'::text) AND (trigger_type = 'schedule'::text))"
+        }
+      ],
+      "policies": [
+        {
+          "name": "Owners manage workflows",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(owner_id = ( SELECT auth.uid() AS uid))",
+          "command": "*",
+          "with_check": "(owner_id = ( SELECT auth.uid() AS uid))"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "workflows_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflows_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "workflows_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['draft'::text, 'active'::text, 'paused'::text, 'archived'::text]))"
+        },
+        {
+          "name": "workflows_trigger_type_check",
+          "type": "c",
+          "definition": "CHECK (trigger_type = ANY (ARRAY['manual'::text, 'schedule'::text, 'webhook'::text, 'event'::text]))"
+        }
+      ],
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "UPDATE",
+          "grantable": false
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "DELETE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "INSERT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "REFERENCES",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "SELECT",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRIGGER",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "TRUNCATE",
+          "grantable": true
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "UPDATE",
+          "grantable": true
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "grantable": false
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "grantable": false
+        }
+      ],
+      "triggers": [
+        {
+          "name": "workflows_updated_at",
+          "definition": "CREATE TRIGGER workflows_updated_at BEFORE UPDATE ON workflows FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+        }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "name": "enforce_workflow_run_insert_defaults",
+      "owner": "postgres",
+      "schema": "private",
+      "language": "plpgsql",
+      "resultType": "trigger",
+      "searchPath": "search_path=\"\"",
+      "volatility": "volatile",
+      "executeRoles": [
+        "PUBLIC",
+        "postgres"
+      ],
+      "definitionMd5": "84f4b62d3400141ef68314ef2ec109c9",
+      "securityDefiner": false,
+      "identityArguments": ""
+    },
+    {
+      "name": "handle_new_user",
+      "owner": "postgres",
+      "schema": "private",
+      "language": "plpgsql",
+      "resultType": "trigger",
+      "searchPath": "search_path=\"\"",
+      "volatility": "volatile",
+      "executeRoles": [
+        "postgres"
+      ],
+      "definitionMd5": "7e19be604686df27c9a97c356487f964",
+      "securityDefiner": true,
+      "identityArguments": ""
+    },
+    {
+      "name": "set_updated_at",
+      "owner": "postgres",
+      "schema": "private",
+      "language": "plpgsql",
+      "resultType": "trigger",
+      "searchPath": "search_path=\"\"",
+      "volatility": "volatile",
+      "executeRoles": [
+        "postgres"
+      ],
+      "definitionMd5": "751885a0b119756ec3a2ce655ccbc61a",
+      "securityDefiner": false,
+      "identityArguments": ""
+    },
+    {
+      "name": "simula_claim_workflow_runs",
+      "owner": "postgres",
+      "schema": "private",
+      "language": "plpgsql",
+      "resultType": "TABLE(id uuid, workflow_id uuid, owner_id uuid, input jsonb, attempt integer)",
+      "searchPath": "search_path=\"\"",
+      "volatility": "volatile",
+      "executeRoles": [
+        "authenticated",
+        "postgres",
+        "service_role"
+      ],
+      "definitionMd5": "12dab10749799215936c7a4e1c233bf8",
+      "securityDefiner": true,
+      "identityArguments": "p_limit integer"
+    },
+    {
+      "name": "simula_claim_workflow_runs_internal",
+      "owner": "postgres",
+      "schema": "private",
+      "language": "plpgsql",
+      "resultType": "TABLE(id uuid, workflow_id uuid, owner_id uuid, input jsonb, attempt integer)",
+      "searchPath": "search_path=\"\"",
+      "volatility": "volatile",
+      "executeRoles": [
+        "postgres",
+        "service_role"
+      ],
+      "definitionMd5": "551651d41e9f71f0950605732d48f1c3",
+      "securityDefiner": true,
+      "identityArguments": "p_limit integer"
+    },
+    {
+      "name": "simula_enqueue_due_workflows",
+      "owner": "postgres",
+      "schema": "private",
+      "language": "plpgsql",
+      "resultType": "integer",
+      "searchPath": "search_path=\"\"",
+      "volatility": "volatile",
+      "executeRoles": [
+        "postgres"
+      ],
+      "definitionMd5": "4002ffa8bedf0379315e4a4499ee538c",
+      "securityDefiner": true,
+      "identityArguments": ""
+    },
+    {
+      "name": "set_updated_at",
+      "owner": "postgres",
+      "schema": "public",
+      "language": "plpgsql",
+      "resultType": "trigger",
+      "searchPath": "search_path=\"\"",
+      "volatility": "volatile",
+      "executeRoles": [
+        "PUBLIC",
+        "anon",
+        "authenticated",
+        "postgres",
+        "service_role"
+      ],
+      "definitionMd5": "a6f7feb6cee753e1a68c3080f77712bc",
+      "securityDefiner": false,
+      "identityArguments": ""
+    },
+    {
+      "name": "simula_claim_workflow_runs",
+      "owner": "postgres",
+      "schema": "public",
+      "language": "sql",
+      "resultType": "TABLE(id uuid, workflow_id uuid, owner_id uuid, input jsonb, attempt integer)",
+      "searchPath": "search_path=\"\"",
+      "volatility": "volatile",
+      "executeRoles": [
+        "authenticated",
+        "postgres",
+        "service_role"
+      ],
+      "definitionMd5": "838e8485e0e190e78280618d29650204",
+      "securityDefiner": false,
+      "identityArguments": "p_limit integer"
+    },
+    {
+      "name": "simula_claim_workflow_runs_internal",
+      "owner": "postgres",
+      "schema": "public",
+      "language": "sql",
+      "resultType": "TABLE(id uuid, workflow_id uuid, owner_id uuid, input jsonb, attempt integer)",
+      "searchPath": "search_path=\"\"",
+      "volatility": "volatile",
+      "executeRoles": [
+        "postgres",
+        "service_role"
+      ],
+      "definitionMd5": "3a94155e6476c8c7263b4a71e1dd093b",
+      "securityDefiner": false,
+      "identityArguments": "p_limit integer"
+    },
+    {
+      "name": "simula_verify_worker_secret",
+      "owner": "postgres",
+      "schema": "public",
+      "language": "sql",
+      "resultType": "boolean",
+      "searchPath": "search_path=\"\"",
+      "volatility": "volatile",
+      "executeRoles": [
+        "postgres",
+        "service_role"
+      ],
+      "definitionMd5": "c4d8fb27e4c7632a8f37cb7521bf06fd",
+      "securityDefiner": true,
+      "identityArguments": "p_secret text"
+    }
+  ],
+  "extensions": [
+    {
+      "name": "pg_cron",
+      "schema": "pg_catalog",
+      "version": "1.6.4"
+    },
+    {
+      "name": "pg_net",
+      "schema": "extensions",
+      "version": "0.20.4"
+    },
+    {
+      "name": "pg_stat_statements",
+      "schema": "extensions",
+      "version": "1.11"
+    },
+    {
+      "name": "pgcrypto",
+      "schema": "extensions",
+      "version": "1.3"
+    },
+    {
+      "name": "plpgsql",
+      "schema": "pg_catalog",
+      "version": "1.0"
+    },
+    {
+      "name": "supabase_vault",
+      "schema": "vault",
+      "version": "0.3.1"
+    },
+    {
+      "name": "uuid-ossp",
+      "schema": "extensions",
+      "version": "1.1"
+    }
+  ],
+  "types": [],
+  "capture": {
+    "relationRlsPolicyInventoryCapturedAt": "2026-11-20 02:21:58.728459+00",
+    "columnsConstraintsIndexesPoliciesCapturedAt": "2026-11-20T02:07:20.142926+00:00",
+    "grantsTriggersCapturedAt": "2026-11-20 02:21:58.728459+00",
+    "sourceLimitations": "Column, constraint, index and policy definitions reuse the prior read-only capture and were cross-checked against current relation counts, RLS flags, and policy counts. Full fresh definition-by-definition parity remains a human review item."
+  },
+  "review": {
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "reviewEvidence": null
+  }
+}

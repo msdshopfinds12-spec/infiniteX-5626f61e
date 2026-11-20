@@ -1,0 +1,96 @@
+name: Application CI
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "vite.config.*"
+      - "vercel.json"
+      - ".github/workflows/app-ci.yml"
+  push:
+    branches:
+      - main
+      - "engineering/**"
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "vite.config.*"
+      - "vercel.json"
+      - ".github/workflows/app-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: application-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: TypeScript, lint, and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Report dependency security audit
+        shell: bash
+        run: |
+          npm audit --json > npm-audit.json || true
+          node --input-type=commonjs -e '
+            const fs = require("node:fs");
+            const report = JSON.parse(fs.readFileSync("npm-audit.json", "utf8"));
+            const vulnerabilities = Object.entries(report.vulnerabilities || {}).map(([name, item]) => ({
+              name,
+              severity: item.severity,
+              direct: item.isDirect,
+              range: item.range,
+              fixAvailable: item.fixAvailable,
+              advisories: (item.via || []).filter(v => typeof v === "object").map(v => ({
+                title: v.title,
+                url: v.url,
+                range: v.range
+              }))
+            }));
+            console.log(JSON.stringify({
+              auditError: report.error || null,
+              counts: report.metadata?.vulnerabilities || null,
+              vulnerabilities
+            }, null, 2));
+          '
+
+      - name: TypeScript validation
+        run: npm run lint
+
+      - name: Run application regression tests
+        run: npm run test:app
+
+      - name: Build production assets
+        run: npm run build
+
+      - name: Verify Vite output
+        shell: bash
+        run: |
+          test -s dist/index.html
+          echo "Vite production output exists: dist/index.html"
