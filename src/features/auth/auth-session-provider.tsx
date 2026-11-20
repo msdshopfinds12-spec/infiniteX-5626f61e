@@ -59,7 +59,7 @@ export function AuthSessionProvider({
       unsubscribe = adapter.onAuthStateChange((session, event) => {
         if (!active) return;
         if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
-        if (event === "SIGNED_OUT" || event === "USER_UPDATED") setRecoveryMode(false);
+        if (event === "SIGNED_OUT") setRecoveryMode(false);
         setState(coordinator.applyAuthEvent(session));
       });
     } catch {
