@@ -1,68 +1,58 @@
 # InfiniteX P0/P1 Implementation Status
 
-**Status:** PARTIAL — review foundation only; authentication integration is not complete  
-**Branch:** `eng/infinitex-p0-p1-auth-2026-11-20`  
-**Base:** `eng/infinitex-unified-ui-backend-2026-11-20`  
-**Scope:** source-only P0/P1 work; no production backend or deployment changes
+**Current status:** AUTHENTICATION UX + RECOVERY IMPLEMENTED; PHASE 49 FAIL-CLOSED BOOTSTRAP AND AUTHORIZATION CONTRACT ADDED; CI CONFIRMATION PENDING.
+**Branch:** `eng/infinitex-p0-p1-auth-2026-11-20`
+**Base:** `eng/infinitex-unified-ui-backend-2026-11-20`
+**PR:** #60 — Draft, open, not merged.
+**Scope:** source-code and documentation changes only; no production backend mutations or deployment.
 
-## Implemented on this branch
+## Verified implementation on this branch
 
-1. Added regression tests for the browser-safe Supabase configuration contract:
-   - Missing and partial public configuration fails closed.
-   - HTTPS is required outside localhost.
-   - Localhost HTTP is accepted for local development.
-   - Publishable keys and legacy anon JWT role validation are covered.
-   - Privileged service-role/secret credentials and malformed URLs are rejected.
-2. Added a provider-neutral authentication identity state contract.
-   - Explicit loading, anonymous, authenticated, and error states.
-   - Identity epoch increments on account switch and sign-out.
-   - Same-user session refresh preserves the identity epoch.
-   - Consumers can fence stale asynchronous responses after an identity change.
-3. Added tests for those state transitions.
-4. Changed `.env.example` to empty public values. It continues to warn that privileged secrets must never be placed in Vite variables.
+1. Exact `@supabase/supabase-js@2.119.2` dependency and npm-generated lockfile.
+2. Browser-safe Supabase public configuration validation; privileged service-role and `sb_secret_*` credentials are rejected.
+3. Typed Supabase browser client using PKCE and official SDK session handling.
+4. Provider-neutral auth state, session event subscription, cleanup, identity epoch, and stale initial-session fencing.
+5. Sign-in, sign-up, sign-out, password-reset request, and password-update actions.
+6. Responsive authentication and password recovery UI with safe error messages, input validation, and non-enumerating reset response.
+7. Recovery mode requires a Supabase `PASSWORD_RECOVERY` event with a non-null session; query-string values alone do not activate recovery.
+8. Dashboard remains DEMO MODE; no live workflow, agent, logs, usage, or security telemetry is claimed.
+9. Read-only GitHub Actions quality gates run npm install, audit, lint, tests, edge/worker security tests, and production build.
+10. Phase 49 adds a fail-closed auth bootstrap resolver and a deny-by-default UI authorization decision contract.
 
-## Verification evidence
+## Phase 49 critical fix
 
-Latest full CI verification before this documentation refresh: commit `d54dbcf65699e8ca13c0b55b1bad68e0dcf6e0c0`, GitHub Actions run #41: [44683709434](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44683709434). The run was confirmed against that exact PR head and completed successfully.
+A code review found that missing or invalid Supabase public configuration caused `Root` to render `<App />` without an auth state. Since the App shell previously treated missing state as permission to render the demo workspace, this was a fail-open bootstrap path.
 
-- Node.js 22 / npm CI workflow: PASS.
-- `npm ci`: PASS — 30 packages installed.
-- `npm audit`: PASS — 0 vulnerabilities reported.
-- `npm run lint`: PASS.
-- `npm test`: PASS — 60 tests, 60 passed, 0 failed.
-- `npm run build`: PASS — Vite 8.3.8 generated the production bundle.
-- Build artifact uploaded to GitHub Actions artifact storage only; it was not deployed.
+The fix makes missing/invalid configuration produce the generic auth error state and makes `App` itself fail closed if no auth state is supplied. New tests cover the bootstrap resolver.
 
-The test suite includes identity-epoch regression coverage for repeated anonymous events and re-authentication after sign-out. A first CI run had exposed Node test modules being included in the browser TypeScript project without Node type declarations; the application tsconfig excludes `src/**/*.test.ts`, while the tests run under Node's test runner.
+## Authorization and data boundaries
 
-A separate temporary, read-only GitHub Actions experiment resolved `@supabase/supabase-js` v`2.119.2` and generated a candidate lockfile. Its `npm ci --ignore-scripts` and `npm audit` both passed with zero reported vulnerabilities. See [workflow run #3](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44682539105), artifact ID `14604862693`. The candidate was not committed; repository package manifest and lockfile remain synchronized without the SDK dependency.
+- The capability decision helper is a client-side UX contract only. It is not server authorization.
+- A browser-provided role, permission list, user ID, URL parameter, or local-storage value must never authorize backend access.
+- Server handlers must derive the subject from the verified Supabase session and enforce permissions for every operation.
+- RLS must enforce row ownership independently.
+- Never select `platform_api_keys.key_hash`; use `src/features/security/api-key-metadata.ts`.
+- Never perform browser INSERTs into `workflow_runs` or set worker-owned lifecycle/result fields; use a trusted server-side enqueue operation after contract review.
+- Billing, credit-ledger mutations, worker claim operations, and privileged operations remain server-side.
+- Account-scoped caches must be cleared/fenced on sign-out and account switch before live user data is introduced.
 
-These checks verify the current source, regression suite, and production build. They do not verify live Supabase authentication, RLS isolation, or production readiness.
+## Verification evidence and limitations
 
-## P1 integration blocker
+Earlier exact-head Phase 48 verification passed:
+- 100 unit/regression tests.
+- 8 Edge Function CORS tests.
+- 10 worker security tests.
+- npm audit: 0 vulnerabilities.
+- lint and production build passed.
 
-The official `@supabase/supabase-js` dependency and matching lockfile are not committed yet. The singleton client, React AuthProvider, sign-in UI, and protected application shell are also not included.
+Phase 49 adds new source and tests. Its final exact-head CI status is pending until the new commit completes all workflow jobs. Do not reuse earlier Phase 48 results as proof of Phase 49 verification.
 
-The existing `package-lock.json` is npm lockfile v3 and the CI workflow uses `npm ci`. The SDK must be added in a controlled Node 22/npm workspace and the lockfile must be generated by npm. Hand-editing the lockfile or adding a package manifest entry without the matching lockfile would break reproducible installs, so that shortcut was intentionally rejected.
+Live Supabase recovery email delivery, redirect allow-list, synthetic-account RLS isolation, cross-user negative tests, live server authorization, and production data access are NOT VERIFIED.
 
-Next required implementation step:
+## Explicit safety boundaries
 
-1. Use a controlled Node 22 workspace with npm registry access.
-2. Install an exact reviewed SDK version and generate the matching lockfile.
-3. Run `npm ci`, `npm audit`, lint, tests, and build.
-4. Add the SDK adapter, AuthProvider, auth screen, protected routes, and cleanup on sign-out/account switch.
-5. Add isolated synthetic-account RLS negative tests before enabling any live feature query.
+- No production DDL, DML, GRANT/REVOKE, RLS policy, migration, Edge Function deployment, secret update, environment change, or billing change.
+- No merge, release, or manual deployment.
+- Automatic Vercel Git integration may create deployment records on branch pushes; this is distinct from a manually approved production deployment. Vercel build-rate-limit/verified-commit blockers remain separate from GitHub Actions CI.
 
-## Safety boundaries observed
-
-- No production Supabase schema, data, RLS policy, Edge Function, or secret was changed.
-- No migration was created or run.
-- No Vercel setting, environment variable, domain, or deployment was changed manually.
-- No merge, release, or deletion was performed.
-- Live browser authentication and live data access remain disabled/unimplemented.
-
-## Automatic Vercel Git integration observation
-
-A branch-push event created a Vercel deployment record for commit `2714e762c19fc1e4b94e62d3548c8e34dcbced31`. Its observed state was `BLOCKED`, with the Vercel error link pointing to the verified-commits project setting. It was not `READY`; no retry, unblock, promote, or deployment action was taken.
-
-This is an automatic Git-integration side effect, not a manually initiated deployment.
+**Release status: NOT APPROVED. Keep PR #60 Draft.**
