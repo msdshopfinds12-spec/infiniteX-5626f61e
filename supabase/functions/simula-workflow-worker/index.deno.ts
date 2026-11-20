@@ -177,6 +177,12 @@ class StatefulQuery {
   }
   private async execute(): Promise<QueryResult> {
     const rows = this.db.tables[this.table] ?? (this.db.tables[this.table] = []);
+    const failureKey = this.operation + ":" + this.table;
+    const injectedFailure = this.db.failures[failureKey];
+    if (injectedFailure) {
+      delete this.db.failures[failureKey];
+      return { data: null, error: injectedFailure };
+    }
     if (this.operation === "select") {
       let selected = rows.filter(row => this.matches(row));
       if (this.ordered) {
@@ -206,6 +212,7 @@ class StatefulQuery {
 
 class StatefulDatabase {
   tables: Record<string, DbRow[]>;
+  failures: Record<string, { code?: string; message: string }> = {};
   private sequence = 0;
   claimedRun: DbRow;
   constructor() {
@@ -341,4 +348,71 @@ Deno.test("cron worker persists action failure without falsely succeeding the wo
   assert(db.tables.workflow_step_runs[0].status === "failed", "failed action must persist failed step state");
   assert(db.tables.workflow_runs[0].status === "failed", "failed action must persist failed workflow state");
   assert(db.tables.workflow_runs[0].status !== "succeeded", "failed action must never report success");
+});
+
+
+Deno.test("authenticated worker retries only an allowlisted transient action failure", async () => {
+  const db = new StatefulDatabase();
+  db.tables.workflow_steps[0].retry_limit = 1;
+  let firstStepAttempts = 0;
+  const handler = createAuthenticatedWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    corsHeadersForRequest: cors,
+    executeSafeAction: (async (actionType: string, input: unknown, config: Record<string, unknown>) => {
+      if (actionType === "transform" && config.suffix === "-one") {
+        firstStepAttempts++;
+        if (firstStepAttempts === 1) {
+          throw Object.assign(new Error("temporary upstream issue"), { code: "UPSTREAM_UNAVAILABLE" });
+        }
+      }
+      return transformAction(actionType, input, config);
+    }) as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST", headers: { Authorization: "Bearer valid-token" }, body: "{}",
+  }));
+  const body = await response.json();
+  assert(response.status === 200 && body.succeeded === 1, "expected transient failure to recover");
+  assert(firstStepAttempts === 2, "expected exactly one retry for the allowlisted transient code");
+  assert(db.tables.workflow_runs[0].status === "succeeded", "retried workflow must persist success");
+});
+
+Deno.test("cron worker fails closed when a step-run database insert fails", async () => {
+  const db = new StatefulDatabase();
+  db.failures["insert:workflow_step_runs"] = { code: "XX000", message: "synthetic database failure" };
+  const handler = createCronWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    executeSafeAction: transformAction as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST", headers: { "x-simula-worker-secret": "s".repeat(40) }, body: "{}",
+  }));
+  const body = await response.json();
+  assert(response.status === 200 && body.failed === 1, "expected isolated run failure in batch summary");
+  assert(db.tables.workflow_step_runs.length === 0, "failed insert must not create a step-run row");
+  assert(db.tables.workflow_runs[0].status === "failed", "database write failure must not falsely succeed workflow");
+});
+
+Deno.test("authenticated worker rejects a claimed run owned by another user without executing actions", async () => {
+  const db = new StatefulDatabase();
+  db.claimedRun.owner_id = "different-owner";
+  let actions = 0;
+  const handler = createAuthenticatedWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    corsHeadersForRequest: cors,
+    executeSafeAction: (async () => { actions++; return { unexpected: true }; }) as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST", headers: { Authorization: "Bearer valid-token" }, body: "{}",
+  }));
+  const body = await response.json();
+  assert(response.status === 200 && body.failed === 1, "owner mismatch must be rejected in batch summary");
+  assert(actions === 0, "owner mismatch must never execute workflow actions");
+  assert(db.tables.workflow_step_runs.length === 0, "owner mismatch must not persist step execution");
 });
