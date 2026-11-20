@@ -1,0 +1,58 @@
+name: InfiniteX Phase 63E Attempt Identity and Concurrency
+
+on:
+  pull_request:
+    paths:
+      - "tests/database/phase-63e-*"
+      - "tests/database/run-phase-63e-*"
+      - "docs/database/PHASE-63E-*"
+      - ".github/workflows/phase-63e-retry-identity-concurrency.yml"
+  push:
+    branches:
+      - "test/phase-63e-attempt-identity-concurrency"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-phase-63e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  disposable-postgres:
+    name: PostgreSQL 17 identity and two-session concurrency
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: infinitex_phase63e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d infinitex_phase63e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: infinitex_phase63e
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Create disposable Phase 63E fixture
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-63e-attempt-identity-schema.sql
+      - name: Verify immutable identity and legitimate worker updates
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-63e-identity-regression.sql
+      - name: Verify independent-session retry serialization and identity rejection
+        run: bash tests/database/run-phase-63e-concurrency.sh
