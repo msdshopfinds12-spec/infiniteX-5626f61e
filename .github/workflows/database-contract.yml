@@ -231,10 +231,8 @@ jobs:
       - name: Start isolated Supabase PostgreSQL 17 container with scheduled jobs disabled
         shell: bash
         run: |
-          # Generate a throwaway pgsodium server key for this disposable CI container only.
-          # It is never stored in GitHub secrets, repository files, or production.
-          PGSODIUM_TEST_SERVER_SECRET="$(openssl rand -hex 32)"
-          echo "::add-mask::$PGSODIUM_TEST_SERVER_SECRET"
+          # Match the Supabase image's supported key-script configuration.
+          # Its bundled script creates a fresh disposable root key file when absent.
           docker run -d --name infinitex-rehearsal-db \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_USER=supabase_admin \
@@ -242,8 +240,9 @@ jobs:
             -p 5432:5432 \
             supabase/postgres:17.6.1.136 \
             postgres -c config_file=/etc/postgresql/postgresql.conf \
-              -c shared_preload_libraries=pg_cron,pg_net,pg_stat_statements,pgsodium \
-              -c pgsodium.server_secret_key="$PGSODIUM_TEST_SERVER_SECRET" \
+              -c shared_preload_libraries=pg_stat_statements,pgaudit,plpgsql,plpgsql_check,pg_cron,pg_net,pgsodium,timescaledb,auto_explain,pg_tle,plan_filter,supabase_vault \
+              -c pgsodium.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
+              -c vault.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
               -c cron.database_name=infinitex_rehearsal \
               -c cron.launch_active_jobs=off
           for attempt in $(seq 1 60); do
