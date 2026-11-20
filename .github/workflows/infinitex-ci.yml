@@ -2,7 +2,9 @@ name: InfiniteX dependency and build verification
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - eng/infinitex-unified-ui-backend-2026-11-20
   workflow_dispatch:
 
 permissions:
