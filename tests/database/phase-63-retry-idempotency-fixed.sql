@@ -1,4 +1,4 @@
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 DO $fixed$
 BEGIN
@@ -37,4 +37,4 @@ BEGIN
 END
 $assert$;
 
-\\echo 'PASS: corrected global-key lookup rejects cross-owner collision without mutation.'
+\echo 'PASS: corrected global-key lookup rejects cross-owner collision without mutation.'
