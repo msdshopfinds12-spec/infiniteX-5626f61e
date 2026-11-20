@@ -56,7 +56,9 @@ table_contract AS (
  FROM relations t
 ),
 function_contract AS (
- SELECT n.nspname AS schema_name,p.proname AS function_name,pg_catalog.pg_get_userbyid(p.proowner) AS owner,
+ SELECT n.nspname AS schema_name,p.proname AS function_name,
+  CASE p.prokind WHEN 'p' THEN 'PROCEDURE' ELSE 'FUNCTION' END AS routine_kind,
+  pg_catalog.pg_get_userbyid(p.proowner) AS owner,
   l.lanname AS language,pg_catalog.pg_get_function_result(p.oid) AS result_type,
   pg_catalog.pg_get_function_identity_arguments(p.oid) AS identity_arguments,p.prosecdef AS security_definer,
   COALESCE((SELECT x FROM unnest(COALESCE(p.proconfig,ARRAY[]::text[])) x
@@ -136,7 +138,7 @@ SELECT jsonb_build_object(
   'columnGrants',column_grants,'triggers',triggers
  ) ORDER BY schema_name,relname) FROM table_contract),'[]'::jsonb),
  'functions',COALESCE((SELECT jsonb_agg(jsonb_build_object(
-  'schema',schema_name,'name',function_name,'owner',owner,'language',language,
+  'schema',schema_name,'name',function_name,'kind',routine_kind,'owner',owner,'language',language,
   'resultType',result_type,'identityArguments',identity_arguments,'securityDefiner',security_definer,
   'searchPath',search_path,'volatility',volatility,'parallelSafety',parallel_safety,
   'strict',strict,'leakproof',leakproof,'executeRoles',execute_roles
