@@ -40,7 +40,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Deno worker HTTP integration tests
-        run: deno test --no-check supabase/functions/simula-workflow-worker/index.test.ts
+        run: deno test --no-check supabase/functions/simula-workflow-worker/index.deno.ts
       - name: Worker authentication boundary tests
         run: npm run test:worker-http-boundary
       - name: Existing worker and CORS security tests
