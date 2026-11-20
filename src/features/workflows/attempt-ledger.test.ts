@@ -100,6 +100,32 @@ test("stale generation and expired lease cannot heartbeat or complete", () => {
   );
 });
 
+test("malformed persisted lease timestamps fail closed for heartbeat and completion", () => {
+  const active = claimed();
+  const malformedAttempts = [
+    { ...active, leaseExpiresAtMs: Number.NaN },
+    { ...active, leaseExpiresAtMs: Number.POSITIVE_INFINITY },
+    { ...active, startedAtMs: Number.NaN },
+    { ...active, heartbeatAtMs: active.startedAtMs! - 1 },
+    { ...active, leaseExpiresAtMs: active.heartbeatAtMs },
+  ] as StepAttempt[];
+
+  for (const malformed of malformedAttempts) {
+    assert.throws(
+      () => heartbeatStepAttempt(malformed, {
+        nowMs: 1_100, expectedLeaseGeneration: 1, leaseDurationMs: 500,
+      }),
+      /stale_or_expired_lease/,
+    );
+    assert.throws(
+      () => finishStepAttempt(malformed, {
+        nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "succeeded",
+      }),
+      /stale_or_expired_lease/,
+    );
+  }
+});
+
 test("successful completion stores a detached deeply immutable JSON snapshot", () => {
   const active = claimed();
   const output = { result: "synthetic", nested: { values: [1, 2] } };
