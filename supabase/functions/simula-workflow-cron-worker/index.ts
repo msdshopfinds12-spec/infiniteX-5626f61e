@@ -24,7 +24,7 @@ type ClaimedRun = {
 };
 
 const headers = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" };
-function reply(status: number, body: JsonRecord) {
+function respond(status: number, body: JsonRecord) {
   return new Response(JSON.stringify(body), { status, headers });
 }
 function record(value: unknown): JsonRecord {
@@ -41,24 +41,36 @@ async function logEvent(
   if (error) console.error("workflow_log_insert_failed", error.message);
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method !== "POST") return reply(405, { ok: false, error: "method_not_allowed" });
+export type CronWorkerDependencies = {
+  createClient: typeof createClient;
+  env: { get(name: string): string | undefined };
+  executeSafeAction: typeof executeSafeAction;
+  now?: () => Date;
+};
+
+export function createCronWorkerHandler(deps: CronWorkerDependencies) {
+  const { createClient, env, executeSafeAction } = deps;
+  const now = deps.now ?? (() => new Date());
+  const respond = (status: number, body: JsonRecord) =>
+    new Response(JSON.stringify(body), { status, headers });
+  return async (req: Request) => {
+  if (req.method !== "POST") return respond(405, { ok: false, error: "method_not_allowed" });
 
   const authentication = await authenticateCronRequest({
     request: req,
-    env: { get: (key: string) => Deno.env.get(key) },
+    env,
     createClient,
   });
   if (!authentication.ok) {
     if (authentication.status === 500) console.error("worker_environment_incomplete");
-    return reply(authentication.status, { ok: false, error: authentication.error });
+    return respond(authentication.status, { ok: false, error: authentication.error });
   }
   const { admin } = authentication;
 
   const bodyResult = await readJsonBodyLimited(req, 2048);
   if (!bodyResult.ok) {
     const status = bodyResult.reason === "payload_too_large" ? 413 : 400;
-    return reply(status, { ok: false, error: bodyResult.reason });
+    return respond(status, { ok: false, error: bodyResult.reason });
   }
   const body = bodyResult.value;
   const limit = clampBatchLimit(body && typeof body === "object" ? body.limit : undefined);
@@ -68,7 +80,7 @@ Deno.serve(async (req: Request) => {
   );
   if (claimError) {
     console.error("queue_claim_failed", claimError.message);
-    return reply(500, { ok: false, error: "queue_claim_failed" });
+    return respond(500, { ok: false, error: "queue_claim_failed" });
   }
 
   const summary = { ok: true, claimed: (claimedRuns ?? []).length, succeeded: 0, failed: 0, superseded: 0, runs: [] as JsonRecord[] };
@@ -110,7 +122,7 @@ Deno.serve(async (req: Request) => {
         const stepRunPayload = {
           run_id: run.id, step_id: step.id, owner_id: ownerId, status: "running",
           input: record(payload), output: null, error_message: null,
-          attempt: stepAttempt, started_at: new Date().toISOString(), finished_at: null,
+          attempt: stepAttempt, started_at: now().toISOString(), finished_at: null,
         };
         if (previous) {
           if (!isAttemptGenerationNewer(previous.attempt, stepAttempt)) {
@@ -158,7 +170,7 @@ Deno.serve(async (req: Request) => {
         if (actionError || !output) {
           const { data: failedStep, error: stepFailureError } = await admin.from("workflow_step_runs").update({
             status: "failed", error_message: (actionError || "action_failed").slice(0, 500),
-            finished_at: new Date().toISOString(),
+            finished_at: now().toISOString(),
           }).eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
             .eq("attempt", stepAttempt).select("id").maybeSingle();
           if (stepFailureError) throw new Error("step_run_failure_update_failed");
@@ -168,7 +180,7 @@ Deno.serve(async (req: Request) => {
 
         payload = output;
         const { data: finishedStep, error: finishStepError } = await admin.from("workflow_step_runs").update({
-          status: "succeeded", output, error_message: null, finished_at: new Date().toISOString(),
+          status: "succeeded", output, error_message: null, finished_at: now().toISOString(),
         }).eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
           .eq("attempt", stepAttempt).select("id").maybeSingle();
         if (finishStepError) throw new Error("step_run_finish_failed");
@@ -179,7 +191,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const { data: finishedRun, error: finishRunError } = await admin.from("workflow_runs").update({
-        status: "succeeded", output: record(payload), error_message: null, finished_at: new Date().toISOString(),
+        status: "succeeded", output: record(payload), error_message: null, finished_at: now().toISOString(),
       }).eq("id", run.id).eq("owner_id", ownerId).eq("status", "running")
         .eq("attempt", run.attempt).select("id").maybeSingle();
       if (finishRunError) throw new Error("workflow_run_finish_failed");
@@ -200,7 +212,7 @@ Deno.serve(async (req: Request) => {
         continue;
       }
       const { data: failedRun, error: updateError } = await admin.from("workflow_runs").update({
-        status: "failed", error_message: failure, finished_at: new Date().toISOString(),
+        status: "failed", error_message: failure, finished_at: now().toISOString(),
       }).eq("id", run.id).eq("owner_id", ownerId).eq("status", "running")
         .eq("attempt", run.attempt).select("id").maybeSingle();
       if (updateError) console.error("workflow_run_failure_update_failed", updateError.message);
@@ -217,5 +229,14 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  return reply(200, summary);
-});
+  return respond(200, summary);
+  };
+}
+
+if (import.meta.main) {
+  Deno.serve(createCronWorkerHandler({
+    createClient,
+    env: { get: (key: string) => Deno.env.get(key) },
+    executeSafeAction,
+  }));
+}
