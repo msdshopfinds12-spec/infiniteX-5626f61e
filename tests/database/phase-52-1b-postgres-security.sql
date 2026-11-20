@@ -26,7 +26,10 @@ $roles$;
 
 CREATE SCHEMA auth;
 CREATE SCHEMA private;
-CREATE TABLE auth.users (id uuid PRIMARY KEY);
+CREATE TABLE auth.users (
+  id uuid PRIMARY KEY,
+  raw_user_meta_data jsonb NOT NULL DEFAULT '{}'::jsonb
+);
 
 CREATE FUNCTION auth.uid()
 RETURNS uuid
@@ -35,6 +38,9 @@ STABLE
 AS $function$
   SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
 $function$;
+
+-- Apply the exact checked-in profile/project RLS migration in this disposable database.
+\ir ../../supabase/migrations/20261025182821_simula_app_factory_core_schema_rls.sql
 
 GRANT USAGE ON SCHEMA auth TO authenticated;
 GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
@@ -71,6 +77,12 @@ GRANT SELECT ON public.workflow_runs TO authenticated;
 INSERT INTO auth.users(id) VALUES
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+
+-- Seed two tenants through the real auth.users profile trigger and project schema.
+INSERT INTO public.user_projects(user_id, title, project_type, content)
+VALUES
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','Tenant A project','workflow','{"private":"A"}'),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Tenant B project','workflow','{"private":"B"}');
 
 INSERT INTO public.workflow_runs(workflow_id, owner_id, input, status)
 VALUES
@@ -153,6 +165,46 @@ BEGIN
     RAISE EXCEPTION 'RLS isolation failed for API keys: expected 1 row, got %', v_count;
   END IF;
 
+  SELECT count(*) INTO v_count FROM public.user_projects;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'RLS isolation failed for user A projects: expected 1 row, got %', v_count;
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.user_projects WHERE title = 'Tenant B project') THEN
+    RAISE EXCEPTION 'user A can read user B project metadata';
+  END IF;
+
+  SELECT count(*) INTO v_count FROM public.profiles;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'RLS isolation failed for user A profile: expected 1 row, got %', v_count;
+  END IF;
+  UPDATE public.profiles SET display_name = 'Tenant A updated'
+   WHERE id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 1 THEN
+    RAISE EXCEPTION 'user A could not update own allowed profile fields';
+  END IF;
+  UPDATE public.profiles SET display_name = 'Tampered by A'
+   WHERE id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 0 THEN
+    RAISE EXCEPTION 'user A modified user B profile';
+  END IF;
+
+  UPDATE public.user_projects SET title = 'Tampered by A'
+   WHERE title = 'Tenant B project';
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 0 THEN
+    RAISE EXCEPTION 'user A modified user B project';
+  END IF;
+
+  BEGIN
+    INSERT INTO public.user_projects(user_id, title, project_type)
+    VALUES ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Forged tenant project','general');
+    RAISE EXCEPTION 'user A inserted a project for user B';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
   BEGIN
     EXECUTE 'SELECT key_hash FROM public.platform_api_keys';
     RAISE EXCEPTION 'key_hash read unexpectedly succeeded';
@@ -232,6 +284,32 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.platform_api_keys;
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'RLS isolation failed for user B: expected 1 row, got %', v_count;
+  END IF;
+
+  SELECT count(*) INTO v_count FROM public.user_projects;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'RLS isolation failed for user B projects: expected 1 row, got %', v_count;
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.user_projects WHERE title = 'Tenant A updated') THEN
+    RAISE EXCEPTION 'user B can read user A project metadata';
+  END IF;
+
+  SELECT count(*) INTO v_count FROM public.profiles;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'RLS isolation failed for user B profile: expected 1 row, got %', v_count;
+  END IF;
+
+  UPDATE public.user_projects SET title = 'Tampered by B'
+   WHERE user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 0 THEN
+    RAISE EXCEPTION 'user B modified user A project';
+  END IF;
+  UPDATE public.profiles SET display_name = 'Tampered by B'
+   WHERE id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 0 THEN
+    RAISE EXCEPTION 'user B modified user A profile';
   END IF;
 
   UPDATE public.platform_api_keys SET revoked_at=now()
