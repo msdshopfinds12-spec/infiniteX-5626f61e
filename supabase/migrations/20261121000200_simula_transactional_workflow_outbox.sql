@@ -46,6 +46,7 @@ CREATE INDEX simula_workflow_outbox_expired_lease_idx
 CREATE INDEX simula_workflow_outbox_owner_created_idx
   ON private.simula_workflow_outbox (owner_id, created_at DESC);
 
+GRANT USAGE ON SCHEMA private TO service_role;
 REVOKE ALL ON TABLE private.simula_workflow_outbox FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON TABLE private.simula_workflow_outbox TO service_role;
 
@@ -98,6 +99,15 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'workflow_run_generation_superseded' USING ERRCODE = '40001';
   END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.workflows AS w
+    WHERE w.id = v_run.workflow_id AND w.owner_id = p_owner_id
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.workflow_steps AS s
+    WHERE s.id = p_step_id AND s.workflow_id = v_run.workflow_id
+  ) THEN
+    RAISE EXCEPTION 'outbox_workflow_step_ownership_mismatch' USING ERRCODE = '42501';
+  END IF;
 
   IF p_event_type IS NOT NULL THEN
     SELECT * INTO v_existing
@@ -118,7 +128,7 @@ BEGIN
       WHERE run_id = p_run_id AND step_id = p_step_id
         AND owner_id = p_owner_id AND attempt = p_attempt
         AND status = 'succeeded';
-      IF NOT FOUND THEN
+      IF NOT FOUND OR v_step_run.output IS DISTINCT FROM p_output THEN
         RAISE EXCEPTION 'outbox_replay_step_state_mismatch' USING ERRCODE = '40001';
       END IF;
       RETURN QUERY SELECT v_step_run.id, v_existing.id, true;
