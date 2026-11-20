@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { WorkflowReadResult, WorkflowReadService } from "./workflow-read-service.ts";
 import WorkflowRunHistory from "./workflow-run-history";
+import WorkflowRunQueueForm from "./workflow-run-queue-form";
+import type { WorkflowRunService } from "./workflow-run-service";
 
 type WorkflowListState =
   | Readonly<{ key: string; status: "loading" }>
@@ -9,6 +11,7 @@ type WorkflowListState =
 
 type WorkflowListProps = Readonly<{
   service: WorkflowReadService | null;
+  runService?: WorkflowRunService | null;
   userId: string;
   identityEpoch: number;
   searchTerm?: string;
@@ -20,6 +23,7 @@ type WorkflowListProps = Readonly<{
  */
 export default function WorkflowList({
   service,
+  runService = null,
   userId,
   identityEpoch,
   searchTerm = "",
@@ -31,6 +35,7 @@ export default function WorkflowList({
   });
   const [retryCount, setRetryCount] = useState(0);
   const [expandedWorkflowId, setExpandedWorkflowId] = useState<string | null>(null);
+  const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -120,11 +125,18 @@ export default function WorkflowList({
             </div>
             {expanded && (
               <div className="workflow-history" id={historyId}>
+                <WorkflowRunQueueForm
+                  workflowId={workflow.id}
+                  workflowStatus={workflow.status}
+                  service={runService}
+                  onQueued={() => setHistoryRefreshToken((token) => token + 1)}
+                />
                 <WorkflowRunHistory
                   service={service}
                   workflowId={workflow.id}
                   userId={userId}
                   identityEpoch={identityEpoch}
+                  refreshToken={historyRefreshToken}
                 />
               </div>
             )}
