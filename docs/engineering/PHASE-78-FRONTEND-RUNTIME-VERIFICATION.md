@@ -157,3 +157,11 @@ No hosted database, production secrets, deployment, billing, or release state wa
 - Workflow third-party actions are now pinned to the exact commit SHAs resolved by that successful run, reducing mutable-tag supply-chain risk.
 - The successful run also emitted upstream action Node 20 deprecation warnings; action runtime modernization should be handled in a separately verified workflow update.
 - Remaining critical gaps: real-browser E2E, live HTTP-to-PostgreSQL integration, Android device QA, and production/deployed Supabase parity.
+
+
+### Immutable-action verification result
+
+- Workflow actions were pinned to immutable commit SHAs verified from the preceding successful run's action resolution log.
+- The pinned workflow completed successfully in run [44822769822](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44822769822) on exact commit `97d991784c8c528a9b01e227d8054bd3a981e113`.
+- The exact-head run passed npm install, lint, full Node test suite, auth/read-service regressions, browser secret-boundary test, Edge Function security tests, all 23 Deno tests, production build, and artifact upload.
+- This verifies that the SHA-pinned action references work in this workflow. It does not resolve the remaining browser E2E, live PostgreSQL HTTP integration, Android device QA, or production parity gaps.
