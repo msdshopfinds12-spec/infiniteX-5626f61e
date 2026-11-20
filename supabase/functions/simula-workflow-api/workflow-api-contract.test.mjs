@@ -9,14 +9,14 @@ import {
 } from "./workflow-api-contract.mjs";
 
 test("accepts the minimal trusted enqueue DTO and defaults input to an empty object", () => {
-  const result = validateEnqueueWorkflowRequest({ workflow_id: " workflow-123 " });
+  const result = validateEnqueueWorkflowRequest({ workflow_id: " 11111111-1111-4111-8111-111111111111 " });
   assert.equal(result.ok, true);
-  assert.deepEqual(result.value, { workflow_id: "workflow-123", input: {} });
+  assert.deepEqual(result.value, { workflow_id: "11111111-1111-4111-8111-111111111111", input: {} });
 });
 
 test("accepts JSON input and preserves the request without adding owner or lifecycle fields", () => {
   const result = validateEnqueueWorkflowRequest({
-    workflow_id: "workflow-123",
+    workflow_id: "11111111-1111-4111-8111-111111111111",
     input: { title: "hello", count: 3, enabled: true, tags: ["a", "b"] },
   });
   assert.equal(result.ok, true);
@@ -25,7 +25,7 @@ test("accepts JSON input and preserves the request without adding owner or lifec
 
 test("rejects client-supplied ownership and lifecycle fields", () => {
   for (const field of ["owner_id", "status", "attempt", "output", "started_at", "worker_id", "lease_token"]) {
-    const result = validateEnqueueWorkflowRequest({ workflow_id: "workflow-123", [field]: "forged" });
+    const result = validateEnqueueWorkflowRequest({ workflow_id: "11111111-1111-4111-8111-111111111111", [field]: "forged" });
     assert.deepEqual(result, { ok: false, code: "unknown_or_forbidden_field" });
   }
 });
@@ -38,7 +38,7 @@ test("rejects malformed workflow identifiers and non-object bodies", () => {
 
 test("rejects prototype-sensitive keys", () => {
   const input = JSON.parse('{"safe":1,"__proto__":{"polluted":true}}');
-  assert.deepEqual(validateEnqueueWorkflowRequest({ workflow_id: "wf", input }), {
+  assert.deepEqual(validateEnqueueWorkflowRequest({ workflow_id: "11111111-1111-4111-8111-111111111111", input }), {
     ok: false, code: "input_contains_forbidden_key",
   });
 });
@@ -47,16 +47,16 @@ test("rejects excessive depth, node count, array length, and object key count", 
   let deep = {};
   let cursor = deep;
   for (let i = 0; i < 14; i += 1) cursor = cursor.next = {};
-  assert.equal(validateEnqueueWorkflowRequest({ workflow_id: "wf", input: deep }).code, "input_too_deep");
-  assert.equal(validateEnqueueWorkflowRequest({ workflow_id: "wf", input: Array(101).fill(1) }).code, "input_array_too_large");
+  assert.equal(validateEnqueueWorkflowRequest({ workflow_id: "11111111-1111-4111-8111-111111111111", input: deep }).code, "input_too_deep");
+  assert.equal(validateEnqueueWorkflowRequest({ workflow_id: "11111111-1111-4111-8111-111111111111", input: Array(101).fill(1) }).code, "input_array_too_large");
   const wide = Object.fromEntries(Array.from({ length: 101 }, (_, i) => ["k" + i, i]));
-  assert.equal(validateEnqueueWorkflowRequest({ workflow_id: "wf", input: wide }).code, "input_object_too_large");
+  assert.equal(validateEnqueueWorkflowRequest({ workflow_id: "11111111-1111-4111-8111-111111111111", input: wide }).code, "input_object_too_large");
 });
 
 test("enforces serialized UTF-8 input byte budget", () => {
   const tooLarge = { text: "x".repeat(WORKFLOW_API_MAX_BODY_BYTES) };
-  assert.equal(validateEnqueueWorkflowRequest({ workflow_id: "wf", input: tooLarge }).code, "input_too_large");
-  assert.equal(validateEnqueueWorkflowRequest({ workflow_id: "wf", input: { text: "é" } }).ok, true);
+  assert.equal(validateEnqueueWorkflowRequest({ workflow_id: "11111111-1111-4111-8111-111111111111", input: tooLarge }).code, "input_too_large");
+  assert.equal(validateEnqueueWorkflowRequest({ workflow_id: "11111111-1111-4111-8111-111111111111", input: { text: "é" } }).ok, true);
 });
 
 test("accepts only bounded opaque idempotency keys", () => {
