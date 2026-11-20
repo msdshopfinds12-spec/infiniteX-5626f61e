@@ -70,6 +70,19 @@ This harness is valuable as a narrow concurrency-contract test. It is not a repl
 Related branch: `audit/phase-4n8b-live-schema-preflight`  
 Related implementation PR: #35 (older, Draft, unmerged, and based on a separate feature branch).
 
+## 4.1 Local Supabase bootstrap prerequisite
+
+A follow-up tree inspection of PR #54's recovery head found 20 SQL files under `supabase/migrations/`: 19 ledger-recovered applied statements plus the separate proposed API-key column-grant migration. The Phase 4N.8B fencing candidate is on the separate audit branch, not part of those 20 files.
+
+The recovery branch does **not** currently contain `supabase/config.toml` or `supabase/seed.sql`. Therefore the presence of recovered SQL files does not yet make the branch a runnable Supabase CLI project. Before claiming clean-room replay readiness:
+- inventory every migration's extension, role, schema, auth, Vault, pg_cron, pg_net, and environment-specific dependencies;
+- decide which dependencies are provided by the official local Supabase stack and which require explicit, isolated compatibility setup;
+- create and review a local-only Supabase configuration, if needed, without production project identifiers or secrets;
+- exclude the un-applied API-key proposal from the historical 19-migration replay;
+- run the 19 recovered statements in an empty disposable environment and preserve logs/catalog output.
+
+Do not create a fake `auth`, `vault`, `cron`, or `net` implementation and call it full Supabase parity. Any compatibility shim must be named, documented, and reflected in the result classification.
+
 ## 5. Current CI evidence for recovery PR #54
 
 At inspected head `ec225c190db285210176574fd558f99b616d768f`, GitHub returned workflow run #44677412455.
@@ -113,6 +126,7 @@ Required steps:
 | Cross-branch migration recovery | VERIFIED BY PR #54 REPORT | 19/19 ledger payload exact string matches reported |
 | Original historical Git blob equivalence | NOT VERIFIED | Search original refs/backups; keep distinction |
 | Recovered migration checksums | MANIFESTED | Independently recompute against file bytes |
+| Supabase CLI config/seed bootstrap | NOT PRESENT | Recovery branch lacks `supabase/config.toml` and `supabase/seed.sql` |
 | Live catalog capture | AVAILABLE, PARTIAL | Sanitized snapshot; pending human review |
 | PR #54 offline validator/regression tests | PASS | Run #44677412455 individual steps |
 | PR #54 overall merge gate | BLOCKED | Explicit snapshot approval pending |
