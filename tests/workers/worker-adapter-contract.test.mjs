@@ -10,6 +10,10 @@ const cronWorker = readFileSync(
   new URL("../../supabase/functions/simula-workflow-cron-worker/index.ts", import.meta.url),
   "utf8",
 );
+const authBoundary = readFileSync(
+  new URL("../../supabase/functions/_shared/worker-auth-boundary.mjs", import.meta.url),
+  "utf8",
+);
 const sharedActions = readFileSync(
   new URL("../../supabase/functions/_shared/workflow-actions.mjs", import.meta.url),
   "utf8",
@@ -48,28 +52,40 @@ test("both worker adapters use the same safe action and bounded retry runtime", 
   }
 });
 
-test("authenticated adapter validates bearer identity before user-scoped queue claim", () => {
-  assert.match(authenticatedWorker, /Authorization/);
-  assert.match(authenticatedWorker, /Bearer\\s\+/i);
-  assert.match(authenticatedWorker, /userClient\.auth\.getUser\(token\)/);
+test("authenticated adapter delegates bearer identity validation before user-scoped queue claim", () => {
+  assert.match(authBoundary, /Authorization/);
+  assert.match(authBoundary, /Bearer\\s/);
+  assert.match(authBoundary, /userClient\.auth\.getUser\(token\)/);
+  assertOrdered(
+    authBoundary,
+    "userClient.auth.getUser(token)",
+    "return { ok: true, userClient",
+    "authenticated boundary must verify identity before returning the user client",
+  );
   assert.match(authenticatedWorker, /isClaimedRunOwnedBy\(run, ownerId\)/);
   assertOrdered(
     authenticatedWorker,
-    "userClient.auth.getUser(token)",
+    "authenticateBearerRequest({",
     'userClient.rpc(\n    "simula_claim_workflow_runs"',
-    "authenticated claim must not precede verified user identity",
+    "authenticated queue claim must only be reachable after the boundary succeeds",
   );
   assert.match(authenticatedWorker, /\.eq\("id", run\.workflow_id\)\.eq\("owner_id", ownerId\)/);
 });
 
-test("cron adapter verifies worker secret before privileged internal queue claim", () => {
-  assert.match(cronWorker, /x-simula-worker-secret/);
-  assert.match(cronWorker, /suppliedSecret\.length < 32/);
-  assert.match(cronWorker, /simula_verify_worker_secret/);
+test("cron adapter verifies worker secret in the boundary before privileged internal queue claim", () => {
+  assert.match(authBoundary, /x-simula-worker-secret/);
+  assert.match(authBoundary, /secret\.length < 32/);
+  assert.match(authBoundary, /simula_verify_worker_secret/);
+  assertOrdered(
+    authBoundary,
+    'admin.rpc("simula_verify_worker_secret"',
+    "return { ok: true, admin",
+    "cron boundary must verify its secret before exposing the privileged client",
+  );
   assert.match(cronWorker, /simula_claim_workflow_runs_internal/);
   assertOrdered(
     cronWorker,
-    "simula_verify_worker_secret",
+    "authenticateCronRequest({",
     "simula_claim_workflow_runs_internal",
     "cron worker must verify its secret before claiming privileged queue rows",
   );
