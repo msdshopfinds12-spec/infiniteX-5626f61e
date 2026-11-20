@@ -7,7 +7,13 @@ const validEnvironment = {
   VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_example",
 };
 
-test("accepts HTTPS project URL and publishable key", () => {
+const encodeBase64Url = (value) =>
+  btoa(JSON.stringify(value)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+
+const legacyAnonJwt = `eyJhbGciOiJIUzI1NiJ9.${encodeBase64Url({ role: "anon" })}.signature`;
+const legacyServiceRoleJwt = `eyJhbGciOiJIUzI1NiJ9.${encodeBase64Url({ role: "service_role" })}.signature`;
+
+test("accepts HTTPS project URL and a publishable key", () => {
   assert.deepEqual(readPublicSupabaseConfig(validEnvironment), {
     status: "ready",
     config: {
@@ -17,12 +23,34 @@ test("accepts HTTPS project URL and publishable key", () => {
   });
 });
 
-test("accepts legacy anon JWT format as a public browser key", () => {
+test("accepts a legacy JWT only when its role claim is anon", () => {
   const result = readPublicSupabaseConfig({
     ...validEnvironment,
-    VITE_SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.signature",
+    VITE_SUPABASE_PUBLISHABLE_KEY: legacyAnonJwt,
   });
   assert.equal(result.status, "ready");
+});
+
+test("rejects legacy service_role JWTs", () => {
+  assert.deepEqual(
+    readPublicSupabaseConfig({
+      ...validEnvironment,
+      VITE_SUPABASE_PUBLISHABLE_KEY: legacyServiceRoleJwt,
+    }),
+    { status: "invalid", reason: "invalid-key" },
+  );
+});
+
+test("rejects arbitrary JWTs and malformed key strings", () => {
+  for (const key of ["header.payload.signature", "not-a-supabase-key", "sb_publishable_"]) {
+    assert.deepEqual(
+      readPublicSupabaseConfig({
+        ...validEnvironment,
+        VITE_SUPABASE_PUBLISHABLE_KEY: key,
+      }),
+      { status: "invalid", reason: "invalid-key" },
+    );
+  }
 });
 
 test("reports missing public configuration without throwing", () => {
@@ -79,20 +107,5 @@ test("rejects URL credentials, query strings, fragments, and paths", () => {
       VITE_SUPABASE_URL: url,
     });
     assert.deepEqual(result, { status: "invalid", reason: "invalid-url" });
-  }
-});
-
-test("rejects known privileged key formats", () => {
-  for (const key of [
-    "sb_secret_do_not_ship",
-    "service_role_do_not_ship",
-    "service-role-do-not-ship",
-    "secret_key_do_not_ship",
-  ]) {
-    const result = readPublicSupabaseConfig({
-      ...validEnvironment,
-      VITE_SUPABASE_PUBLISHABLE_KEY: key,
-    });
-    assert.deepEqual(result, { status: "invalid", reason: "invalid-key" });
   }
 });
