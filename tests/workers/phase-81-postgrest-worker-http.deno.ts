@@ -15,7 +15,8 @@ function required(name: string): string {
 const postgrestFetch: typeof fetch = (input, init) => {
   const source = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
   const target = new URL(source);
-  target.pathname = target.pathname.replace(/^\\/rest\\/v1(?=\\/|$)/, "") || "/";
+  if (target.pathname === "/rest/v1") target.pathname = "/";
+  else if (target.pathname.startsWith("/rest/v1/")) target.pathname = target.pathname.slice("/rest/v1".length);
   if (input instanceof Request) return fetch(new Request(target, input));
   return fetch(target, init);
 };
