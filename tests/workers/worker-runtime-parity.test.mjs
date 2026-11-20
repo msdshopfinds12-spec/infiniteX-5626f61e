@@ -36,8 +36,8 @@ for (const [name, path] of [
     assert.equal(olderGenerationGuards, 2, "both step-start paths must reject equal/newer stored generations");
     assert.ok(stepGenerationGuards >= 1, "step failure must match the claimed generation");
     assert.match(source, /simula_complete_step_with_outbox/);
-    assert.match(source, /p_attempt:\\s*stepAttempt/);
-    assert.doesNotMatch(source, /\.update\(\{[\s\S]{0,180}?status:\\s*["\x27]succeeded/,
+    assert.match(source, /p_attempt:\s*stepAttempt/);
+    assert.doesNotMatch(source, /\.update\(\{[\s\S]{0,180}?status:\s*["\x27]succeeded/,
       "successful step completion must use the transactional RPC, not a direct update");
     assert.ok(runGenerationGuards >= 2, "run completion/failure must match the claimed generation");
     assert.match(source, /workflow_step_attempt_superseded/);
