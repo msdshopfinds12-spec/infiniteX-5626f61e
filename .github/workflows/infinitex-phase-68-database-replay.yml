@@ -10,6 +10,7 @@ on:
       - "docs/database/PHASE-52.1*"
       - "docs/database/live-schema-metadata.snapshot.json"
       - "scripts/rehearse-migration-chain.mjs"
+      - "scripts/test-workflow-claim-stress.sh"
       - "tests/database/phase-52-1*"
       - ".github/workflows/infinitex-phase-68-database-replay.yml"
 
@@ -75,6 +76,14 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: infinitex_rehearsal
         run: bash scripts/test-workflow-claim-concurrency.sh
+      - name: Stress parallel workflow claims and duplicate step-run inserts
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: bash scripts/test-workflow-claim-stress.sh
       - name: Create isolated security test database
         env:
           PGHOST: 127.0.0.1
