@@ -146,3 +146,21 @@ Keep IQ Core isolated from the React browser bundle. Add a pinned server-side ad
 | Live database has candidate RPC | NOT VERIFIED; previous live catalog check returned absent |
 | PostgreSQL 17 full lifecycle concurrency tests | NOT TESTED |
 | Production migration/deployment | NOT AUTHORIZED |
+
+
+### F-07 — Candidate branch does not contain the authoritative historical migration chain
+
+Severity: release blocker
+
+A recursive tree inspection of the candidate branch found only one tracked SQL migration under `supabase/migrations/`: the Phase 4N.8B transactional step-fencing candidate. The live Supabase project previously reported 19 migration-ledger entries, but their original SQL bodies are not present in this branch's migration directory.
+
+This means the candidate branch is not a reproducible database bootstrap source. Do not treat the candidate migration as a complete schema history, and do not run `supabase db reset` or attempt a production migration from this branch.
+
+Required recovery:
+- export/recover the exact historical migration SQL from the authoritative source repository, backup or controlled Supabase migration history;
+- map every live ledger version to an immutable source file and checksum;
+- compare the reconstructed chain to the live catalog (tables, constraints, functions, grants, extensions and policies);
+- resolve any drift explicitly and preserve a baseline snapshot;
+- only then run clean-room PostgreSQL 17/Supabase bootstrap and migration tests.
+
+Until this is complete, local full-stack schema reproducibility is BLOCKED even though the live database itself is active.
