@@ -76,7 +76,7 @@ Deno.test({
       });
       const body = await response.json();
       assert(response.status === 200, "worker HTTP endpoint must return 200; got " + response.status);
-      assert(body.claimed === 1 && body.succeeded === 1 && body.failed === 0, "worker must claim and execute exactly one owner-A workflow");
+      assert(body.claimed === 1 && body.succeeded === 1 && body.failed === 0, "worker must claim and execute exactly one owner-A workflow; summary=" + JSON.stringify(body));
 
       const admin = createClient(url, serviceJwt, {
         auth: { persistSession: false, autoRefreshToken: false },
