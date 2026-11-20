@@ -35,3 +35,8 @@ test('ACL aggregation uses explicit deterministic catalog fields', async () => {
   assert.ok(sql.includes('ORDER BY a.attnum,x.grantee,x.privilege_type,x.is_grantable'), 'column ACLs must sort by ordinal and explicit ACL fields');
   assert.equal(/ORDER BY\\s+1\\s*,\\s*2\\s*,\\s*3/.test(sql), false, 'positional ACL ordering is forbidden');
 });
+
+test('sequence and relation ACL default object types remain PostgreSQL char values', async () => {
+  const sql = await readFile(sqlPath, 'utf8');
+  assert.ok(sql.includes("CASE WHEN t.relkind='S' THEN 'S'::\\\"char\\\" ELSE 'r'::\\\"char\\\" END"), 'acldefault CASE must be explicitly cast to PostgreSQL internal char');
+});
