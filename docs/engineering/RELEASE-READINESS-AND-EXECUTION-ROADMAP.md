@@ -8,6 +8,16 @@
 
 This roadmap defines the shortest safe path to a complete, supportable InfiniteX release. “100% complete” means every required product capability has an agreed acceptance test and evidence; it does not mean a dashboard looks finished or a build happens to pass.
 
+## 0. Latest isolated progress — PR #103 (2026-11-21)
+
+- PR #103 remains Draft and unmerged on `phase-71/worker-http-integration`; PR #102 remains untouched and Draft.
+- Worker HTTP handlers are injectable and have Deno request/response integration tests, stateful mock workflow execution, retry/failure/ownership tests.
+- A typed read-only workflow and workflow-run service is connected to the authenticated Pipelines view. No browser-side workflow mutations or run creation are enabled.
+- Exact-head GitHub Actions run #44804709537 and disposable PostgreSQL 17 replay run #44804709498 passed on `b87cb3a3377242704bed6f3c5c4032143e02b7fb`.
+- Remaining: approved non-production browser query, two-user browser RLS verification, live schema/function reconciliation, mobile/accessibility QA, and release authorization.
+- Vercel project-specific checks continue to show build-rate-limit blockers; no deployment was initiated.
+
+
 ## 1. Executive status
 
 | Area | Evidence-backed status | Release consequence |
