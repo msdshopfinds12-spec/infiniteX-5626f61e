@@ -37,7 +37,7 @@ function fakeClient(options?: {
 
   return {
     client,
-    emit: (session: SyntheticSession | null) => listener?.("SIGNED_IN", session),
+    emit: (session: SyntheticSession | null, event = "SIGNED_IN") => listener?.(event, session),
     isUnsubscribed: () => unsubscribed,
   };
 }
@@ -79,4 +79,18 @@ test("maps auth events and unsubscribes the SDK listener", () => {
     null,
   ]);
   assert.equal(fake.isUnsubscribed(), true);
+});
+
+test("preserves PASSWORD_RECOVERY auth events for the session provider", () => {
+  const fake = fakeClient();
+  const adapter = createSupabaseAuthSessionAdapter(fake.client);
+  const received: Array<{ session: unknown; event?: string }> = [];
+  adapter.onAuthStateChange((session, event) => received.push({ session, event }));
+
+  fake.emit({ user: { id: "synthetic-recovery-user" } }, "PASSWORD_RECOVERY");
+
+  assert.deepEqual(received, [{
+    session: { user: { id: "synthetic-recovery-user" } },
+    event: "PASSWORD_RECOVERY",
+  }]);
 });
