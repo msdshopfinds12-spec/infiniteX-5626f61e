@@ -298,3 +298,47 @@ Deno.test("cron worker executes the same workflow using verified privileged clai
   assert(db.tables.workflow_runs[0].status === "succeeded", "expected cron workflow run to persist succeeded state");
   assert(db.tables.workflow_logs.length === 3, "expected cron step and workflow logs");
 });
+
+
+Deno.test("authenticated worker fences a stale claimed attempt from newer persisted step state", async () => {
+  const db = new StatefulDatabase();
+  db.tables.workflow_step_runs.push({
+    id: "newer-step-run", run_id: "run-1", step_id: "step-1",
+    owner_id: "owner-1", status: "succeeded", attempt: 2,
+  });
+  let actions = 0;
+  const handler = createAuthenticatedWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    corsHeadersForRequest: cors,
+    executeSafeAction: (async () => { actions++; return { unexpected: true }; }) as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST", headers: { Authorization: "Bearer valid-token" }, body: "{}",
+  }));
+  const body = await response.json();
+  assert(response.status === 200, "stale claim is reported in the batch summary");
+  assert(body.superseded === 1 && body.succeeded === 0, "expected stale attempt to be superseded");
+  assert(actions === 0, "stale attempt must not execute workflow actions");
+  assert(db.tables.workflow_step_runs[0].attempt === 2, "newer persisted step generation must remain unchanged");
+});
+
+Deno.test("cron worker persists action failure without falsely succeeding the workflow", async () => {
+  const db = new StatefulDatabase();
+  const handler = createCronWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    executeSafeAction: (async () => { throw new Error("synthetic action failure"); }) as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST", headers: { "x-simula-worker-secret": "s".repeat(40) }, body: "{}",
+  }));
+  const body = await response.json();
+  assert(response.status === 200, "worker returns a batch summary for per-run failure");
+  assert(body.failed === 1 && body.succeeded === 0, "expected one failed workflow");
+  assert(db.tables.workflow_step_runs[0].status === "failed", "failed action must persist failed step state");
+  assert(db.tables.workflow_runs[0].status === "failed", "failed action must persist failed workflow state");
+  assert(db.tables.workflow_runs[0].status !== "succeeded", "failed action must never report success");
+});
