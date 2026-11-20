@@ -44,6 +44,8 @@ The shared CORS regression suite must prove:
 
 A passing unit test proves helper behavior only. It does not prove that the live Edge Function setting is configured, that deployed source matches the repository, or that authentication/RLS work against production.
 
+The pull-request CI workflow must run against the exact PR head SHA after changes are pushed. A workflow update merged into the target branch does not retroactively create a CI run for an earlier PR head. Record the tested SHA and run result before treating source-level verification as complete.
+
 ## Rollout gates
 
 Before any production rollout:
