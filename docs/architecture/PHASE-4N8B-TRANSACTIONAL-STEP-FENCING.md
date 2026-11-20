@@ -51,3 +51,35 @@ dedicated disposable PostgreSQL/Supabase-compatible test environment is wired in
 CI, the integration job is expected to fail closed. Do not add credentials from the
 live project to make it pass. A plain PostgreSQL harness must be labelled as SQL/RPC
 contract testing, not full Supabase Auth/PostgREST/Edge Runtime integration.
+
+
+## CI environment feasibility review
+
+A follow-up repository inspection found that this branch does not contain
+`supabase/config.toml`, `supabase/seed.sql`, or the baseline migration
+`20261103134302_ashaa_backend_credit_ledger.sql`. The current workflow also
+does not provision a local Supabase stack or a disposable fixture. The integration
+test requires a Supabase-compatible HTTP endpoint and a service-role credential;
+therefore, a plain PostgreSQL service container cannot execute that Deno
+`supabase-js` test as written.
+
+### Safe decision
+
+- Do not wire the live project's URL or service-role key into GitHub Actions.
+- Do not fabricate a partial schema and label it a full integration environment.
+- Do not run the fixture test against the production project.
+- Keep the test fail-closed; the current workflow will fail at the required fixture
+  assertion until an isolated fixture is provisioned. This is intentional and visible.
+- Before implementing CI provisioning, recover and review the complete canonical
+  migration chain and Supabase local configuration from the repository's authoritative
+  branch. Then choose one of two explicit test tiers:
+  1. **Local Supabase integration tier:** start a disposable local Supabase stack,
+     apply the complete migration chain, seed unique fixture rows, export only
+     ephemeral local service credentials, execute Deno tests, and tear down.
+  2. **PostgreSQL contract tier:** use a disposable PostgreSQL 17 service with a
+     complete reviewed schema/role harness and SQL-native concurrent sessions.
+     Label results as database contract tests, not Supabase HTTP/Auth integration.
+
+The current PR does not yet meet either tier. CI provisioning remains BLOCKED,
+not passed. The next implementation must first establish the authoritative schema
+source and migration order, then add a deterministic fixture lifecycle and cleanup.
