@@ -1,6 +1,6 @@
 # InfiniteX Frontend-to-Supabase Integration Plan
 
-**Status:** PLAN — approved for source-only engineering; implementation not yet started  
+**Status:** PARTIAL — auth safety foundation implemented; SDK integration and authenticated application remain incomplete  
 **Date:** 2026-11-20  
 **Base candidate:** PR #50  
 **Live project:** Ashaa-INX (`vepacoemkhudamfaccah`)
@@ -29,11 +29,11 @@ Relevant live worker RPCs include `public.simula_claim_workflow_runs`, `public.s
 
 ## 3. Dependency decision
 
-Use the official `@supabase/supabase-js` client, pinned to an exact stable version and committed with a regenerated npm lockfile. The current official release evidence reviewed for this plan is v2.119.1 (2026-11-18).
+Use the official `@supabase/supabase-js` client. The reviewed Node 22 / npm 10.9.9 experiment resolved v2.119.2 and generated a matching npm lockfile candidate. That candidate completed `npm ci --ignore-scripts` and `npm audit` with zero reported vulnerabilities in GitHub Actions. Treat v2.119.2 as the current candidate, not an installed application dependency: review the artifact, then commit the exact version declaration and matching lockfile atomically before importing the SDK.
 
 Do not hand-edit `package-lock.json`. Generate it using npm in a clean Node 22 environment, then run `npm ci`, `npm audit`, lint, tests, and build. The repository currently uses Node 22 in CI.
 
-No dependency has been added in this planning change because the connected GitHub file API cannot run npm to produce and verify the matching lockfile. The next implementation step must use a controlled Node 22 workspace; do not bypass `npm ci` or remove the lockfile.
+The dependency is not yet added to the application branch. The temporary Node 22 workflow produced a reviewed candidate artifact, but the repository still has its original synchronized `package.json` and `package-lock.json`. Do not hand-edit or partially commit either manifest. Commit the exact dependency declaration and npm-generated lockfile together, then rerun the full CI workflow on the resulting head.
 
 ## 4. Environment contract
 
@@ -166,7 +166,7 @@ Do not run destructive tests against the live project. Use synthetic accounts an
 
 ## 10. Implementation order
 
-1. Create a clean Node 22 workspace on the PR #50 head.
+1. Create a clean Node 22 workspace from the current PR #60 implementation branch.
 2. Install pinned `@supabase/supabase-js` and regenerate lockfile.
 3. Add env validation and typed client factory.
 4. Add AuthProvider and auth screen.

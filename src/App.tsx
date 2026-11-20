@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Activity, Bot, Cpu, GitBranch, Play, Search, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
+import { Activity, Bot, Cpu, GitBranch, LogOut, Play, Search, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -8,10 +8,21 @@ import MetricCard from "./components/MetricCard";
 import AgentList from "./components/AgentList";
 import PipelineBoard from "./components/PipelineBoard";
 import LogStream from "./components/LogStream";
+import AuthScreen from "./features/auth/auth-screen";
+import PasswordRecoveryScreen from "./features/auth/password-recovery-screen";
+import type { AuthActions } from "./features/auth/auth-actions";
 import type { ViewKey } from "./types";
+import type { AuthState } from "./features/auth/auth-state";
 
-export default function App() {
+type AppProps = Readonly<{
+  authState?: AuthState;
+  authActions?: AuthActions;
+  recoveryMode?: boolean;
+}>;
+
+export default function App({ authState, authActions, recoveryMode = false }: AppProps) {
   const [view, setView] = useState<ViewKey>("overview");
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
 
   // Illustrative placeholders only; these values are not live backend telemetry.
@@ -24,6 +35,49 @@ export default function App() {
     ],
     []
   );
+
+  if (authState?.status === "loading") {
+    return (
+      <main className="auth-status-page">
+        <div className="auth-status-card" role="status">
+          <div className="auth-brand-mark"><Zap size={21} aria-hidden="true" /></div>
+          <h1>Securing your workspace</h1>
+          <p>Checking your authentication session. This usually takes a moment.</p>
+          <div className="auth-loading-bar" aria-hidden="true"><span /></div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!authState || authState.status === "error") {
+    return (
+      <main className="auth-status-page">
+        <div className="auth-status-card" role="alert">
+          <ShieldAlert size={28} />
+          <h1>Session could not be verified</h1>
+          <p>Authentication is not configured or could not be verified. Check the workspace configuration or connection, then retry. Protected workspace content remains unavailable.</p>
+          <button className="auth-submit" type="button" onClick={() => window.location.reload()}>
+            Retry session check
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (recoveryMode && authActions) {
+    return <PasswordRecoveryScreen actions={authActions} />;
+  }
+
+  if (authState?.status === "anonymous" && authActions) {
+    return <AuthScreen actions={authActions} />;
+  }
+
+  async function handleSignOut() {
+    if (!authActions) return;
+    setSignOutError(null);
+    const result = await authActions.signOut();
+    if (result.status === "error") setSignOutError(result.message);
+  }
 
   const title =
     view === "overview" ? "Overview" :
@@ -39,9 +93,21 @@ export default function App() {
         <div className="main">
           <TopBar title={title} theme={theme} onToggleTheme={toggleTheme} />
           <main className="content">
+            {authState?.status === "authenticated" && (
+              <div className="account-strip">
+                <span className="account-indicator"><span /> Authenticated session</span>
+                <button className="btn btn-ghost account-signout" type="button" onClick={handleSignOut}>
+                  <LogOut size={15} /> Sign out
+                </button>
+              </div>
+            )}
+            {signOutError && <p className="auth-inline-error" role="alert">{signOutError}</p>}
             <div className="demo-notice" role="status">
               <strong>DEMO MODE</strong>
-              <span>Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified.</span>
+              <span>
+                Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified.
+                {authState?.status === "authenticated" && " Your session is authenticated, but dashboard data remains demo-only."}
+              </span>
             </div>
             {view === "overview" && (
               <>

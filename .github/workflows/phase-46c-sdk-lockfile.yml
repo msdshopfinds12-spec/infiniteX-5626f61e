@@ -1,0 +1,50 @@
+name: InfiniteX Phase 46C SDK lockfile verification
+
+on:
+  push:
+    branches: [eng/infinitex-p0-p1-auth-2026-11-20]
+    paths:
+      - ".github/workflows/phase-46c-sdk-lockfile.yml"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    branches: [eng/infinitex-unified-ui-backend-2026-11-20]
+    paths:
+      - ".github/workflows/phase-46c-sdk-lockfile.yml"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify committed SDK pin
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const expected = '2.119.2';
+          if (pkg.dependencies?.['@supabase/supabase-js'] !== expected) throw new Error('package.json SDK pin mismatch');
+          if (lock.packages?.['']?.dependencies?.['@supabase/supabase-js'] !== expected) throw new Error('lockfile root SDK pin mismatch');
+          if (lock.packages?.['node_modules/@supabase/supabase-js']?.version !== expected) throw new Error('lockfile resolved SDK version mismatch');
+          console.log('Exact SDK manifest/lockfile contract: PASS');
+          NODE
+
+      - name: Clean install and security audit
+        run: |
+          npm ci
+          npm audit
