@@ -80,6 +80,9 @@ export function createWorkflowRunRequestHandler(deps: Dependencies) {
 
     const auth = await authenticate({ request: req, env: deps.env, createClient: deps.createClient });
     if (!auth.ok) return response(auth.status, { ok: false, error: auth.error }, cors.headers);
+    if (!UUID_PATTERN.test(auth.ownerId)) {
+      return response(401, { ok: false, error: "invalid_session" }, cors.headers);
+    }
 
     const bodyResult = await readJsonBodyLimited(req, 20 * 1024);
     if (!bodyResult.ok) {
