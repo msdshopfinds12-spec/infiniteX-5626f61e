@@ -42,3 +42,13 @@ The candidate-specific workflow `.github/workflows/infinitex-phase-68-database-r
 The concurrency test runs only against the isolated PostgreSQL 17 replay database with synthetic rows. It deliberately holds the oldest queue row in one database session, verifies a separate service-role claim skips that row, then verifies the released row can be claimed at a distinct attempt generation. It also verifies 15-minute lease recovery, terminal failure at attempt 5, unique step-run identity, and stale-generation terminal update rejection.
 
 This is real database-session evidence, but not a high-volume stress test or proof of deployed Edge Function behavior.
+
+
+## Phase 69 update — parallel stress verification
+
+The earlier statement that high-volume concurrency was not tested is superseded by the bounded Phase 69 stress test. On candidate head `aaf9bb1d3f16904ec07d5e32b1c495ec8010dd3a`, 16 independent PostgreSQL sessions claimed 80 synthetic runs exactly once, all at attempt generation 1, and no seeded run remained queued. Two concurrent independent inserts of the same step-run identity preserved the unique `(run_id, step_id)` invariant.
+
+- [PR Phase 69 PostgreSQL replay/stress/security — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44796503703)
+- [PR candidate quality gates — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44796503555)
+
+See [Phase 69 — Parallel Claim and Duplicate Insert Stress Verification](../engineering/PHASE-69-PARALLEL-CLAIM-STRESS.md). This remains bounded CI stress evidence, not sustained production-load benchmarking or full deployed Edge Function end-to-end proof.
