@@ -22,6 +22,7 @@ on:
       - ".github/workflows/phase-78-frontend-runtime-verification.yml"
       - "src/**"
       - "tests/**"
+      - "scripts/**"
       - "supabase/functions/**"
       - "package.json"
       - "package-lock.json"
@@ -106,6 +107,28 @@ jobs:
 
       - name: Chromium browser smoke and responsive regression
         run: node scripts/phase-78-browser-smoke.mjs
+
+      - name: Build isolated auth-test bundle with synthetic public configuration
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_phase78_test_only
+        run: npm run build -- --outDir dist-auth-test
+
+      - name: Start isolated auth-test preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4174 --strictPort --outDir dist-auth-test > /tmp/infinitex-auth-preview.log 2>&1 &
+          echo $! > /tmp/infinitex-auth-preview.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4174/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/infinitex-auth-preview.log
+          exit 1
+
+      - name: Chromium authentication journey regression
+        env:
+          INFINITEX_AUTH_BASE_URL: http://127.0.0.1:4174
+        run: node scripts/phase-78-auth-browser-smoke.mjs
 
       - name: Upload build artifact for inspection
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
