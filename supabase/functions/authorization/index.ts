@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeadersForRequest } from "../_shared/cors.ts";
 import { readJsonBodyLimited } from "../_shared/worker-security.mjs";
+import { parseBearerToken } from "../_shared/bearer-token.mjs";
 import {
   createPolicyUnavailablePayload,
   isEmptyAuthorizationRequest,
@@ -24,12 +25,10 @@ Deno.serve(async (req: Request) => {
     return reply(cors.headers, 405, { ok: false, error: "METHOD_NOT_ALLOWED" });
   }
 
-  const authorization = req.headers.get("Authorization") ?? "";
-  const tokenMatch = authorization.match(/^Bearer\\s+(\\S+)$/i);
-  if (!tokenMatch) {
+  const token = parseBearerToken(req.headers.get("Authorization"));
+  if (!token) {
     return reply(cors.headers, 401, { ok: false, error: "UNAUTHENTICATED" });
   }
-  const token = tokenMatch[1];
 
   const contentType = req.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase();
   if (contentType !== "application/json") {
