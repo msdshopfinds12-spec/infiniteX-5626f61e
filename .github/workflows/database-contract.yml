@@ -9,8 +9,6 @@ on:
       - "tests/database/**"
       - "docs/database/**"
       - ".github/workflows/database-contract.yml"
-  push:
-    branches: [recovery/infinitex-database-source-of-truth]
   workflow_dispatch:
 
 permissions:
