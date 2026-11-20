@@ -37,7 +37,7 @@ Deno.test({
       executeSafeAction: (await import("../../supabase/functions/_shared/workflow-actions.mjs")).executeSafeAction,
       // The integration supplies a deterministic synthetic identity boundary. The
       // JWT itself is still verified by PostgREST's signature/role enforcement.
-      authenticateBearerRequest: (async ({ request, env, createClient: makeClient }) => {
+      authenticateBearerRequest: (async ({ request, env, createClient: makeClient }: { request: Request; env: { get(name: string): string | undefined }; createClient: typeof createClient }) => {
         const match = request.headers.get("Authorization")?.match(/^Bearer\s+(\S+)$/i);
         if (!match || match[1] !== userJwt) {
           return { ok: false as const, status: 401, error: "invalid_session" };
@@ -53,11 +53,10 @@ Deno.test({
       }) as never,
     });
 
-    const listener = Deno.listen({ hostname: "127.0.0.1", port: 0 });
-    const address = listener.addr as Deno.NetAddr;
-    const server = Deno.serve({ listener, onListen() {} }, handler);
+    const workerPort = 8081;
+    const server = Deno.serve({ hostname: "127.0.0.1", port: workerPort, onListen() {} }, handler);
     try {
-      const response = await fetch("http://127.0.0.1:" + address.port + "/functions/v1/simula-workflow-worker", {
+      const response = await fetch("http://127.0.0.1:" + workerPort + "/functions/v1/simula-workflow-worker", {
         method: "POST",
         headers: {
           "Authorization": "Bearer " + userJwt,
