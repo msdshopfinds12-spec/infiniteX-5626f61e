@@ -9,6 +9,7 @@ import AgentList from "./components/AgentList";
 import PipelineBoard from "./components/PipelineBoard";
 import LogStream from "./components/LogStream";
 import AuthScreen from "./features/auth/auth-screen";
+import PasswordRecoveryScreen from "./features/auth/password-recovery-screen";
 import type { AuthActions } from "./features/auth/auth-actions";
 import type { ViewKey } from "./types";
 import type { AuthState } from "./features/auth/auth-state";
@@ -16,9 +17,10 @@ import type { AuthState } from "./features/auth/auth-state";
 type AppProps = Readonly<{
   authState?: AuthState;
   authActions?: AuthActions;
+  recoveryMode?: boolean;
 }>;
 
-export default function App({ authState, authActions }: AppProps) {
+export default function App({ authState, authActions, recoveryMode = false }: AppProps) {
   const [view, setView] = useState<ViewKey>("overview");
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
@@ -60,6 +62,10 @@ export default function App({ authState, authActions }: AppProps) {
         </div>
       </main>
     );
+  }
+
+  if (recoveryMode && authActions) {
+    return <PasswordRecoveryScreen actions={authActions} />;
   }
 
   if (authState?.status === "anonymous" && authActions) {
