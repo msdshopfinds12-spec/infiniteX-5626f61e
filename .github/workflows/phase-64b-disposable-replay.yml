@@ -8,6 +8,7 @@ on:
     paths:
       - "supabase/migrations/**"
       - "docs/database/PHASE-52.1*"
+      - "docs/database/live-schema-metadata.snapshot.json"
       - "scripts/rehearse-migration-chain.mjs"
       - "tests/database/phase-52-1*"
       - ".github/workflows/phase-64b-disposable-replay.yml"
@@ -66,13 +67,20 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: infinitex_rehearsal
         run: node scripts/rehearse-migration-chain.mjs
+      - name: Create isolated security test database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+        run: createdb --maintenance-db=postgres infinitex_security_test
       - name: Execute disposable PostgreSQL security behavior suite
         env:
           PGHOST: 127.0.0.1
           PGPORT: 5432
           PGUSER: supabase_admin
           PGPASSWORD: postgres
-          PGDATABASE: infinitex_rehearsal
+          PGDATABASE: infinitex_security_test
         run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-52-1b-postgres-security.sql
       - name: Collect disposable PostgreSQL logs
         if: always()
