@@ -15,7 +15,7 @@ async function collectSourceFiles(directory) {
   for (const entry of entries) {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) files.push(...await collectSourceFiles(path));
-    else if (/\.(?:[cm]?[jt]sx?)$/i.test(entry.name)) files.push(path);
+    else if (/\.(?:[cm]?[jt]sx?)$/i.test(entry.name) && !/(?:\.test|\.spec)\.[cm]?[jt]sx?$/i.test(entry.name)) files.push(path);
   }
   return files;
 }
