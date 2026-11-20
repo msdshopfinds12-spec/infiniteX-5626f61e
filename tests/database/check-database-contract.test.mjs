@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-const validator = fileURLToPath(new URL('../scripts/check-database-contract.mjs', import.meta.url));
+const validator = fileURLToPath(new URL('../../scripts/check-database-contract.mjs', import.meta.url));
 
 async function runValidator(t, snapshotText) {
   const cwd = await mkdtemp(path.join(tmpdir(), 'infinitex-contract-'));
