@@ -6,7 +6,7 @@ const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("Phase 77 shell harness refuses every database except the named disposable fixture", async () => {
   const script = await read("../../scripts/test-phase-77-worker-state-machine.sh");
-  assert.match(script, /PGDATABASE\s*!=\s*"infinitex_rehearsal"/);
+  assert.match(script, /\$PGDATABASE"\s*!=\s*"infinitex_rehearsal"/);
   assert.match(script, /REFUSING: Phase 77 integration harness only runs against infinitex_rehearsal/);
   assert.match(script, /DELETE FROM auth\.users WHERE id = '\$OWNER'/);
 });
