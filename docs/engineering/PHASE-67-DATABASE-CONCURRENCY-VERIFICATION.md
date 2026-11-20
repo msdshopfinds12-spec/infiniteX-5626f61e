@@ -118,7 +118,7 @@ The replay job completed:
 | Terminal failure at attempt 5 | PASS |
 | Step-run uniqueness and stale-generation CAS behavior | PASS |
 | Disposable security behavior suite | PASS |
-| High-volume concurrent claim stress test | NOT TESTED |
+| Bounded 16-session / 80-run parallel claim stress | PASS (Phase 69) |
 | Full deployed Edge Function end-to-end workflow | NOT TESTED |
 | Live catalog parity with disposable replay | NOT ESTABLISHED |
 | Production worker rollout | NOT AUTHORIZED |
@@ -131,3 +131,15 @@ The replay job completed:
 - No production worker deployment, merge, or release.
 
 **Phase 67 decision:** the previous migration-source blocker is resolved for candidate reproducibility. Core claim, lease-recovery, uniqueness, and generation-fencing behaviors now have isolated PostgreSQL execution evidence. High-volume contention, full live catalog parity, and deployed runtime parity remain open.
+
+
+## 9. Phase 69 — bounded parallel claim stress
+
+<badge>PASS — exact candidate head `aaf9bb1d3f16904ec07d5e32b1c495ec8010dd3a`</badge>
+
+- [PR PostgreSQL replay + Phase 69 stress + security — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44796503703)
+- [PR quality gates — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44796503555)
+
+The new harness launched 16 independent PostgreSQL sessions to claim 80 synthetic queued runs in batches of five. Assertions verified 80 total claims, 80 unique IDs, generation 1 for every claim, no duplicates, and no remaining queued fixtures. It also launched two independent inserts for the same `(run_id, step_id)` key and verified exactly one row persisted.
+
+This upgrades the evidence from a single held-row contention scenario to bounded multi-session parallel claim stress. It remains a finite CI test, not a sustained load benchmark or full Edge Function end-to-end test. All writes remained inside the disposable PostgreSQL 17 container.
