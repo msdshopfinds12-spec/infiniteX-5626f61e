@@ -53,23 +53,23 @@ try {
   assert.equal(authCalls.length, 0, "invalid client input must not call the auth endpoint");
 
   await page.getByLabel("Email address").fill("not-an-email");
-  await page.getByLabel("Password").fill("incorrect-password");
+  await page.getByLabel("Password", { exact: true }).fill("incorrect-password");
   await submit.click();
   await page.getByRole("alert").getByText("Enter a valid email address.").waitFor();
   assert.equal(authCalls.length, 0, "malformed email must be rejected before network access");
 
   await page.getByLabel("Email address").fill("synthetic@example.test");
   await page.getByRole("button", { name: "Show password" }).click();
-  assert.equal(await page.getByLabel("Password").getAttribute("type"), "text");
+  assert.equal(await page.getByLabel("Password", { exact: true }).getAttribute("type"), "text");
   await page.getByRole("button", { name: "Hide password" }).click();
-  assert.equal(await page.getByLabel("Password").getAttribute("type"), "password");
+  assert.equal(await page.getByLabel("Password", { exact: true }).getAttribute("type"), "password");
 
   await submit.click();
   await page.getByRole("alert").getByText("Email or password is incorrect. Check your details and try again.").waitFor();
   assert.equal(authCalls.filter(call => call.grant === "password").length, 1, "valid-form sign-in should reach the mocked auth boundary");
 
   await page.getByRole("tab", { name: "Create account" }).click();
-  await page.getByLabel("Password").fill("synthetic-password-1");
+  await page.getByLabel("Password", { exact: true }).fill("synthetic-password-1");
   await page.getByLabel("Confirm password").fill("synthetic-password-2");
   await page.getByRole("button", { name: "Create account" }).click();
   await page.getByRole("alert").getByText("Your passwords do not match.").waitFor();
