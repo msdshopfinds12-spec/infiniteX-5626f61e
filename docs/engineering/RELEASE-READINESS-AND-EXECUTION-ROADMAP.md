@@ -12,8 +12,8 @@ This roadmap defines the shortest safe path to a complete, supportable InfiniteX
 
 - PR #103 remains Draft and unmerged on `phase-71/worker-http-integration`; PR #102 remains untouched and Draft.
 - Worker HTTP handlers are injectable and have Deno request/response integration tests, stateful mock workflow execution, retry/failure/ownership tests.
-- A typed read-only workflow and workflow-run service is connected to the authenticated Pipelines view. No browser-side workflow mutations or run creation are enabled.
-- Exact-head GitHub Actions run #44804709537 and disposable PostgreSQL 17 replay run #44804709498 passed on `b87cb3a3377242704bed6f3c5c4032143e02b7fb`.
+- Typed read-only workflow, workflow-run, and safe event-log services are connected to the authenticated Pipelines view. No browser-side workflow mutations or run creation are enabled; log `details` and run input/output are excluded from browser projections.
+- Exact-head GitHub Actions run #44805498658 and disposable PostgreSQL 17 replay run #44805508557 passed on `060c0516f9d3d3964e1c292b8c856f026083f3c6`.
 - Remaining: approved non-production browser query, two-user browser RLS verification, live schema/function reconciliation, mobile/accessibility QA, and release authorization.
 - Vercel project-specific checks continue to show build-rate-limit blockers; no deployment was initiated.
 
