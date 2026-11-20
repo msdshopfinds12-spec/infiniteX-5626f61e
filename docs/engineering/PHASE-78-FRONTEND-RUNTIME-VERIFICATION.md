@@ -182,3 +182,26 @@ No hosted database, production secrets, deployment, billing, or release state wa
 
 - A subsequent reproducibility attempt pinned Playwright to `1.56.1` while retaining `ubuntu-latest`; the runner had advanced to Ubuntu 26.04, which Playwright 1.56.1 does not support for browser dependency installation. This was an environment compatibility failure before Chromium tests, not an application regression.
 - Corrective change: pin the CI runner to `ubuntu-24.04`, a supported LTS environment for the pinned Playwright release. A new exact-head CI run is required before this runner pin can be marked VERIFIED.
+
+
+## 12. Pinned Chromium runner verification
+
+- **VERIFIED:** GitHub Actions run [44823322718](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44823322718) completed successfully on exact commit `d33eb763faf3737303dd774c79aba1bc36ba7dee`.
+- All 18 workflow steps passed, including the pinned `ubuntu-24.04` runner, ephemeral Playwright `1.56.1` installation, Chromium browser smoke, responsive checks, production build, and artifact upload.
+- This closes the previous Ubuntu/Playwright compatibility follow-up for the fail-closed browser smoke lane.
+
+## 13. Synthetic authentication browser journey — implementation pending CI evidence
+
+- Added `scripts/phase-78-auth-browser-smoke.mjs`, a real Chromium journey through the anonymous authentication UI using synthetic form values and mocked Supabase Auth HTTP responses. It covers client-side email validation, password visibility, sanitized invalid-credentials feedback, sign-up password confirmation, and password recovery feedback. No real account or production credential is used.
+- Workflow now creates a separate test-only Vite build with a fake public Supabase URL/key and previews it on loopback; the existing no-configuration fail-closed browser smoke remains separate.
+- Code review found that the recovery redirect helper accepted `localhost` but rejected equivalent IPv4/IPv6 loopback addresses. The helper now explicitly allows `localhost`, `127.0.0.1`, and `[::1]` over HTTP; all non-loopback origins still require HTTPS. Added unit coverage for IPv4 and IPv6 loopback.
+- The latest exact-head CI run for the new journey is [44823716801](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44823716801), currently queued/pending at the time of this documentation update. Do not mark the synthetic auth journey or loopback fix VERIFIED until this run completes successfully.
+- If the new journey fails, inspect the exact Playwright step and correct the harness/application boundary before widening test coverage.
+
+### Current status update
+- Pinned Chromium fail-closed smoke: VERIFIED on run `44823322718`.
+- Synthetic auth journey: IMPLEMENTED; CI PENDING.
+- Local loopback password recovery origin support: IMPLEMENTED; CI PENDING.
+- Authenticated success/account-switch browser E2E: NOT IMPLEMENTED.
+- Live worker HTTP-to-PostgreSQL integration and production Supabase parity: NOT VERIFIED.
+- Physical Android QA: NOT TESTED.
