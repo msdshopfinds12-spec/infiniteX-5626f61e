@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../lib/supabase/database.types.ts";
-import type { ApiKeyMetadata } from "./api-key-metadata.ts";
+import { API_KEY_METADATA_COLUMNS, type ApiKeyMetadata } from "./api-key-metadata.ts";
 
 export type ApiKeyRecord = Pick<
   ApiKeyMetadata,
@@ -43,6 +43,8 @@ function isNullableString(value: unknown): value is string | null {
 
 function isApiKeyMetadata(value: unknown): value is ApiKeyMetadata {
   if (!isRecord(value)) return false;
+  const allowedKeys = API_KEY_METADATA_COLUMNS as readonly string[];
+  if (Object.keys(value).some((key) => !allowedKeys.includes(key))) return false;
   return typeof value.id === "string"
     && typeof value.label === "string"
     && typeof value.key_prefix === "string"
@@ -56,6 +58,8 @@ function isApiKeyMetadata(value: unknown): value is ApiKeyMetadata {
 
 function isApiKeyRecord(value: unknown): value is ApiKeyRecord {
   if (!isRecord(value)) return false;
+  const allowedKeys = ["id", "label", "key_prefix", "scopes", "expires_at", "created_at"];
+  if (Object.keys(value).some((key) => !allowedKeys.includes(key))) return false;
   return typeof value.id === "string"
     && typeof value.label === "string"
     && typeof value.key_prefix === "string"
@@ -145,6 +149,7 @@ export function createApiKeyService(client: ApiKeyClient) {
         (value): value is Extract<ApiKeyManagerResponse, { revoked: unknown }> =>
           isRecord(value) && value.ok === true
           && isRecord(value.revoked)
+          && Object.keys(value.revoked).every((key) => key === "id" || key === "revoked_at")
           && typeof value.revoked.id === "string"
           && isNullableString(value.revoked.revoked_at),
       ).then((result) => result.status === "error"
