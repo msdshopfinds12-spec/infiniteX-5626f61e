@@ -35,8 +35,10 @@ export function validateReconstructedBaseline({ provenance, baselineSql, snapsho
   }
   if (provenance?.sourceArtifact?.path !== 'docs/database/live-schema-metadata.snapshot.json'
       || provenance?.sourceArtifact?.gitBlobSha !== 'f67a81de26ebf2ba9b3de0340663379bd550af82'
-      || provenance?.sourceArtifact?.capturedAt !== '2026-11-20T02:07:20.142926+00:00') {
-    errors.push('Reconstructed baseline source provenance does not match the reviewed metadata artifact.');
+      || provenance?.sourceArtifact?.capturedAt !== '2026-11-20T02:07:20.142926+00:00'
+      || snapshot?.captured_at !== provenance?.sourceArtifact?.capturedAt
+      || snapshot?.capture?.canonical_baseline !== false) {
+    errors.push('Reconstructed baseline source provenance does not match the reviewed noncanonical metadata artifact.');
   }
   const declared = new Set(provenance?.reconstructedObjects ?? []);
   for (const object of required) if (!declared.has(object)) errors.push('Missing declared reconstructed object: ' + object);
