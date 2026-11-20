@@ -1,4 +1,4 @@
-name: InfiniteX Edge Function source contract tests
+name: InfiniteX Edge Function security regression
 
 on:
   pull_request:
@@ -9,12 +9,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: infinitex-edge-contract-${{ github.ref }}
+  group: infinitex-edge-security-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  source-contract:
-    name: Node 22 source contract regression
+  security-regression:
+    name: Node 22 security regression
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -28,5 +28,5 @@ jobs:
         run: |
           node --version
           git rev-parse HEAD
-      - name: Run Edge Function source contract tests
-        run: node --test tests/edge-function-source-contract.test.mjs
+      - name: Run source contract and runtime security tests
+        run: node --test tests/*.test.mjs
