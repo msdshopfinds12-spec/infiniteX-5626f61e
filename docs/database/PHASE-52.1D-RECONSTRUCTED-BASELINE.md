@@ -53,3 +53,8 @@ The runner applies the fixture after recovered migrations 1–4 and before recov
 3. The runner validates the fixture source marker and required object list before execution.
 4. Candidate migration remains separate and is skipped if historical replay is blocked or fails.
 5. Existing v1 contract merge gate remains fail-closed.
+
+
+## Disposable cryptographic prerequisite
+
+The rehearsal container generates a fresh random pgsodium server key at CI runtime and masks it in job output. The key is passed only to the ephemeral PostgreSQL container to allow the checked-in Vault/pgsodium migration behavior to be exercised. It is not stored in repository files or GitHub secrets, is not reused, and is not a production key. The container is removed after the job.
