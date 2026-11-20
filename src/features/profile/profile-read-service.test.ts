@@ -8,7 +8,6 @@ function createClient(result: unknown, shouldThrow = false) {
   const calls: Array<{ method: string; args: unknown[] }> = [];
   const builder = {
     select(columns: string) { calls.push({ method: "select", args: [columns] }); return this; },
-    eq(column: string, value: unknown) { calls.push({ method: "eq", args: [column, value] }); return this; },
     maybeSingle() {
       calls.push({ method: "maybeSingle", args: [] });
       if (shouldThrow) return Promise.reject(new Error("private network detail"));
@@ -33,12 +32,11 @@ const sample = {
 
 test("profile service queries only safe own-profile columns using the authenticated identity", async () => {
   const { client, calls } = createClient({ data: sample, error: null });
-  const result = await createProfileReadService(client).getOwnProfile(" user-123 ");
+  const result = await createProfileReadService(client).getOwnProfile();
   assert.deepEqual(result, { status: "success", data: sample });
   assert.deepEqual(calls, [
     { method: "from", args: ["profiles"] },
     { method: "select", args: ["display_name,avatar_url,created_at,updated_at"] },
-    { method: "eq", args: ["id", "user-123"] },
     { method: "maybeSingle", args: [] },
   ]);
   assert.equal(calls.some(call => call.args.join(",").includes("role")), false);
@@ -47,31 +45,35 @@ test("profile service queries only safe own-profile columns using the authentica
 
 test("profile service represents a missing profile as a successful empty result", async () => {
   const { client } = createClient({ data: null, error: null });
-  assert.deepEqual(await createProfileReadService(client).getOwnProfile("user-123"), {
+  assert.deepEqual(await createProfileReadService(client).getOwnProfile(), {
     status: "success",
     data: null,
   });
 });
 
-test("profile service rejects blank identity before making a query", async () => {
-  const { client, calls } = createClient({ data: null, error: null });
-  assert.deepEqual(await createProfileReadService(client).getOwnProfile("  "), {
-    status: "error",
-    code: "invalid_user_id",
-  });
-  assert.deepEqual(calls, []);
+test("profile service does not accept or query a caller-supplied identity", async () => {
+  const { client, calls } = createClient({ data: sample, error: null });
+  const service = createProfileReadService(client);
+  assert.equal(service.getOwnProfile.length, 0);
+  await service.getOwnProfile();
+  assert.deepEqual(calls, [
+    { method: "from", args: ["profiles"] },
+    { method: "select", args: ["display_name,avatar_url,created_at,updated_at"] },
+    { method: "maybeSingle", args: [] },
+  ]);
+  assert.equal(calls.some(call => call.method === "eq"), false);
 });
 
 test("profile service normalizes database errors without exposing provider details", async () => {
   const { client } = createClient({ data: null, error: { message: "private SQL detail" } });
-  const result = await createProfileReadService(client).getOwnProfile("user-123");
+  const result = await createProfileReadService(client).getOwnProfile();
   assert.deepEqual(result, { status: "error", code: "query_failed" });
   assert.doesNotMatch(JSON.stringify(result), /private SQL detail/);
 });
 
 test("profile service normalizes network exceptions", async () => {
   const { client } = createClient(null, true);
-  assert.deepEqual(await createProfileReadService(client).getOwnProfile("user-123"), {
+  assert.deepEqual(await createProfileReadService(client).getOwnProfile(), {
     status: "error",
     code: "network_unavailable",
   });
