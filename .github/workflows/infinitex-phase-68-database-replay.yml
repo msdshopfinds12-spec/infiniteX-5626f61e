@@ -8,6 +8,8 @@ on:
     paths:
       - "supabase/migrations/**"
       - "docs/database/PHASE-52.1*"
+      - "docs/database/PHASE-68-CANONICAL-MIGRATION-SOURCE-RECOVERY.md"
+      - "docs/engineering/**"
       - "docs/database/live-schema-metadata.snapshot.json"
       - "scripts/rehearse-migration-chain.mjs"
       - "scripts/test-workflow-claim-stress.sh"
