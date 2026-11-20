@@ -156,5 +156,15 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: infinitex_contract_test
         run: |
+          psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE infinitex_contract_reader NOLOGIN;
+          CREATE SCHEMA private;
+          CREATE TABLE public.contract_probe (id bigint, private_note text);
+          CREATE SEQUENCE public.contract_probe_seq;
+          GRANT SELECT ON public.contract_probe TO infinitex_contract_reader;
+          GRANT SELECT (private_note) ON public.contract_probe TO infinitex_contract_reader;
+          GRANT USAGE ON SEQUENCE public.contract_probe_seq TO infinitex_contract_reader;
+          GRANT USAGE ON SCHEMA private TO infinitex_contract_reader;
+          SQL
           psql -X -v ON_ERROR_STOP=1 -qAt -f supabase/contracts/capture-database-contract.readonly.sql > /tmp/database-contract-snapshot.json
-          node --input-type=module -e "import fs from 'node:fs'; const s=JSON.parse(fs.readFileSync('/tmp/database-contract-snapshot.json','utf8')); if(s.schemaVersion!==2 || s.reviewStatus!=='PENDING_HUMAN_REVIEW' || !Array.isArray(s.tables) || !Array.isArray(s.schemas)) process.exit(1); console.log('PostgreSQL 17 catalog query executed; schemaVersion=2; human review remains pending.');"
+          node --input-type=module -e "import fs from 'node:fs'; const s=JSON.parse(fs.readFileSync('/tmp/database-contract-snapshot.json','utf8')); const t=s.tables.find(x=>x.schema==='public'&&x.name==='contract_probe'); if(s.schemaVersion!==2 || s.reviewStatus!=='PENDING_HUMAN_REVIEW' || !Array.isArray(s.tables) || !Array.isArray(s.schemas) || !t?.grants.some(x=>x.grantor==='postgres'&&x.grantee==='infinitex_contract_reader'&&x.privilege==='SELECT') || !t?.columnGrants.some(x=>x.grantor==='postgres'&&x.grantee==='infinitex_contract_reader'&&x.column==='private_note') || !s.schemas.find(x=>x.name==='private') ) process.exit(1); console.log('PostgreSQL 17 catalog query passed: relation, column, and schema ACL metadata captured; human review remains pending.');"
