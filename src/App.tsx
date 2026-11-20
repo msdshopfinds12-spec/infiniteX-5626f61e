@@ -9,10 +9,20 @@ import AgentList from "./components/AgentList";
 import PipelineBoard from "./components/PipelineBoard";
 import LogStream from "./components/LogStream";
 import type { ViewKey } from "./types";
+import type { AuthState } from "./features/auth/auth-state";
 
-export default function App() {
+type AppProps = Readonly<{ authState?: AuthState }>;
+
+export default function App({ authState }: AppProps) {
   const [view, setView] = useState<ViewKey>("overview");
   const { theme, toggleTheme } = useTheme();
+
+  const authStatusLabel =
+    authState?.status === "authenticated" ? "authenticated session detected" :
+    authState?.status === "anonymous" ? "no active session" :
+    authState?.status === "error" ? "session unavailable" :
+    authState?.status === "loading" ? "checking session" :
+    "not configured";
 
   // Illustrative placeholders only; these values are not live backend telemetry.
   const metrics = useMemo(
@@ -41,7 +51,10 @@ export default function App() {
           <main className="content">
             <div className="demo-notice" role="status">
               <strong>DEMO MODE</strong>
-              <span>Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified.</span>
+              <span>
+                Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified.
+                {authState && ` Supabase auth: ${authStatusLabel}. Dashboard data remains demo-only.`}
+              </span>
             </div>
             {view === "overview" && (
               <>
