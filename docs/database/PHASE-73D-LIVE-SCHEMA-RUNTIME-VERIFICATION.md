@@ -141,3 +141,13 @@ The companion SQL file `supabase/diagnostics/phase-73d-read-only-catalog-audit.s
 - No application row payloads, Vault secret values, API keys, tokens, or environment secrets were retrieved for this report.
 - No SQL DDL/DML, GRANT/REVOKE, migration application, secret change, Edge Function deployment, Vercel deployment, merge, billing change, or production scheduling change.
 - Phase 73D status remains **PARTIAL** until worker parity and the candidate API-key privilege migration are independently rehearsed and approved.
+## 9. Repository audit-guard CI evidence
+
+The branch adds `scripts/verify-phase-73d-read-only.mjs`, exposed as `npm run verify:phase-73d`, plus a branch-scoped GitHub Actions workflow with `contents: read` permission.
+
+- Workflow run: [44820078976](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44820078976)
+- Exact tested head: `a4b10f7542cf5ce14de5c1a9513a53843f3c444a`
+- Result: SUCCESS
+- The guard confirms that every executable statement in the companion diagnostic SQL starts with SELECT, checks for prohibited write/DDL operations, and verifies that the report records the required live observations and read-only scope.
+
+This CI validates the diagnostic artifact's read-only contract. It does not repeat the live Supabase queries or test deployed Edge Function behavior.
