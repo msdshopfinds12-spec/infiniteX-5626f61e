@@ -160,7 +160,7 @@ const RETRYABLE_STEP_ERROR_CODES = new Set([
 ]);
 
 /** retry_limit means additional attempts after the initial execution; hard cap prevents runaway work. */
-export function validateRetryLimit(value, defaultRetries = 0, maximumRetries = 5) {
+export function validateRetryLimit(value, defaultRetries = 0, maximumRetries = 10) {
   if (!Number.isInteger(defaultRetries) || defaultRetries < 0 ||
       !Number.isInteger(maximumRetries) || maximumRetries < defaultRetries) {
     throw new TypeError("invalid_retry_policy");
