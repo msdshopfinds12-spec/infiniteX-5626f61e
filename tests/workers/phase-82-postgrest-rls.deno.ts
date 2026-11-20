@@ -69,7 +69,7 @@ Deno.test({
     const keys = await keyMetadata.json();
     assert(keys.length === 1 && keys[0].owner_id === ownerA && keys[0].label === "Phase 82 synthetic A", "tenant A must see only its own API-key metadata");
     const secretColumn = await rest(tokenA, "platform_api_keys?select=key_hash");
-    assert(secretColumn.status === 400, "authenticated client must not select key_hash; got " + secretColumn.status);
+    assert(secretColumn.status === 403, "authenticated client must be denied key_hash selection with 403; got " + secretColumn.status);
 
     // User A cannot select User B's profile or workflow queue row.
     const profileB = await rest(tokenA, "profiles?select=id&id=eq." + ownerB);
