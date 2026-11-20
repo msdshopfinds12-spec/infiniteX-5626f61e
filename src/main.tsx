@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { AuthSessionProvider, useAuthActions, useAuthRecoveryMode, useAuthState } from "./features/auth/auth-session-provider";
+import { resolveAuthBootstrapState } from "./features/auth/auth-bootstrap.ts";
 import { createSupabaseAuthSessionAdapter } from "./features/auth/supabase-auth-session-adapter";
 import { createBrowserSupabaseClient } from "./lib/supabase/client";
 import "./styles/global.css";
@@ -25,7 +26,8 @@ function ConnectedApp() {
 
 function Root() {
   if (!authAdapter) {
-    return <App />;
+    // Missing/invalid public auth configuration must never render the workspace.
+    return <App authState={resolveAuthBootstrapState(supabaseResult)!} />;
   }
 
   return (
