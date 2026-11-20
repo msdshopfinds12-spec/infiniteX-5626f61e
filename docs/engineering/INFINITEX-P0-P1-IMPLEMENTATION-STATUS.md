@@ -23,21 +23,19 @@
 
 ## Verification evidence
 
-- Node.js runtime used for focused checks: v22.16.0.
-- Focused test result: 15 passed, 0 failed.
-- The focused tests were run in an isolated temporary Node test harness against mirrored source modules. This is not a full repository checkout run.
+Exact PR head SHA: `01baa4b4bf8c863918014ed8abe5c1227934d434`
 
-## Not yet verified
+GitHub Actions run #27: [44681599314](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44681599314)
 
-The following commands have **not** been run against this branch checkout:
+- Node.js: v22.23.4; npm: 10.9.9.
+- `npm ci`: PASS.
+- `npm audit`: PASS — 0 vulnerabilities reported.
+- `npm run lint`: PASS after excluding Node-run `.test.ts` modules from the browser TypeScript project.
+- `npm test`: PASS — 58 tests, 58 passed, 0 failed.
+- `npm run build`: PASS — Vite production bundle generated.
+- Build artifact uploaded to GitHub Actions artifact storage; it was not deployed.
 
-- `npm ci`
-- `npm audit`
-- `npm run lint`
-- `npm test`
-- `npm run build`
-
-No claim of full-repository build or CI success is made.
+A first CI run (#26) exposed that Node test modules were being included in the browser TypeScript project without Node type declarations. The fix was to exclude `src/**/*.test.ts` from the application tsconfig while leaving those tests under the Node test runner. The subsequent exact-head run #27 passed all workflow steps.
 
 ## P1 integration blocker
 
