@@ -34,7 +34,7 @@ export function createProfileReadService(
           .maybeSingle();
 
         if (error) return { status: "error", code: "query_failed" } as const;
-        return { status: "success", data: data as OwnProfile | null } as const;
+        return { status: "success", data } as const;
       } catch {
         return { status: "error", code: "network_unavailable" } as const;
       }
