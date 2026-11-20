@@ -1,4 +1,4 @@
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 INSERT INTO phase62.workflow_step_attempts (
   id, owner_id, run_id, step_id, attempt_number, idempotency_key,
