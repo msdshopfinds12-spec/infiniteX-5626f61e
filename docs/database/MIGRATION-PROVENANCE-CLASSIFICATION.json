@@ -29,7 +29,7 @@
       "path": "supabase/migrations/20261121000200_simula_transactional_workflow_outbox.sql",
       "classification": "PROPOSED_NOT_APPLIED",
       "sourceStatus": "NOT_VERIFIED_LIVE",
-      "sha256": "a29ded13457715bec33a2474a1b8f11ae830467100c3bd3747d472314b2e77f9",
+      "sha256": "51f907f2be04339deb61cfb4bfe90b66ac66dc244b6b0a5361dd5c3a36d801b8",
       "reason": "Phase 87.1 candidate only. Rehearsal and integration are limited to disposable PostgreSQL CI; no live migration evidence or production approval.",
       "productionApproval": "NOT_GRANTED"
     }
