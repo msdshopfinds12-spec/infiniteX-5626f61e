@@ -13,6 +13,7 @@ test('API-key client grants exclude key_hash and retain metadata-only access', a
   const sql = await readFile(migrationPath, 'utf8');
 
   assert.match(sql, /revoke\s+select\s+on\s+table\s+public\.platform_api_keys\s+from\s+authenticated\s*;/i);
+  assert.match(sql, /revoke\s+select\s*\(\s*key_hash\s*\)\s+on\s+table\s+public\.platform_api_keys\s+from\s+authenticated\s*;/i);
   assert.match(sql, /grant\s+select\s*\([\s\S]*?\)\s*on\s+table\s+public\.platform_api_keys\s+to\s+authenticated\s*;/i);
   assert.doesNotMatch(
     sql.match(/grant\s+select\s*\(([\s\S]*?)\)\s*on\s+table\s+public\.platform_api_keys/i)?.[1] ?? '',
