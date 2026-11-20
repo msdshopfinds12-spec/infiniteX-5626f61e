@@ -1,0 +1,88 @@
+name: Phase 54 Dependency Remediation
+
+on:
+  push:
+    branches:
+      - "engineering/phase-54-*"
+    paths:
+      - ".github/workflows/dependency-remediation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-54-dependency-remediation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  remediate-and-verify:
+    name: Generate patched lockfile and run full application gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated remediation branch
+        uses: actions/checkout@v4
+
+      - name: Set up supported Node.js runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Record runtime versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Generate lockfile for patched Vite toolchain
+        run: |
+          npm install --package-lock-only --ignore-scripts --save-dev --save-exact vite@8.3.8 @vitejs/plugin-react@6.3.0
+          node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('package.json','utf8')); const l=JSON.parse(fs.readFileSync('package-lock.json','utf8')); if(p.devDependencies?.vite!=='8.3.8'||p.devDependencies?.['@vitejs/plugin-react']!=='6.3.0'||l.packages?.['']?.devDependencies?.vite!=='8.3.8'||l.packages?.['']?.devDependencies?.['@vitejs/plugin-react']!=='6.3.0') process.exit(1); console.log('Manifest and lockfile root dependency declarations match the isolated target versions.');"
+
+      - name: Install exactly from generated lockfile and trace deprecations
+        shell: bash
+        run: |
+          set -o pipefail
+          NODE_OPTIONS=--trace-deprecation npm ci 2>&1 | tee npm-install.log
+
+      - name: Run dependency security audit
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit.json
+          audit_status=$?
+          set -e
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const report = JSON.parse(fs.readFileSync("npm-audit.json", "utf8"));
+            const counts = report.metadata?.vulnerabilities ?? {};
+            console.log(JSON.stringify({ counts, vulnerabilities: report.vulnerabilities ?? {} }, null, 2));
+            if ((counts.total ?? 0) !== 0) process.exit(1);
+          '
+          test "$audit_status" -eq 0
+
+      - name: TypeScript validation
+        run: npm run lint
+
+      - name: Application regression tests
+        run: npm run test:app
+
+      - name: Production build
+        run: npm run build
+
+      - name: Verify production entry point
+        run: test -s dist/index.html
+
+      - name: Upload generated manifests and verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-54-dependency-remediation-evidence
+          path: |
+            package.json
+            package-lock.json
+            npm-audit.json
+            npm-install.log
+          if-no-files-found: warn
+          retention-days: 7
