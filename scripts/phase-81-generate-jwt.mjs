@@ -14,7 +14,7 @@ function sign(payload) {
   return input + "." + signature;
 }
 const now = Math.floor(Date.now() / 1000);
-const exp = now + 600;
+const exp = now + 1800;
 const userId = "81000000-0000-4000-8000-000000000001";
 const userToken = sign({ aud: "authenticated", role: "authenticated", sub: userId, iat: now, exp });
 const serviceToken = sign({ aud: "authenticated", role: "service_role", sub: userId, iat: now, exp });
