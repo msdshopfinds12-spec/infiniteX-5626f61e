@@ -14,6 +14,7 @@ test('PostgreSQL behavior harness applies the exact reviewed migrations in dispo
     '20261025202606_simula_internal_worker_queue_claiming.sql',
     '20261103134251_ashaa_backend_api_keys_and_webhook_idempotency.sql',
     '20261120120000_harden_platform_api_key_column_access.sql',
+    '20261025182821_simula_app_factory_core_schema_rls.sql',
   ]) {
     assert.ok(sql.includes(migration), 'missing migration from disposable behavior test: ' + migration);
   }
@@ -35,6 +36,14 @@ test('behavior harness covers tenant isolation, secret columns, webhook grants, 
     'SECURITY DEFINER',
     'workflow claim crossed tenant boundary',
     'user B modified user A API key',
+    'user A can read user B project metadata',
+    'user A modified user B project',
+    'user B modified user A project',
+    'user A modified user B profile',
+    'user B modified user A profile',
+    'Forged tenant project',
+    'projects_select_own',
+    'profiles_select_own',
     'search_path=""',
   ]) {
     assert.ok(sql.includes(token), 'missing security assertion: ' + token);
