@@ -9,9 +9,10 @@
     "preview": "vite preview",
     "lint": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "test": "node --experimental-strip-types --test",
+    "test:workflow-api-contract": "node --test supabase/functions/simula-workflow-api/workflow-api-contract.test.mjs",
     "test:edge-worker-security": "node --test supabase/functions/_shared/worker-security.test.mjs",
     "test:edge-function-cors": "node --experimental-strip-types --test supabase/functions/_shared/cors.test.mjs",
-    "test:edge-function-security": "npm run test:edge-function-cors && npm run test:edge-worker-security"
+    "test:edge-function-security": "npm run test:edge-function-cors && npm run test:edge-worker-security && npm run test:workflow-api-contract"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.2",
