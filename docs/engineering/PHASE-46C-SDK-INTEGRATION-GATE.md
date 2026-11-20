@@ -238,4 +238,4 @@ The read-only live schema baseline still governs feature implementation:
 
 The new regression tests cover ready, missing, and invalid auth bootstrap states; authenticated capability allow; unauthenticated denial; missing snapshot; subject mismatch; expired/invalid expiry; and missing capability.
 
-The final commit must pass the complete GitHub Actions workflow at its exact head before this phase is called CI-verified.
+Exact-head CI verification completed at commit `cc8cee43a7d6e2da6ecc37ba505bfbad349ff875` (run [44701040596](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44701040596)): SUCCESS. Results: 109/109 unit/regression tests, 8/8 Edge Function CORS tests, 10/10 worker security tests, npm audit 0 vulnerabilities, lint PASS, and production build PASS (1,618 modules). A final documentation commit will require another exact-head run.
