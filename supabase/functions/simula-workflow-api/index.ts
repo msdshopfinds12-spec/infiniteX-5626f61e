@@ -26,7 +26,7 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return reply(req, 405, { ok: false, error: "method_not_allowed" });
 
   const path = new URL(req.url).pathname.replace(/\/+$/, "");
-  if (!path.endsWith("/runs")) {
+  if (path !== "/runs" && !path.endsWith("/simula-workflow-api/runs")) {
     return reply(req, 404, { ok: false, error: "route_not_found" });
   }
 
@@ -46,7 +46,7 @@ Deno.serve(async (req: Request) => {
     global: { headers: { Authorization: "Bearer " + tokenMatch[1] } },
   });
   const { data, error } = await userClient.auth.getUser(tokenMatch[1]);
-  if (error || !data.user) return reply(req, 401, { ok: false, error: "invalid_session" });
+  if (error || !data.user?.id) return reply(req, 401, { ok: false, error: "invalid_session" });
 
   if (!(req.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) {
     return reply(req, 415, { ok: false, error: "unsupported_media_type" });
