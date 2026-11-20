@@ -43,3 +43,15 @@ CI results are pending until GitHub Actions completes on the exact final commit.
 This phase adds a typed service boundary; it does not yet add a complete API-key management screen, perform a live authenticated browser test, or prove the deployed Edge Function source matches the branch candidate. The frontend view should be wired only after this service passes CI and the actual UI design/accessibility states are reviewed.
 
 No live database query/write, migration, function deployment, secret/config change, PR merge, Vercel deployment, or billing change was performed.
+
+## CI evidence
+
+- Workflow run: [Phase 76 API-key Frontend Contract](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44820932001)
+- Tested source commit: `a6fc02d6bc43459a6d406ff67bd714cf3ee12010`
+- Result: `SUCCESS`
+- `npm ci`: passed
+- `npm run test:api-key-service`: passed
+- `npm run lint`: passed
+- `npm run build`: passed
+
+The final branch head also includes a documentation-only report commit after the tested source commit. No application or test source changed after the CI-tested commit.
