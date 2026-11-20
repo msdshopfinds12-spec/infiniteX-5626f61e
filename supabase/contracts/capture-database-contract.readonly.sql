@@ -134,6 +134,7 @@ partition_dependency_contract AS (
  JOIN pg_catalog.pg_class cc ON cc.oid=i.inhrelid
  JOIN pg_catalog.pg_namespace cn ON cn.oid=cc.relnamespace
  WHERE pn.nspname IN ('public','private') AND cn.nspname IN ('public','private')
+  AND cc.relispartition
 ),
 membership_contract AS (
  SELECT COALESCE(jsonb_agg(jsonb_build_object(
