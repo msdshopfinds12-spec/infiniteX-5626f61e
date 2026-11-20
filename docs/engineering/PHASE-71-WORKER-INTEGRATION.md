@@ -14,6 +14,8 @@ This phase extracts the authentication/privilege boundary from the two Deno work
 - Bearer parsing trims HTTP optional whitespace and requires exactly one non-whitespace token; malformed schemes and multi-token values are rejected.
 - A regression was found during code review: the initial parser regex was double-escaped. It has been corrected and malformed-header cases were added to the test suite.
 - Existing downstream claim RPCs, owner checks, workflow execution, attempt fencing, and terminal writes remain in their respective adapters.
+- `index.deno.ts` now contains a stateful Supabase mock implementing table reads, filters, ordered steps, inserts, conditional updates, RPC claims, and log persistence.
+- Stateful integration scenarios cover successful two-step execution for both authenticated and cron handlers, stale-generation fencing, and action-failure persistence.
 
 ## Security invariants
 
@@ -22,7 +24,9 @@ This phase extracts the authentication/privilege boundary from the two Deno work
 3. Missing/short cron secret is rejected before creating a privileged client.
 4. Cron secret verification must return exactly boolean `true` and no RPC error before the admin client is returned to the handler.
 5. Incomplete environment configuration fails closed.
-6. User and cron privilege boundaries remain separate.
+6. Stale workflow-step generations cannot execute actions or overwrite newer persisted state.
+7. A failed action must persist failed step and workflow states; it must not be reported as success.
+8. User and cron privilege boundaries remain separate.
 
 ## Validation
 
@@ -37,7 +41,7 @@ npm run lint
 npm run build
 ```
 
-The new tests cover the extracted authentication boundary only. They do **not** yet constitute full HTTP-handler integration or complete workflow execution tests. Those remain Phase 71B–71F acceptance work.
+GitHub Actions run #44802441505 passed on commit `0d6362b63b3e43cfd57167ad3f9f847f2360b3a1`. This includes Deno HTTP-handler integration, stateful multi-step execution for both worker paths, stale-generation fencing, action-failure persistence, Node auth-boundary and regression suites, TypeScript lint, and Vite production build. The stateful mock is not a real Supabase/PostgreSQL server; real worker-to-database integration, additional failure-injection cases, and live schema comparison remain outstanding.
 
 ## Safety constraints
 
