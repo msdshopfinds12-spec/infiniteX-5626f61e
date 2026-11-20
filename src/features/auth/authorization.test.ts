@@ -59,3 +59,15 @@ test("denies capabilities absent from the snapshot", () => {
     { allowed: false, reason: "permission-denied" },
   );
 });
+
+test("denies malformed runtime permission snapshots without throwing", () => {
+  const malformed = {
+    subjectId: "user-a",
+    permissions: null,
+    expiresAt: 10_000,
+  };
+  assert.deepEqual(
+    evaluateCapabilityAccess(authenticated, malformed as never, "workspace.read", 1),
+    { allowed: false, reason: "snapshot-unavailable" },
+  );
+});
