@@ -1,4 +1,4 @@
-name: InfiniteX Phase 46C SDK lockfile candidate
+name: InfiniteX Phase 46C SDK lockfile verification
 
 on:
   push:
@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 jobs:
-  generate-and-verify:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -31,10 +31,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Generate npm lockfile using exact SDK version
-        run: npm install --package-lock-only --ignore-scripts --save-exact @supabase/supabase-js@2.119.2
-
-      - name: Verify manifest and lockfile agree
+      - name: Verify committed SDK pin
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
@@ -47,72 +44,7 @@ jobs:
           console.log('Exact SDK manifest/lockfile contract: PASS');
           NODE
 
-      - name: Verify clean install and security audit
+      - name: Clean install and security audit
         run: |
-          npm ci --ignore-scripts
+          npm ci
           npm audit
-
-      - name: Upload generated dependency files for traceability
-        uses: actions/upload-artifact@v4
-        with:
-          name: infinitex-phase-46c-sdk-lockfile
-          path: |
-            package.json
-            package-lock.json
-          if-no-files-found: error
-          retention-days: 3
-
-  atomic-dependency-commit:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/eng/infinitex-p0-p1-auth-2026-11-20'
-    needs: generate-and-verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout protected target branch
-        uses: actions/checkout@v4
-        with:
-          ref: eng/infinitex-p0-p1-auth-2026-11-20
-          persist-credentials: true
-
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Generate exact SDK dependency and lockfile
-        run: npm install --package-lock-only --ignore-scripts --save-exact @supabase/supabase-js@2.119.2
-
-      - name: Validate dependency files and full project quality gates
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
-          const expected = '2.119.2';
-          if (pkg.dependencies?.['@supabase/supabase-js'] !== expected) throw new Error('package.json SDK pin mismatch');
-          if (lock.packages?.['']?.dependencies?.['@supabase/supabase-js'] !== expected) throw new Error('lockfile root SDK pin mismatch');
-          if (lock.packages?.['node_modules/@supabase/supabase-js']?.version !== expected) throw new Error('lockfile resolved SDK version mismatch');
-          console.log('Exact SDK manifest/lockfile contract: PASS');
-          NODE
-          npm ci --ignore-scripts
-          npm audit
-          npm run lint
-          npm test
-          npm run build
-
-      - name: Create one atomic dependency commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- package.json package-lock.json
-          if git diff --cached --quiet; then
-            echo "Dependency files already match the reviewed SDK pin; no commit required."
-            exit 0
-          fi
-          git commit -m "chore(deps): pin Supabase SDK 2.119.2"
-          git push origin HEAD:eng/infinitex-p0-p1-auth-2026-11-20
