@@ -40,3 +40,13 @@ This is a disposable PostgreSQL fixture, not a clone of the full Supabase projec
 A successful run is necessary but not sufficient for production approval. The next gate is a fuller isolated schema rehearsal and a review of frontend/API queries that may currently depend on table-wide SELECT.
 
 **No production changes:** no live SQL, migration application, GRANT/REVOKE, Edge Function deployment, secret change, merge, or Vercel deployment.
+
+## CI evidence
+
+- Workflow: [Phase 75 API-key Migration Rehearsal](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44820604455)
+- Tested commit: `b7d4910e6bc2985a58df3034de94ec7aebef81d7`
+- PostgreSQL: `17.12`
+- Result: `SUCCESS`
+- The exact migration executed successfully; all privilege and RLS assertions passed; transaction ended with `ROLLBACK`.
+
+This confirms the migration's expected grants against the isolated fixture only. The report-only commit that records this result does not change the tested SQL or workflow.
