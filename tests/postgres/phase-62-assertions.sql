@@ -231,3 +231,54 @@ END;
 $phase62$;
 
 SELECT 'phase-62-sql-contract-tests-passed' AS result;
+
+-- A colliding retry key bound to a different step identity must fail closed.
+INSERT INTO workflow_step_attempts(
+  id, owner_id, run_id, step_id, attempt_number, idempotency_key,
+  request_fingerprint, status, scheduled_at, finished_at, failure_kind
+) VALUES
+  ('attempt-conflict-step-1', 'owner-a', 'run-conflict-step', 'step-original', 1,
+   'step-attempt:v1:run-conflict-step:step-original:1', 'fingerprint-step',
+   'failed', clock_timestamp() - interval '2 seconds', clock_timestamp(), 'transient'),
+  ('attempt-conflict-step-2', 'owner-a', 'run-conflict-step', 'step-substituted', 2,
+   'step-attempt:v1:run-conflict-step:step-original:2', 'fingerprint-step',
+   'queued', clock_timestamp(), NULL, NULL);
+DO $phase62$
+BEGIN
+  BEGIN
+    PERFORM phase62.fail_and_schedule_retry(
+      'attempt-conflict-step-1', 'owner-a', 1, clock_timestamp(), 3,
+      'transient', 'unused-conflict-step'
+    );
+    RAISE EXCEPTION 'expected retry_idempotency_conflict for step mismatch';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'retry_idempotency_conflict' THEN RAISE; END IF;
+  END;
+END;
+$phase62$;
+
+-- A colliding retry key bound to a different attempt number must fail closed.
+INSERT INTO workflow_step_attempts(
+  id, owner_id, run_id, step_id, attempt_number, idempotency_key,
+  request_fingerprint, status, scheduled_at, finished_at, failure_kind
+) VALUES
+  ('attempt-conflict-number-1', 'owner-a', 'run-conflict-number', 'step-i', 1,
+   'step-attempt:v1:run-conflict-number:step-i:1', 'fingerprint-number',
+   'failed', clock_timestamp() - interval '2 seconds', clock_timestamp(), 'transient'),
+  ('attempt-conflict-number-2', 'owner-a', 'run-conflict-number', 'step-i', 7,
+   'step-attempt:v1:run-conflict-number:step-i:2', 'fingerprint-number',
+   'queued', clock_timestamp(), NULL, NULL);
+DO $phase62$
+BEGIN
+  BEGIN
+    PERFORM phase62.fail_and_schedule_retry(
+      'attempt-conflict-number-1', 'owner-a', 1, clock_timestamp(), 3,
+      'transient', 'unused-conflict-number'
+    );
+    RAISE EXCEPTION 'expected retry_idempotency_conflict for attempt-number mismatch';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'retry_idempotency_conflict' THEN RAISE; END IF;
+  END;
+END;
+$phase62$;
+
