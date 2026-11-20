@@ -93,7 +93,8 @@ export function createAuthenticatedWorkerHandler(deps: AuthenticatedWorkerDepend
   });
   if (!authentication.ok) {
     if (authentication.status === 500) console.error("worker_environment_incomplete");
-    return respond(req, authentication.status, { ok: false, error: authentication.error });
+    const authStatus = typeof authentication.status === "number" ? authentication.status : 401;
+    return respond(req, authStatus, { ok: false, error: authentication.error });
   }
   const { userClient, ownerId, supabaseUrl, serviceRoleKey } = authentication;
 
