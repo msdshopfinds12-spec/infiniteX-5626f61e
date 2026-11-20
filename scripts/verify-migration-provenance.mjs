@@ -51,6 +51,7 @@ export function validateMigrationInventory({ appliedEntries, candidateEntries, f
       continue;
     }
     if (candidatePaths.has(entry.path)) errors.push(`Duplicate candidate migration path: ${entry.path}`);
+    if (appliedPaths.has(entry.path)) errors.push(`Candidate path overlaps applied migration path: ${entry.path}`);
     candidatePaths.add(entry.path);
     if (entry.classification !== 'PROPOSED_NOT_APPLIED') {
       errors.push(`Candidate must be classified PROPOSED_NOT_APPLIED: ${entry.path}`);

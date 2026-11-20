@@ -49,7 +49,7 @@ test('rejects duplicate versions and candidate/applied path overlap', () => {
     files: [applied[0].path],
   });
   assert.match(errors.join('\n'), /overlaps or duplicates/);
-  assert.match(errors.join('\n'), /Duplicate candidate migration path/);
+  assert.match(errors.join('\n'), /Candidate path overlaps applied migration path/);
 });
 
 test('requires every applied and candidate file to exist in the inventory', () => {
