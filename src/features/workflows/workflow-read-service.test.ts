@@ -132,8 +132,49 @@ test("workflow run history normalizes database errors and validates its limit", 
   assert.equal(calls.length, 5);
 });
 
+test("workflow event logs use safe metadata only and chronological order", async () => {
+  const log = {
+    id: 1,
+    workflow_id: "workflow-1",
+    run_id: "run-1",
+    level: "info",
+    event: "workflow_step_succeeded",
+    created_at: "2026-11-21T00:00:01.000Z",
+  };
+  const { client, calls } = createClient({ data: [log], error: null });
+  const result = await createWorkflowReadService(client).listRunLogs(" run-1 ", { limit: 30 });
+  assert.equal(result.status, "success");
+  if (result.status === "success") assert.deepEqual(result.data, [log]);
+  assert.deepEqual(calls, [
+    { method: "from", args: ["workflow_logs"] },
+    { method: "select", args: ["id,workflow_id,run_id,level,event,created_at"] },
+    { method: "eq", args: ["run_id", "run-1"] },
+    { method: "order", args: ["created_at", { ascending: true }] },
+    { method: "limit", args: [30] },
+  ]);
+  assert.equal(calls.some(call => call.args.join(",").includes("owner_id")), false);
+  assert.equal(calls.some(call => call.args.join(",").includes("details")), false);
+});
+
+test("workflow event logs reject blank run IDs and invalid limits without querying", async () => {
+  const { client, calls } = createClient({ data: [], error: null });
+  const service = createWorkflowReadService(client);
+  assert.deepEqual(await service.listRunLogs("  "), {
+    status: "error",
+    code: "invalid_run_id",
+  });
+  assert.deepEqual(await service.listRunLogs("run-1", { limit: 101 }), {
+    status: "error",
+    code: "invalid_limit",
+  });
+  assert.deepEqual(calls, []);
+});
+
 test("workflow read service does not accept a caller-supplied owner identity", () => {
   const { client } = createClient({ data: [], error: null });
   const service = createWorkflowReadService(client);
-  assert.deepEqual(Object.keys(service).sort(), ["listOwnWorkflows", "listWorkflowRuns"].sort());
+  assert.deepEqual(
+    Object.keys(service).sort(),
+    ["listOwnWorkflows", "listWorkflowRuns", "listRunLogs"].sort(),
+  );
 });
