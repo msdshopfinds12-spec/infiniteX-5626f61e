@@ -18,6 +18,37 @@ export function classifyPsqlFailure(output = '') {
   return 'FAIL';
 }
 
+export function validateReconstructedBaseline({ provenance, baselineSql, snapshot }) {
+  const errors = [];
+  const required = [
+    'public.workflows',
+    'public.workflow_steps',
+    'public.workflow_runs',
+    'public.workflow_step_runs',
+    'public.workflow_logs',
+  ];
+  if (provenance?.classification !== 'RECONSTRUCTED_DISPOSABLE_FIXTURE'
+      || provenance?.canonical !== false
+      || provenance?.productionApproval !== 'NOT_GRANTED'
+      || provenance?.liveParity !== 'NOT_VERIFIED') {
+    errors.push('Baseline must remain explicitly reconstructed, noncanonical, not live-verified, and not production-approved.');
+  }
+  if (provenance?.sourceArtifact?.path !== 'docs/database/live-schema-metadata.snapshot.json'
+      || provenance?.sourceArtifact?.gitBlobSha !== 'f67a81de26ebf2ba9b3de0340663379bd550af82'
+      || provenance?.sourceArtifact?.capturedAt !== '2026-11-20T02:07:20.142926+00:00') {
+    errors.push('Reconstructed baseline source provenance does not match the reviewed metadata artifact.');
+  }
+  const declared = new Set(provenance?.reconstructedObjects ?? []);
+  for (const object of required) if (!declared.has(object)) errors.push('Missing declared reconstructed object: ' + object);
+  const created = new Set([...baselineSql.matchAll(/CREATE TABLE public\.([a-z_]+)/gi)].map((match) => 'public.' + match[1]));
+  for (const object of required) if (!created.has(object)) errors.push('SQL fixture does not create required object: ' + object);
+  for (const object of created) if (!required.includes(object)) errors.push('SQL fixture creates undeclared application object: ' + object);
+  const snapshotNames = new Set((snapshot?.tables ?? []).map((table) => 'public.' + table.name));
+  for (const object of required) if (!snapshotNames.has(object)) errors.push('Source snapshot does not contain required object: ' + object);
+  if (/^\s*scheduled_for\s+/im.test(baselineSql)) errors.push('Baseline must omit scheduled_for because recovered migration 5 adds it.');
+  return errors;
+}
+
 export function validateProvenance({ manifest, classification, files }) {
   const errors = [];
   if (manifest?.ledger_entry_count !== 19 || manifest?.applied_migrations?.length !== 19) {
@@ -74,6 +105,7 @@ async function main() {
     candidateCount: classification.candidateMigrations?.length ?? 0,
     appliedMigrationsExecuted: 0,
     candidateExecuted: false,
+    reconstructedBaselineExecuted: false,
     blockedAt: null,
     message: null,
     inventoryErrors,
@@ -89,6 +121,7 @@ async function main() {
       '- Status: **' + status + '**',
       '- Recovered migrations: ' + report.recoveredMigrationCount,
       '- Applied migrations executed: ' + report.appliedMigrationsExecuted,
+      '- Reconstructed baseline executed: ' + (report.reconstructedBaselineExecuted ? 'yes (disposable only; noncanonical)' : 'no'),
       '- Candidate migration executed: ' + (report.candidateExecuted ? 'yes (disposable only)' : 'no'),
       '- Result: ' + message,
       blockedAt ? '- First blocked migration: ' + blockedAt : '',
@@ -119,7 +152,7 @@ async function main() {
   }
 
   const ordered = [...manifest.applied_migrations].sort((a, b) => a.version.localeCompare(b.version));
-  for (const entry of ordered) {
+  for (const [index, entry] of ordered.entries()) {
     const absolute = path.resolve(root, entry.path);
     if (!absolute.startsWith(path.resolve(root, 'supabase/migrations') + path.sep)) {
       await finish('FAIL', 1, 'Unsafe migration path rejected: ' + entry.path);
@@ -140,6 +173,28 @@ async function main() {
     }
     report.appliedMigrationsExecuted += 1;
     console.log('REPLAY PASS ' + entry.version + ' ' + entry.path);
+
+    // The reconstructed fixture belongs between recovered migrations 1–4 and 5–19.
+    if (index === 3) {
+      const provenance = JSON.parse(await readFile(path.join(root, 'docs/database/PHASE-52.1D-RECONSTRUCTED-BASELINE.json'), 'utf8'));
+      const snapshot = JSON.parse(await readFile(path.join(root, provenance.sourceArtifact.path), 'utf8'));
+      const baselinePath = path.join(root, 'tests/database/phase-52-1d-reconstructed-workflow-baseline.sql');
+      const baselineSql = await readFile(baselinePath, 'utf8');
+      const baselineErrors = validateReconstructedBaseline({ provenance, baselineSql, snapshot });
+      if (baselineErrors.length) {
+        await finish('FAIL', 1, 'Reconstructed baseline validation failed: ' + baselineErrors.join('; '));
+        return;
+      }
+      const baselineResult = runPsql(['-f', baselinePath], env);
+      if (baselineResult.status !== 0) {
+        const classificationResult = classifyPsqlFailure(baselineResult.output);
+        await finish(classificationResult, classificationResult === 'BLOCKED' ? 2 : 1,
+          'Reconstructed disposable baseline execution failed: ' + baselineResult.output.slice(-2200), 'phase-52.1D reconstructed baseline');
+        return;
+      }
+      report.reconstructedBaselineExecuted = true;
+      console.log('RECONSTRUCTED BASELINE PASS (disposable only; noncanonical)');
+    }
   }
 
   for (const candidate of classification.candidateMigrations) {
