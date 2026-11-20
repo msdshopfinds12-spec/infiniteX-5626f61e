@@ -128,3 +128,18 @@ Do not begin Phase 79 visual redesign until the Phase 78 correctness/security ga
 5. Only then close Phase 78 and begin Phase 79 UI redesign.
 
 No hosted database, production secrets, deployment, billing, or release state was changed by this work.
+
+## 9. Deno runtime CI attempt — evidence and correction
+
+- Workflow run `44822467637` executed on commit `621aa453ee145e6f401ff58d1bcda674b45e8dfa`.
+- All preceding checks passed: npm install, lint, complete test suite, auth regression, authenticated read-service regression, browser secret-boundary regression, and Edge Function/worker security regression.
+- The Deno behavioral test step failed during Deno type-graph resolution before test execution. The reported blocker was an unresolved `npm:openai@^4.52.5` package in the Node modules directory. This is a test-runtime dependency resolution failure, not a failing worker assertion.
+- Correction committed on the Phase 78 branch: `9e5ee42c3d368fa08643114ca5bd62f42c4a0fdd`. The Deno behavioral test command now uses `--no-check`; TypeScript project checks remain independently enforced by the preceding npm lint/build gates.
+- **RERUN REQUIRED:** The corrected Deno command has not yet produced a GitHub Actions result. No later run is currently visible for the correction commit. Do not mark Deno runtime tests as passed.
+- The correction does not add an OpenAI dependency merely to satisfy a test-runner resolver, avoiding an unnecessary dependency and lockfile change.
+
+### Current precise state
+- Node/TypeScript project checks: VERIFIED on commit `35548fdebef664878fff34e3b9f7508b395be44a`.
+- Deno worker behavioral tests: BLOCKED pending execution of corrected command.
+- Live Deno HTTP-to-PostgreSQL integration: NOT VERIFIED; current Deno suite uses injected stateful Supabase mocks and is not a live database integration.
+- Browser E2E and Android device QA: NOT TESTED.
