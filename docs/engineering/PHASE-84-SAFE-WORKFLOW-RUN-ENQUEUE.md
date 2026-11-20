@@ -1,6 +1,6 @@
 # Phase 84 — Safe Authenticated Workflow Run Enqueue
 
-**Status:** IMPLEMENTED IN ISOLATED CANDIDATE / CI VERIFICATION PENDING  
+**Status:** VERIFIED IN DISPOSABLE CI / DRAFT PR OPEN  
 **Base:** `phase-83-frontend-data-access-audit`  
 **Scope:** New database RPC migration, authenticated Edge Function, disposable PostgREST integration tests
 
@@ -42,9 +42,22 @@ The new `simula_enqueue_workflow_run` function:
 - Returns only run ID, status, creation time, and replay indicator.
 - Does not expose service-role credentials or any privileged data.
 
+## Verified CI result
+
+- Phase 84 run [44830824820](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44830824820): **SUCCESS**
+- Exact tested commit: `be0af9dac49ed22fa706b97bc1464c6784bf311e`
+- Migration provenance validation and replay of the 19 recovered migrations plus separately classified candidate migrations: passed in disposable PostgreSQL 17.
+- Phase 81 real worker HTTP journey: passed.
+- Phase 82 two-tenant PostgREST RLS tests: passed.
+- Phase 84 Deno type-check and authenticated enqueue integration test: passed.
+- Disposable PostgreSQL and PostgREST cleanup: passed.
+- Supporting Phase 80 source type safety [44830824878](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44830824878), Phase 68 PostgreSQL security/replay [44830824876](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44830824876), Phase 81 [44830824772](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44830824772), Phase 82 [44830824623](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44830824623), and Phase 83 [44830824773](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44830824773): **SUCCESS**.
+
+The first CI attempt exposed a migration provenance guard that assumed exactly one candidate migration. The guard and its regression test now support multiple independently classified candidates; no applied migration history was rewritten.
+
 ## Integration coverage
 
-The Phase 84 disposable CI test must verify:
+The Phase 84 disposable CI test verifies:
 1. Owner A can enqueue an active workflow they own.
 2. A new request returns HTTP 201 and a queued run.
 3. Exact retries return HTTP 200 with `replayed=true` and do not create duplicates.
