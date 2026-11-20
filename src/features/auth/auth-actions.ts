@@ -27,7 +27,7 @@ export function normalizeEmail(value: string): string {
 
 export function validateEmail(value: string): string | null {
   const email = normalizeEmail(value);
-  if (email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return "Enter a valid email address.";
   }
   return null;
