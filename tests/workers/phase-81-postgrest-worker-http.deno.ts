@@ -311,7 +311,7 @@ Deno.test({
         { p_limit: 5 },
       );
       assert(!secondClaimError, "outbox retry claim must succeed");
-      const secondLease = (secondClaims ?? []).find((event) => event.id === outboxId);
+      const secondLease = (secondClaims ?? []).find((event: { id: string; attempts: number; lock_token: string }) => event.id === outboxId);
       assert(secondLease && secondLease.attempts === 2 && secondLease.lock_token !== firstLease.lock_token,
         "retry must issue a new generation token and increment attempt count");
 
