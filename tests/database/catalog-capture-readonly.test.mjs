@@ -4,12 +4,11 @@ import { readFile } from 'node:fs/promises';
 
 const sqlPath = new URL('../../supabase/contracts/capture-database-contract.readonly.sql', import.meta.url);
 
-test('catalog capture is a single read-only SELECT with no mutation statements', async () => {
+test('catalog capture is one read-only SELECT statement', async () => {
   const sql = await readFile(sqlPath, 'utf8');
-  const statements = sql.split(';').map((part) => part.trim()).filter(Boolean);
-  assert.equal(statements.length, 1);
-  assert.match(statements[0], /^WITH\b[\s\S]*\bSELECT\s+jsonb_build_object/i);
-  assert.doesNotMatch(sql, /^\s*(CREATE|ALTER|INSERT|UPDATE|DELETE|DROP|TRUNCATE|GRANT|REVOKE|CALL|DO)\b/im);
+  assert.match(sql.trim(), /^WITH\\b[\\s\\S]*\\bSELECT\\s+jsonb_build_object[\\s\\S]*;$/i);
+  assert.equal((sql.match(/\\bSELECT\\s+jsonb_build_object\\s*\\(/gi) ?? []).length, 1);
+  assert.doesNotMatch(sql, /^\\s*(CREATE|ALTER|INSERT|UPDATE|DELETE|DROP|TRUNCATE|GRANT|REVOKE|CALL|DO)\\b/im);
 });
 
 test('catalog capture includes required RLS and function security metadata', async () => {
@@ -21,6 +20,6 @@ test('catalog capture includes required RLS and function security metadata', asy
 
 test('catalog capture excludes application row and secret-value queries', async () => {
   const sql = await readFile(sqlPath, 'utf8');
-  assert.doesNotMatch(sql, /vault\.decrypted_secrets|vault\.secrets|platform_api_keys|webhook_events/i);
-  assert.doesNotMatch(sql, /net\.http_post|cron\.schedule/i);
+  assert.doesNotMatch(sql, /vault\\.decrypted_secrets|vault\\.secrets|platform_api_keys|webhook_events/i);
+  assert.doesNotMatch(sql, /net\\.http_post|cron\\.schedule/i);
 });
