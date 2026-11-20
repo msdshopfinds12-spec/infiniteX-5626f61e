@@ -90,3 +90,13 @@ Phase 73C may be marked VERIFIED only when:
 - an independent reviewer signs off on the evidence.
 
 Until then, status remains PARTIAL / NOT RELEASE-READY.
+## 7. Repository automation evidence
+
+The branch includes `scripts/verify-phase-73c-provenance.mjs`, exposed as `npm run verify:phase-73c`, and a branch-scoped GitHub Actions workflow with `contents: read` permission.
+
+- Workflow run: [44819713272](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44819713272)
+- Result: SUCCESS
+- Checks: 122 passed
+- Verified: all 19 recovered SQL SHA-256 digests; unique versions; one-statement ledger entries; explicit NOT_VERIFIED original Git provenance; confined migration paths; 14-table snapshot count; corrected baseline count; and candidate migration approval classifications.
+
+This is repository integrity automation only. It does not connect to Supabase, query the live database, validate current production grants, or prove deployed worker parity. Phase 73C remains PARTIAL.
