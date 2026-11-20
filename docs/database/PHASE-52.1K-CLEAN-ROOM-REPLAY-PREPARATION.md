@@ -121,3 +121,20 @@ Any SQL error, missing required platform dependency, hash mismatch, unexpected s
 **Production replay: NOT AUTHORIZED.**
 
 Do not claim a replay, successful migration execution, or schema parity until the actual isolated PostgreSQL run and evidence bundle exist.
+
+## SQL dependency triage — read-only source review
+
+A read-only scan of all 19 manifest-listed SQL files was completed from the recovery branch. It found recurring dependencies on Supabase-managed schemas and roles, grants, SECURITY DEFINER routines, RLS, extensions, and worker scheduling/network facilities.
+
+Notable signals:
+- The core schema migration references platform roles/schemas and defines SECURITY DEFINER routines, triggers, and RLS policies.
+- The cron scheduler and worker migrations reference extension/platform facilities and role grants.
+- The secure cron/Vault migration references Supabase-managed schemas and SECURITY DEFINER routines.
+- The secure worker scheduling migration references the `net` schema and network-call facilities.
+- The API-key and credit-ledger migrations include role/grant and RLS-sensitive statements.
+
+This was a lexical dependency triage, not a complete semantic SQL review. It does not prove all dependencies or safety properties.
+
+**Environment decision:** a bare `postgres:17` container cannot yet be assumed sufficient. Before replay, the full SQL must be semantically reviewed and required platform dependencies must be made available in a pinned, disposable Supabase-compatible PostgreSQL 17 environment. Do not fake auth/storage/vault/cron/net behavior or security roles merely to make the chain pass. If the required platform runtime cannot be provisioned without production credentials or paid resources, classify replay BLOCKED and document the exact missing prerequisites.
+
+The candidate hardening migration remains outside the 19-file set.
