@@ -30,6 +30,7 @@ test('candidate migration cannot be represented as part of recovered applied his
       classification: 'PROPOSED_NOT_APPLIED',
       sourceStatus: 'NOT_VERIFIED_LIVE',
       productionApproval: 'NOT_GRANTED',
+      sha256: 'a'.repeat(64),
     }],
   };
   const files = [...appliedMigrations.map((entry) => entry.path), candidatePath];
