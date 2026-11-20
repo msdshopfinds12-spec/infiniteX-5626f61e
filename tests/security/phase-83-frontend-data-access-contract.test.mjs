@@ -69,7 +69,7 @@ test("workflow run request contains only caller input and workflow identity", as
   const request = await read("src/features/workflows/workflow-run-request.ts");
   assert.match(request, /workflow_id:\s*string/);
   assert.match(request, /input:\s*Json/);
-  assert.match(request, /server must derive owner_id from the verified session/);
+  assert.match(request, /server must derive\\s+owner_id from the verified session/);
   assert.doesNotMatch(request, /owner_id:\s*|status:\s*|attempt:\s*|output:\s*/);
 });
 
@@ -91,7 +91,7 @@ test("workspace labels demo telemetry and read-only integration honestly", async
   const app = await read("src/App.tsx");
   assert.match(app, /READ-ONLY INTEGRATION/);
   assert.match(app, /DEMO MODE/);
-  assert.match(app, /metrics are not live backend telemetry/i);
+  assert.match(app, /values are not live backend telemetry/i);
   assert.match(app, /overview metrics, agents, sample logs, and security posture remain demo or unverified/i);
   assert.match(app, /pipeline execution is not connected/i);
 });
