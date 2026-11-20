@@ -107,6 +107,34 @@ role_contract AS (
   rolbypassrls AS bypass_rls,rolconnlimit AS connection_limit
  FROM pg_catalog.pg_roles WHERE rolname !~ '^pg_'
 ),
+default_privilege_contract AS (
+ SELECT pg_catalog.pg_get_userbyid(d.defaclrole) AS owner,
+  CASE d.defaclobjtype WHEN 'r' THEN 'TABLES' WHEN 'S' THEN 'SEQUENCES'
+   WHEN 'f' THEN 'FUNCTIONS' WHEN 'T' THEN 'TYPES' WHEN 'n' THEN 'SCHEMAS'
+   ELSE d.defaclobjtype::text END AS object_type,
+  n.nspname AS schema_name,
+  COALESCE(jsonb_agg(jsonb_build_object(
+   'grantor',grantor_role.rolname,
+   'grantee',CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE grantee_role.rolname END,
+   'privilege',a.privilege_type,'grantable',a.is_grantable
+  ) ORDER BY a.grantor,a.grantee,a.privilege_type,a.is_grantable),'[]'::jsonb) AS grants
+ FROM pg_catalog.pg_default_acl d
+ LEFT JOIN pg_catalog.pg_namespace n ON n.oid=d.defaclnamespace
+ CROSS JOIN LATERAL pg_catalog.aclexplode(d.defaclacl) a
+ LEFT JOIN pg_catalog.pg_roles grantee_role ON grantee_role.oid=a.grantee
+ LEFT JOIN pg_catalog.pg_roles grantor_role ON grantor_role.oid=a.grantor
+ GROUP BY d.oid,n.nspname
+),
+partition_dependency_contract AS (
+ SELECT pn.nspname AS parent_schema,pc.relname AS parent_table,
+  cn.nspname AS child_schema,cc.relname AS child_table,i.inhseqno AS sequence
+ FROM pg_catalog.pg_inherits i
+ JOIN pg_catalog.pg_class pc ON pc.oid=i.inhparent
+ JOIN pg_catalog.pg_namespace pn ON pn.oid=pc.relnamespace
+ JOIN pg_catalog.pg_class cc ON cc.oid=i.inhrelid
+ JOIN pg_catalog.pg_namespace cn ON cn.oid=cc.relnamespace
+ WHERE pn.nspname IN ('public','private') AND cn.nspname IN ('public','private')
+),
 membership_contract AS (
  SELECT COALESCE(jsonb_agg(jsonb_build_object(
   'member',m.rolname,'role',g.rolname,'adminOption',a.admin_option,
@@ -127,7 +155,7 @@ SELECT jsonb_build_object(
   'scopeSchemas',jsonb_build_array('public','private'),
   'metadataCategories',jsonb_build_array('schemas','tables','columns','constraints','indexes',
    'table_grants','column_grants','rls_policies','triggers','functions','extensions',
-   'custom_types','role_attributes','role_memberships'),
+   'custom_types','role_attributes','role_memberships','default_privileges','partition_dependencies'),
   'applicationRowsRead',false,'functionBodiesRead',false,'secretsRead',false,'writeStatementsExecuted',false
  ),
  'schemas',COALESCE((SELECT jsonb_agg(to_jsonb(s) ORDER BY s.name) FROM schema_contract s),'[]'::jsonb),
@@ -146,5 +174,12 @@ SELECT jsonb_build_object(
  'extensions',COALESCE((SELECT jsonb_agg(to_jsonb(e) ORDER BY e.name) FROM extension_contract e),'[]'::jsonb),
  'types',COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY t.schema_name,t.name) FROM type_contract t),'[]'::jsonb),
  'roles',COALESCE((SELECT jsonb_agg(to_jsonb(r) ORDER BY r.name) FROM role_contract r),'[]'::jsonb),
- 'roleMemberships',(SELECT memberships FROM membership_contract)
+ 'roleMemberships',(SELECT memberships FROM membership_contract),
+ 'defaultPrivileges',COALESCE((SELECT jsonb_agg(jsonb_build_object(
+  'owner',owner,'objectType',object_type,'schema',schema_name,'grants',grants
+ ) ORDER BY owner,object_type,schema_name NULLS FIRST) FROM default_privilege_contract),'[]'::jsonb),
+ 'partitionDependencies',COALESCE((SELECT jsonb_agg(jsonb_build_object(
+  'parentSchema',parent_schema,'parentTable',parent_table,'childSchema',child_schema,
+  'childTable',child_table,'sequence',sequence
+ ) ORDER BY parent_schema,parent_table,sequence,child_schema,child_table) FROM partition_dependency_contract),'[]'::jsonb)
 ) AS database_contract_snapshot;
