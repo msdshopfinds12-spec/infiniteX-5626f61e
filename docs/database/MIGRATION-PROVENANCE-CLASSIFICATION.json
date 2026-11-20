@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Classify every checked-in SQL migration without implying that candidate files are applied to the live database.",
+  "appliedSource": "docs/database/MIGRATION-LEDGER-RECOVERY-MANIFEST.json",
+  "candidateMigrations": [
+    {
+      "version": "20261120120000",
+      "name": "harden_platform_api_key_column_access",
+      "path": "supabase/migrations/20261120120000_harden_platform_api_key_column_access.sql",
+      "classification": "PROPOSED_NOT_APPLIED",
+      "sourceStatus": "NOT_VERIFIED_LIVE",
+      "sha256": "3b05308615ba2753afcc815ea2667ef75c530e9dc916e6fa802531e933e126f5",
+      "reason": "Repository candidate only. No verified live migration-ledger evidence establishes application.",
+      "productionApproval": "NOT_GRANTED"
+    }
+  ]
+}
