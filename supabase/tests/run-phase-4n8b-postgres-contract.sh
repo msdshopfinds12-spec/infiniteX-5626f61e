@@ -44,7 +44,7 @@ where id = '30000000-0000-4000-8000-000000000001'
 for update;
 \! touch "$READY_FILE"
 \! while [ ! -f "$B_STARTED_FILE" ]; do sleep 0.02; done
-select pg_sleep(0.25);
+\! for _ in $(seq 1 200); do if [ "$(psql "$DATABASE_URL" -X -Atc "select count(*) from pg_stat_activity where application_name = 'phase4n8b-session-b' and wait_event_type = 'Lock'")" = "1" ]; then exit 0; fi; sleep 0.05; done; echo "Session B never reached a database lock wait." >&2; exit 1
 select public.simula_transition_workflow_step(
   '30000000-0000-4000-8000-000000000001',
   '40000000-0000-4000-8000-000000000001',
