@@ -47,5 +47,11 @@ jobs:
       - name: Edge function and worker security tests
         run: npm run test:edge-function-security
 
+      - name: Run Deno worker regression suite
+        run: npx --yes deno@2.2.12 test --no-lock supabase/functions/_shared/worker-security.deno.ts
+      - name: Type-check authenticated workflow worker
+        run: npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-worker/index.ts
+      - name: Type-check cron workflow worker
+        run: npx --yes deno@2.2.12 check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
       - name: Production build
         run: npm run build
