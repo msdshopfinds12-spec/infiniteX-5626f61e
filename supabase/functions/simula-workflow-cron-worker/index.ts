@@ -180,12 +180,24 @@ export function createCronWorkerHandler(deps: CronWorkerDependencies) {
         }
 
         payload = output;
-        const { data: finishedStep, error: finishStepError } = await admin.from("workflow_step_runs").update({
-          status: "succeeded", output, error_message: null, finished_at: now().toISOString(),
-        }).eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
-          .eq("attempt", stepAttempt).select("id").maybeSingle();
+        // Keep cron and authenticated workers on the same atomic completion path.
+        // Never fall back to a direct success update if the RPC fails.
+        const { data: completionRows, error: finishStepError } = await admin.rpc(
+          "simula_complete_step_with_outbox",
+          {
+            p_owner_id: ownerId,
+            p_run_id: run.id,
+            p_step_id: step.id,
+            p_attempt: stepAttempt,
+            p_output: output,
+            p_event_type: null,
+            p_idempotency_key: null,
+            p_payload: {},
+          },
+        );
         if (finishStepError) throw new Error("step_run_finish_failed");
-        if (!finishedStep) throw new Error("workflow_step_attempt_superseded");
+        const completion = Array.isArray(completionRows) ? completionRows[0] : completionRows;
+        if (!completion?.step_run_id) throw new Error("workflow_step_attempt_superseded");
         await logEvent(admin, ownerId, run.workflow_id, run.id, "info", "workflow_step_succeeded", {
           step_id: step.id, step_order: step.step_order, action_type: step.action_type,
         });
