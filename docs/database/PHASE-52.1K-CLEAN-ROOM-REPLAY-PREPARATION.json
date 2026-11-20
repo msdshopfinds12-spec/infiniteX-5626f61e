@@ -1,0 +1,56 @@
+{
+  "artifact": "PHASE_52_1K_CLEAN_ROOM_REPLAY_PREPARATION",
+  "repository": "msdshopfinds12-spec/infiniteX-5626f61e",
+  "branch": "engineering/phase-52-1k-clean-room-replay-preparation",
+  "base_commit": "47afa1ba5756f12715687638691fd88e71b333bc",
+  "inspected_recovery_branch": "recovery/infinitex-database-source-of-truth",
+  "inspected_recovery_branch_tip": "b136dc50113cf5270e1b3595d289623bb2710ce0",
+  "recovery_commit": "6f4f6d73868c040ee32e0f779ba29bcfbd1e218c",
+  "recovery_commit_parent": "f315ed2e8cd749ee455ff26f091f12d1cab0143d",
+  "recovered_ledger_files": 19,
+  "ledger_to_file_matches": "19/19 as recorded in existing recovery evidence",
+  "original_git_blob_equivalence": "NOT_ESTABLISHED",
+  "canonical_bootstrap": "NOT_ESTABLISHED",
+  "phase_52_1k": "PREPARATION_DOCUMENTED",
+  "phase_52_1l_replay": "BLOCKED_PENDING_SEMANTIC_REVIEW_AND_PINNED_PLATFORM_DEPENDENCIES",
+  "database_engine_target": "PostgreSQL 17",
+  "replay_scope": "19 manifest-listed ledger-recovered migration SQL files only",
+  "excluded_candidate_migration": "supabase/migrations/20261120120000_harden_platform_api_key_column_access.sql",
+  "safety": {
+    "production_connection": "PROHIBITED",
+    "production_writes": 0,
+    "production_migrations": 0,
+    "merge_authorized": false,
+    "deployment_authorized": false,
+    "secrets_access_authorized": false,
+    "billing_changes": 0
+  },
+  "required_phase_52_1l_evidence": [
+    "pinned repository commit and manifest checksum",
+    "PostgreSQL 17 server version",
+    "preflight dependency inventory",
+    "19 per-file execution results",
+    "complete redacted logs",
+    "final catalog and extension/role inventory",
+    "machine-readable result manifest",
+    "disposable environment destruction confirmation"
+  ],
+  "decision": "Do not mark replay PASS or establish schema parity until an isolated PostgreSQL 17 run produces all required evidence.",
+  "sql_dependency_triage": {
+    "scanned_files": 19,
+    "scan_type": "READ_ONLY_LEXICAL_TRIAGE_NOT_FULL_SEMANTIC_REVIEW",
+    "observed_signals": [
+      "Supabase-managed schemas and roles",
+      "GRANT statements",
+      "SECURITY DEFINER routines",
+      "RLS policies",
+      "extensions",
+      "cron/Vault references",
+      "net schema/network calls",
+      "triggers"
+    ],
+    "plain_postgres_17_sufficiency": "NOT_ESTABLISHED",
+    "recommended_rehearsal_target": "Pinned disposable Supabase-compatible PostgreSQL 17 environment, only after semantic dependency review",
+    "prohibition": "Do not fabricate security-sensitive Supabase platform behavior or use production credentials"
+  }
+}
