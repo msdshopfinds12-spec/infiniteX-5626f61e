@@ -17,7 +17,8 @@
     "verify:phase-73c": "node scripts/verify-phase-73c-provenance.mjs",
     "verify:phase-73d": "node scripts/verify-phase-73d-read-only.mjs",
     "test:worker-runtime-parity": "node --test tests/workers/worker-runtime-parity.test.mjs",
-    "test:api-key-service": "node --experimental-strip-types --test tests/security/api-key-service-contract.test.mjs src/features/security/api-key-metadata.test.ts"
+    "test:api-key-service": "node --experimental-strip-types --test tests/security/api-key-service-contract.test.mjs src/features/security/api-key-metadata.test.ts",
+    "test:phase-77-contract": "node --test tests/database/phase-77-worker-postgres-integration.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.2",
