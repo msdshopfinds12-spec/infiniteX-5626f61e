@@ -137,6 +137,12 @@ test("step budget executes bounded actions and validates output size", () => {
 });
 
 test("step budget rejects expired deadlines and non-function actions", () => {
-  assert.throws(() => executeWithinStepBudget(() => ({}), {}, 1, 100, () => 0), /step_timeout_exceeded/);
+  const expiredTimes = [0, 1000];
+  assert.throws(
+    () => executeWithinStepBudget(
+      () => ({}), {}, 1, 100, () => expiredTimes.shift() ?? 1000,
+    ),
+    /step_timeout_exceeded/,
+  );
   assert.throws(() => executeWithinStepBudget(null, {}, 1), /action_must_be_function/);
 });
