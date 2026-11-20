@@ -6,12 +6,12 @@ set -euo pipefail
 : "${POSTGRES_DB:=infinitex_test}"
 
 psql_in_container() {
-  docker exec "$PG_CONTAINER_ID" psql -X -v ON_ERROR_STOP=1 \
+  docker exec -i "$PG_CONTAINER_ID" psql -X -v ON_ERROR_STOP=1 \
     -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"
 }
 
-psql_in_container -f tests/postgres/phase-62-schema.sql
-psql_in_container -f tests/postgres/phase-62-assertions.sql
+psql_in_container < tests/postgres/phase-62-schema.sql
+psql_in_container < tests/postgres/phase-62-assertions.sql
 
 # Two independent PostgreSQL sessions race to claim the same queued row.
 psql_in_container -c "INSERT INTO phase62.workflow_step_attempts(
