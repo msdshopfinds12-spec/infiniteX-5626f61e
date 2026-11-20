@@ -105,3 +105,20 @@ Before WP3 pure helpers are integrated:
 ## 10. Safety
 
 No source runtime behavior was changed in this inventory. No migrations, grants, RLS, data, secrets, deployments, merges, or releases were changed.
+
+## 11. Frontend integration status
+
+Additional source inspection of `src/App.tsx`, `src/components/PipelineBoard.tsx`, and `src/types.ts` confirms the current dashboard explicitly labels its metrics, agents, logs, and pipeline rows as illustrative demo data. Pipeline rows are hard-coded local constants; pipeline actions are disabled. The App demo notice explicitly states that no live backend, agent runtime, pipeline, log stream, or security scan is connected or verified.
+
+The immutable `createWorkflowRunRequest` helper exists and is tested, but the inspected App and PipelineBoard do not import it or call a workflow enqueue endpoint. The inspected source tree has no separate workflow API client or workflow UI feature module.
+
+**Conclusion:** do not describe the workflow engine as integrated end-to-end. The next product integration milestone must include a real workflow list/detail/run UI, a trusted enqueue API adapter, safe run status projection, loading/error/empty states, and synthetic integration tests. Keep the demo components clearly labeled until that integration is complete.
+
+## 12. Updated status
+
+| Area | Status | Evidence |
+|---|---|---|
+| Dashboard telemetry and pipeline board | DEMO ONLY | App and PipelineBoard source |
+| Workflow request helper | VERIFIED (isolated helper) | Unit-tested helper |
+| Request helper wired to workflow UI/API | NOT IMPLEMENTED in inspected source | No import/call site in inspected UI tree |
+| Live workflow execution visible in UI | NOT IMPLEMENTED | Demo-only pipeline board |
