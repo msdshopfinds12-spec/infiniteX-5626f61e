@@ -3,6 +3,8 @@
 -- The key_hash column is intentionally server-only and must never be selected by clients.
 
 revoke select on table public.platform_api_keys from authenticated;
+-- Column-level grants are independent of table-level grants; revoke the secret explicitly too.
+revoke select (key_hash) on table public.platform_api_keys from authenticated;
 
 grant select (
   id,
