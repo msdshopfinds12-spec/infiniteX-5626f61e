@@ -5,6 +5,7 @@ import {
   WORKFLOW_API_MAX_BODY_BYTES,
   validateEnqueueWorkflowRequest,
   validateIdempotencyKey,
+  parseWorkflowApiRoute,
 } from "./workflow-api-contract.mjs";
 
 test("accepts the minimal trusted enqueue DTO and defaults input to an empty object", () => {
@@ -67,7 +68,6 @@ test("accepts only bounded opaque idempotency keys", () => {
   assert.equal(IDEMPOTENCY_KEY_PATTERN.test("safe.key:123-abc"), true);
 });
 
-import { parseWorkflowApiRoute } from "./workflow-api-contract.mjs";
 
 test("parses collection route with or without the function gateway prefix", () => {
   assert.deepEqual(parseWorkflowApiRoute("/runs"), { resource: "runs" });
