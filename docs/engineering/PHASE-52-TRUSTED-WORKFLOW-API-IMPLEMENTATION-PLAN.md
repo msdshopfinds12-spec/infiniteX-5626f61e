@@ -261,15 +261,15 @@ Phase 52 is not production-ready merely because TypeScript lint or unit tests pa
 | Area | Status |
 |---|---|
 | Phase 52 architecture and contract | DOCUMENTED |
-| Route parsing and request validation | IMPLEMENTED IN BRANCH; contract tests added |
-| JWT verification and server-derived owner | IMPLEMENTED IN BRANCH; runtime integration not tested |
+| Route parsing and request validation | IMPLEMENTED IN BRANCH; CI contract tests PASS (13 cases) |
+| JWT verification and server-derived owner | IMPLEMENTED IN BRANCH; bearer parsing covered by CI; Edge runtime integration not tested |
 | Owner-scoped status projection | IMPLEMENTED IN BRANCH; strict allowlist excludes output, input, owner IDs, and internal error fields |
 | Queued-only cancellation | IMPLEMENTED IN BRANCH; runtime race test not run |
 | Enqueue/idempotency persistence | BLOCKED; endpoint intentionally returns 501 |
 | Live migration ledger | 19 versions recorded in prior read-only reconciliation |
 | Matching migration source in this repository | NOT PRESENT in inspected tree |
 | Disposable database migration/RPC tests | NOT RUN |
-| GitHub Actions on current PR head | IN PROGRESS at last check |
+| GitHub Actions on current PR head | PASS — runs #124 and #106 on exact head `4d7a8205989548b16dcbd0b1c0fdcde27503d2a8` |
 | Production schema changes | NOT AUTHORIZED |
 | Production deployment / merge | NOT AUTHORIZED |
 
