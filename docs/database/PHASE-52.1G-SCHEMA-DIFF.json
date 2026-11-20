@@ -1,0 +1,83 @@
+{
+  "artifact": "PHASE_52_1G_HISTORICAL_SNAPSHOT_COMPARISON",
+  "classification": "DEFINITION_LEVEL_COMPARISON_WITH_SCOPE_LIMITATIONS",
+  "historical_snapshot_captured_at": "2026-11-20T02:07:20.142926+00:00",
+  "live_capture_captured_at": "2026-11-20T14:54:23.029113+00:00",
+  "comparison_scope": "Historical snapshot public tables, columns, indexes, constraints, policies, RLS flags and selected routine metadata; current live metadata captured read-only.",
+  "normalization": {
+    "policy_commands": {
+      "r": "SELECT",
+      "a": "INSERT",
+      "w": "UPDATE",
+      "d": "DELETE",
+      "*": "ALL"
+    }
+  },
+  "summary": {
+    "column_missing": 0,
+    "column_extra": 0,
+    "column_changed": 0,
+    "index_missing": 0,
+    "index_extra": 0,
+    "index_changed": 0,
+    "constraint_missing": 0,
+    "constraint_extra": 0,
+    "constraint_changed": 0,
+    "policy_missing": 0,
+    "policy_extra": 0,
+    "policy_changed": 0,
+    "rls_differences": 0,
+    "routine_missing": 0,
+    "routine_extra": 0,
+    "routine_changed": 0,
+    "routine_grant_differences": 0,
+    "migration_ledger_equal": true
+  },
+  "differences": {
+    "columns": {
+      "missing": [],
+      "extra": [],
+      "changed": []
+    },
+    "indexes": {
+      "missing": [],
+      "extra": [],
+      "changed": []
+    },
+    "constraints": {
+      "missing": [],
+      "extra": [],
+      "changed": []
+    },
+    "policies": {
+      "missing": [],
+      "extra": [],
+      "changed": []
+    },
+    "rls": [],
+    "routines": {
+      "missing": [],
+      "extra": [],
+      "changed": []
+    },
+    "routine_grant_differences": []
+  },
+  "limitations": [
+    "Historical snapshot is from 2026-11-20T02:07:20.142926+00:00; live capture is later, so this is a point-in-time comparison, not a simultaneous snapshot.",
+    "Historical snapshot does not contain full table/column grant baselines; current grants are captured but cannot be historically diffed.",
+    "Role membership/attributes, sequence metadata/grants and extension inventory are newly captured, not compared to historical snapshot.",
+    "Function bodies are intentionally excluded; behavioral/security review still requires source inspection and disposable tests.",
+    "Default privileges and complete cross-schema dependency graph are not captured.",
+    "Matching definitions do not establish migration replayability or canonical Contract V2 readiness."
+  ],
+  "acceptance": {
+    "captured_live_catalog": "PASS_FOR_LISTED_SCOPE",
+    "historical_definition_diff": "PASS_FOR_COMPARED_OBJECT_CLASSES",
+    "grant_baseline_comparison": "NOT_AVAILABLE",
+    "complete_schema_contract": "NOT_ESTABLISHED",
+    "canonical_migration_replay": "NOT_ESTABLISHED",
+    "contract_v2": "BLOCKED",
+    "production_migration": "NOT_AUTHORIZED",
+    "release": "NOT_AUTHORIZED"
+  }
+}
