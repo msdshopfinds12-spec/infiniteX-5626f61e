@@ -54,6 +54,32 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Report dependency security audit
+        shell: bash
+        run: |
+          npm audit --json > npm-audit.json || true
+          node --input-type=commonjs -e '
+            const fs = require("node:fs");
+            const report = JSON.parse(fs.readFileSync("npm-audit.json", "utf8"));
+            const vulnerabilities = Object.entries(report.vulnerabilities || {}).map(([name, item]) => ({
+              name,
+              severity: item.severity,
+              direct: item.isDirect,
+              range: item.range,
+              fixAvailable: item.fixAvailable,
+              advisories: (item.via || []).filter(v => typeof v === "object").map(v => ({
+                title: v.title,
+                url: v.url,
+                range: v.range
+              }))
+            }));
+            console.log(JSON.stringify({
+              auditError: report.error || null,
+              counts: report.metadata?.vulnerabilities || null,
+              vulnerabilities
+            }, null, 2));
+          '
+
       - name: TypeScript validation
         run: npm run lint
 
