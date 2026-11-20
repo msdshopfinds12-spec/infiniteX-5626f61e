@@ -90,3 +90,16 @@ The inspected authenticated column privileges include UPDATE on `profiles.displa
 - No production DDL, DML, GRANT/REVOKE, RLS policy change, migration, secret change, or Edge Function deployment.
 - No live user records were modified.
 - No PR merge, Vercel change, or deployment.
+
+
+## Phase 49 frontend authorization safeguards — source-only
+
+The Phase 49 implementation adds a fail-closed browser bootstrap and a typed capability decision helper. These changes do not modify or assert new live RLS behavior.
+
+- Missing/invalid public Supabase configuration now produces an auth error state instead of rendering the application shell without verified auth.
+- The App shell fails closed if auth state is absent.
+- A client-side capability snapshot is checked for current subject match, expiry, and requested capability before any future UI feature is enabled.
+- The capability helper is a UX control only. Browser state is user-modifiable and must never be treated as authoritative authorization.
+- Every server operation must independently derive the authenticated subject and enforce authorization; database RLS remains the enforcement boundary.
+- Existing P1 constraints remain: never select `platform_api_keys.key_hash`; never create workflow runs or set worker-owned status/output from the browser.
+- No live database schema, grants, policies, data, or migrations were changed.
