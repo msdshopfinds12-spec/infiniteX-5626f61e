@@ -1,7 +1,9 @@
 # Phase 78 — Frontend Runtime and Authenticated Integration Verification
 
-**Status:** PLAN — implementation and exact-head CI evidence pending.  
+**Status:** PARTIAL — exact-head frontend CI VERIFIED; browser E2E, Android viewport QA, and local Deno HTTP-to-PostgreSQL parity remain NOT VERIFIED.  
 **Base:** `phase-77/worker-postgres-integration` at `2cbd351108bbe7c8dc3d777e43e0c1f2fffcf1e6`  
+**Verified Phase 78 CI commit:** `35548fdebef664878fff34e3b9f7508b395be44a`  
+**Workflow run:** [44822293006](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44822293006) — SUCCESS  
 **Branch:** `phase-78/frontend-runtime-verification`  
 **Scope:** Verify existing React/Supabase read-only integration and close runtime evidence gaps without enabling mutations.
 
@@ -25,7 +27,8 @@ Produce repeatable evidence that the existing authenticated browser integration 
 ## 3. Required workstreams
 
 ### A. Frontend exact-head baseline
-- Run `npm ci`, `npm run lint`, `npm test`, and `npm run build` in GitHub Actions on the exact Phase 78 head.
+- **VERIFIED:** Run `44822293006` passed on exact commit `35548fdebef664878fff34e3b9f7508b395be44a`: `npm ci`, `npm run lint`, `npm test`, explicit auth and authenticated read-service Node test runs, browser secret-boundary test, Edge Function/worker security suite, `npm run build`, and build artifact upload all completed successfully.
+- The workflow is triggered for the Phase 78 branch and manual dispatch; pull requests to the listed integration branches also run the gate.
 - Preserve the committed lockfile; never hand-edit npm lock metadata.
 - Keep workflow permissions read-only and third-party actions pinned to immutable SHAs.
 - Record the exact commit SHA and run URL.
@@ -94,3 +97,34 @@ Any action outside the disposable test environment requires a separate explicit 
 ## 7. Decision rule
 
 Do not begin Phase 79 visual redesign until the Phase 78 correctness/security gate is green. Do not call InfiniteX production-ready based on CI alone. Production readiness requires authoritative schema provenance, deployed function parity, live RLS verification, observability, rollback/restore evidence, and human release approval.
+
+## 8. Phase 78 execution evidence and current gap register
+
+### VERIFIED
+- Exact-head CI run `44822293006` completed with conclusion `success` on commit `35548fdebef664878fff34e3b9f7508b395be44a`.
+- Reproducible `npm ci` succeeded.
+- `npm run lint` succeeded.
+- `npm test` succeeded.
+- Explicit auth lifecycle regression command succeeded.
+- Explicit profile/project/workflow authenticated read-service regression command succeeded.
+- Browser secret-boundary regression command succeeded.
+- `npm run test:edge-function-security` succeeded.
+- `npm run build` succeeded.
+- Build artifact upload succeeded.
+- The first workflow attempt exposed a Node test-runner directory invocation issue; the workflow was corrected to pass explicit `*.test.ts` paths, and the corrected exact-head run passed.
+
+### PARTIAL / NOT VERIFIED
+- The current test suite is Node-based. This CI result is not a real browser E2E test and does not prove interactive React behavior in Chrome/WebView.
+- Android viewport, touch interaction, keyboard navigation, and assistive-technology QA have not been run on a physical device.
+- No authenticated HTTP request has yet been executed against a locally running Deno Edge Function connected to disposable PostgreSQL as part of this Phase 78 run.
+- Live hosted Supabase schema/RLS parity and deployed Edge Function parity remain NOT VERIFIED.
+- Vercel deployment/build-rate-limit status is a separate system and is not cleared by this GitHub Actions result.
+
+### Next engineering gate
+1. Inspect existing UI test dependencies and add the smallest viable component-level/browser test path; do not add large dependencies without justification.
+2. Add a reproducible local Deno/Supabase HTTP integration workflow using synthetic identities and disposable infrastructure, or record a specific reproducible blocker.
+3. Run responsive/accessibility checks with a browser automation runtime if available at zero additional cost.
+4. Re-audit browser bundle boundaries and runtime service wiring.
+5. Only then close Phase 78 and begin Phase 79 UI redesign.
+
+No hosted database, production secrets, deployment, billing, or release state was changed by this work.
