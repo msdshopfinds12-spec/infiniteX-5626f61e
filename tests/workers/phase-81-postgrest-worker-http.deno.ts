@@ -228,8 +228,116 @@ Deno.test({
         .select("id")
         .eq("run_id", staleRunId)
         .eq("step_id", "81000000-2000-4000-8000-000000000002");
+
       assert(!laterStepsError && laterSteps?.length === 0,
         "stale worker must stop before executing later workflow steps");
+
+      // Phase 87.1: transactional step completion + durable outbox intent.
+      const outboxRunId = "81000000-3000-4000-8000-000000000005";
+      const { error: outboxRunInsertError } = await admin.from("workflow_runs").insert({
+        id: outboxRunId,
+        workflow_id: "81000000-1000-4000-8000-000000000001",
+        owner_id: userId,
+        status: "running",
+        input: { seed: "phase87-outbox" },
+        attempt: 1,
+      });
+      assert(!outboxRunInsertError, "disposable outbox run must be seeded: " + (outboxRunInsertError?.message ?? ""));
+      const { error: outboxStepInsertError } = await admin.from("workflow_step_runs").insert({
+        run_id: outboxRunId,
+        step_id: "81000000-2000-4000-8000-000000000001",
+        owner_id: userId,
+        status: "running",
+        input: { seed: "phase87-outbox" },
+        attempt: 1,
+      });
+      assert(!outboxStepInsertError, "disposable outbox step must be seeded: " + (outboxStepInsertError?.message ?? ""));
+
+      const completionArgs = {
+        p_owner_id: userId,
+        p_run_id: outboxRunId,
+        p_step_id: "81000000-2000-4000-8000-000000000001",
+        p_attempt: 1,
+        p_output: { transformed: true },
+        p_event_type: "notification.requested",
+        p_idempotency_key: "phase87-disposable-notification-0001",
+        p_payload: { recipient_ref: "synthetic-user-a", template: "test-only" },
+      };
+      const { data: firstCompletion, error: firstCompletionError } = await admin.rpc(
+        "simula_complete_step_with_outbox",
+        completionArgs,
+      );
+      assert(!firstCompletionError && firstCompletion?.length === 1 && firstCompletion[0].replayed === false,
+        "first completion must atomically finish the step and create one outbox event: " + (firstCompletionError?.message ?? ""));
+      const outboxId = firstCompletion[0].outbox_id;
+      assert(typeof outboxId === "string", "first completion must return durable outbox event ID");
+
+      const { data: replayCompletion, error: replayCompletionError } = await admin.rpc(
+        "simula_complete_step_with_outbox",
+        completionArgs,
+      );
+      assert(!replayCompletionError && replayCompletion?.[0]?.replayed === true
+        && replayCompletion[0].outbox_id === outboxId,
+        "same idempotency key and payload must replay the original outbox event");
+
+      const { error: conflictError } = await admin.rpc("simula_complete_step_with_outbox", {
+        ...completionArgs,
+        p_payload: { recipient_ref: "different-recipient", template: "test-only" },
+      });
+      assert(Boolean(conflictError), "same idempotency key with different payload must be rejected");
+
+      const claimArgs = { p_limit: 5 };
+      const [claimA, claimB] = await Promise.all([
+        admin.rpc("simula_claim_workflow_outbox", claimArgs),
+        admin.rpc("simula_claim_workflow_outbox", claimArgs),
+      ]);
+      assert(!claimA.error && !claimB.error, "parallel outbox claim RPCs must succeed");
+      const claimedOutbox = [...(claimA.data ?? []), ...(claimB.data ?? [])]
+        .filter((event) => event.id === outboxId);
+      assert(claimedOutbox.length === 1 && claimedOutbox[0].attempts === 1,
+        "parallel claimers must lease the same outbox event to exactly one worker");
+      const firstLease = claimedOutbox[0];
+
+      const { data: failedFinish, error: failedFinishError } = await admin.rpc(
+        "simula_finish_workflow_outbox",
+        { p_id: outboxId, p_lock_token: firstLease.lock_token, p_succeeded: false, p_error: "synthetic_transient_failure" },
+      );
+      assert(!failedFinishError && failedFinish?.[0]?.status === "pending",
+        "transient delivery failure must return event to pending with backoff");
+
+      await new Promise((resolve) => setTimeout(resolve, 5500));
+      const { data: secondClaims, error: secondClaimError } = await admin.rpc(
+        "simula_claim_workflow_outbox",
+        { p_limit: 5 },
+      );
+      assert(!secondClaimError, "outbox retry claim must succeed");
+      const secondLease = (secondClaims ?? []).find((event) => event.id === outboxId);
+      assert(secondLease && secondLease.attempts === 2 && secondLease.lock_token !== firstLease.lock_token,
+        "retry must issue a new generation token and increment attempt count");
+
+      const { error: staleLeaseError } = await admin.rpc("simula_finish_workflow_outbox", {
+        p_id: outboxId,
+        p_lock_token: firstLease.lock_token,
+        p_succeeded: false,
+        p_error: "stale_worker_must_not_commit",
+      });
+      assert(Boolean(staleLeaseError), "stale outbox lease token must not complete a newer delivery attempt");
+
+      const { data: successfulFinish, error: successfulFinishError } = await admin.rpc(
+        "simula_finish_workflow_outbox",
+        { p_id: outboxId, p_lock_token: secondLease.lock_token, p_succeeded: true, p_error: null },
+      );
+      assert(!successfulFinishError && successfulFinish?.[0]?.status === "succeeded",
+        "current outbox lease must be able to complete delivery");
+
+      const { data: finalReplay, error: finalReplayError } = await admin.rpc(
+        "simula_complete_step_with_outbox",
+        completionArgs,
+      );
+      assert(!finalReplayError && finalReplay?.[0]?.replayed === true
+        && finalReplay[0].outbox_id === outboxId,
+        "completion replay after delivery must return the same outbox event");
+
     } finally {
       await server.shutdown();
     }
