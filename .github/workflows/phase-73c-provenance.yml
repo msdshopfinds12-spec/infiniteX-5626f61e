@@ -1,0 +1,28 @@
+name: Phase 73C Provenance Integrity
+on:
+  push:
+    branches:
+      - phase-73c/schema-provenance-audit
+    paths:
+      - 'docs/database/**'
+      - 'docs/engineering/INFINITEX-LIVE-SCHEMA-RLS-BASELINE-2026-11-20.md'
+      - 'supabase/migrations/**'
+      - 'scripts/verify-phase-73c-provenance.mjs'
+      - 'package.json'
+      - '.github/workflows/phase-73c-provenance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  provenance-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify migration provenance and snapshot integrity
+        run: npm run verify:phase-73c
