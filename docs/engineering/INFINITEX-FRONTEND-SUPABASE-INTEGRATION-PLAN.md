@@ -12,10 +12,10 @@ This plan began as a demo-to-Supabase implementation proposal. The isolated Phas
 - `@supabase/supabase-js@2.119.2` is declared in `package.json` and the npm lockfile is committed.
 - `createBrowserSupabaseClient` validates public URL/publishable-key configuration and fails closed when configuration is missing or invalid.
 - Supabase Auth session adapter, auth-state coordinator, React provider, sign-in/sign-up/recovery/sign-out flows, and related tests exist.
-- `createWorkflowReadService` provides bounded, read-only workflow queries with an explicit safe-column projection and no caller-supplied owner ID.
-- The Pipelines view renders an authenticated, identity-fenced read-only workflow list with loading, empty, error, retry, and search states.
+- `createWorkflowReadService` provides bounded, read-only workflow and run-history queries with explicit safe-column projections and no caller-supplied owner ID.
+- The Pipelines view renders an authenticated, identity-fenced read-only workflow list with expandable run history, loading, empty, error, retry, and search states. Run history excludes workflow input, output, and raw error-message fields.
 - Overview metrics, agent cards, sample logs, workflow execution/mutations, and security posture remain demo or unverified.
-- GitHub Actions run #44803752589 and disposable PostgreSQL run #44803752733 passed on commit `a7506951744b7c7b2940fd139543bde9cd271a58`.
+- GitHub Actions run #44804709537 and disposable PostgreSQL run #44804709498 passed on exact head `b87cb3a3377242704bed6f3c5c4032143e02b7fb`.
 
 These results verify source behavior and isolated CI. They do not prove that a browser session has successfully queried the intended live Supabase project, that two-user browser RLS tests have passed, or that production deployment is ready.
 
