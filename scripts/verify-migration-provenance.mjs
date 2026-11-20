@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 const root = process.cwd();
 const manifestPath = path.join(root, 'docs/database/MIGRATION-LEDGER-RECOVERY-MANIFEST.json');
@@ -131,7 +132,9 @@ async function main() {
   console.log('LIMITATION: repository provenance checks do not prove live database state or original historical Git blob equivalence.');
 }
 
-main().catch((error) => {
-  console.error(`BLOCKED: ${error.message}`);
-  process.exitCode = 2;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch((error) => {
+    console.error(`BLOCKED: ${error.message}`);
+    process.exitCode = 2;
+  });
+}
