@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Activity, Bot, Cpu, GitBranch, Play, Search, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
+import { Activity, Bot, Cpu, GitBranch, LogOut, Play, Search, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -8,21 +8,20 @@ import MetricCard from "./components/MetricCard";
 import AgentList from "./components/AgentList";
 import PipelineBoard from "./components/PipelineBoard";
 import LogStream from "./components/LogStream";
+import AuthScreen from "./features/auth/auth-screen";
+import type { AuthActions } from "./features/auth/auth-actions";
 import type { ViewKey } from "./types";
 import type { AuthState } from "./features/auth/auth-state";
 
-type AppProps = Readonly<{ authState?: AuthState }>;
+type AppProps = Readonly<{
+  authState?: AuthState;
+  authActions?: AuthActions;
+}>;
 
-export default function App({ authState }: AppProps) {
+export default function App({ authState, authActions }: AppProps) {
   const [view, setView] = useState<ViewKey>("overview");
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
-
-  const authStatusLabel =
-    authState?.status === "authenticated" ? "authenticated session detected" :
-    authState?.status === "anonymous" ? "no active session" :
-    authState?.status === "error" ? "session unavailable" :
-    authState?.status === "loading" ? "checking session" :
-    "not configured";
 
   // Illustrative placeholders only; these values are not live backend telemetry.
   const metrics = useMemo(
@@ -34,6 +33,45 @@ export default function App({ authState }: AppProps) {
     ],
     []
   );
+
+  if (authState?.status === "loading") {
+    return (
+      <main className="auth-status-page">
+        <div className="auth-status-card" role="status">
+          <div className="auth-brand-mark"><Zap size={21} aria-hidden="true" /></div>
+          <h1>Securing your workspace</h1>
+          <p>Checking your authentication session. This usually takes a moment.</p>
+          <div className="auth-loading-bar" aria-hidden="true"><span /></div>
+        </div>
+      </main>
+    );
+  }
+
+  if (authState?.status === "error") {
+    return (
+      <main className="auth-status-page">
+        <div className="auth-status-card" role="alert">
+          <ShieldAlert size={28} />
+          <h1>Session could not be verified</h1>
+          <p>InfiniteX could not confirm your session. Refresh the page or check your connection. Your workspace data remains protected.</p>
+          <button className="auth-submit" type="button" onClick={() => window.location.reload()}>
+            Retry session check
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (authState?.status === "anonymous" && authActions) {
+    return <AuthScreen actions={authActions} />;
+  }
+
+  async function handleSignOut() {
+    if (!authActions) return;
+    setSignOutError(null);
+    const result = await authActions.signOut();
+    if (result.status === "error") setSignOutError(result.message);
+  }
 
   const title =
     view === "overview" ? "Overview" :
@@ -49,11 +87,20 @@ export default function App({ authState }: AppProps) {
         <div className="main">
           <TopBar title={title} theme={theme} onToggleTheme={toggleTheme} />
           <main className="content">
+            {authState?.status === "authenticated" && (
+              <div className="account-strip">
+                <span className="account-indicator"><span /> Authenticated session</span>
+                <button className="btn btn-ghost account-signout" type="button" onClick={handleSignOut}>
+                  <LogOut size={15} /> Sign out
+                </button>
+              </div>
+            )}
+            {signOutError && <p className="auth-inline-error" role="alert">{signOutError}</p>}
             <div className="demo-notice" role="status">
               <strong>DEMO MODE</strong>
               <span>
                 Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified.
-                {authState && ` Supabase auth: ${authStatusLabel}. Dashboard data remains demo-only.`}
+                {authState?.status === "authenticated" && " Your session is authenticated, but dashboard data remains demo-only."}
               </span>
             </div>
             {view === "overview" && (
