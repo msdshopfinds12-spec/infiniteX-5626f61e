@@ -43,6 +43,6 @@ test("queue acceptance refreshes safe run history without exposing raw output", 
 
 test("workspace explains the disabled-until-deployed gate and queued-versus-executed distinction", async () => {
   const app = await read("src/App.tsx");
-  assert.match(app, /Queueing is disabled until the Phase 84 migration and Edge Function are explicitly deployed and verified/);
+  assert.match(app, /Workflow queueing is disabled until the Phase 84 migration and Edge Function are explicitly deployed and verified/);
   assert.match(app, /a queued response does not prove worker execution/);
 });
