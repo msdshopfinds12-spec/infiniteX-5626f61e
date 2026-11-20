@@ -109,7 +109,7 @@ export default function WorkflowList({
                   className="btn btn-ghost"
                   type="button"
                   aria-expanded={expanded}
-                  aria-controls={historyId}
+                  aria-controls={expanded ? historyId : undefined}
                   onClick={() => setExpandedWorkflowId(expanded ? null : workflow.id)}
                 >
                   {expanded ? "Hide runs" : "View runs"}
