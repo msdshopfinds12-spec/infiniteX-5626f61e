@@ -120,3 +120,23 @@ referenced by the transition function, and the exact unique key
 check only. It does not prove transition semantics, transaction rollback,
 concurrent-session behavior, lock-order safety, or Edge Function integration;
 those remain separate test gates.
+
+
+## Local-only integration endpoint policy
+
+The mutating Deno fixture test accepts only loopback HTTP Supabase endpoints:
+`http://localhost` and `http://127.0.0.1`. Remote Supabase hosts,
+including HTTPS project URLs, are rejected. URL credentials are also rejected.
+The GitHub Actions invocation restricts Deno network access to those two
+loopback hostnames and limits environment access to the six fixture variables.
+
+This is intentionally stricter than merely rejecting the known production
+hostname: an arbitrary remote HTTPS URL could still point to an unintended
+project. The test must run against a disposable local Supabase stack only.
+
+**Infrastructure remains BLOCKED:** the current repository branch does not
+contain a verified complete Supabase migration chain or local Supabase
+configuration, and the workflow does not start a local Supabase stack. Keep
+`PHASE_4N8B_FIXTURE_READY` unset/false until reproducible local stack startup,
+migration application, synthetic fixture creation, and teardown are implemented
+and reviewed. Do not set it to true with a remote project URL.
