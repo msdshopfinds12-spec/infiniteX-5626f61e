@@ -1,8 +1,8 @@
 # Phase 52 — Trusted Workflow API Implementation Plan
 
-**Status:** PLAN ONLY — no runtime implementation, SQL, migration, grants, RLS, secrets, or deployment  
+**Status:** IMPLEMENTATION IN PROGRESS — Draft PR #65; enqueue remains fail-closed pending database idempotency work. No production migration, grants, RLS changes, secret changes, or deployment.  
 **Parent baseline:** Phase 51 Draft PR #63, head `29526e345d53a9564d7a6edd8fff06d444d04e22`  
-**Branch:** `feat/phase-52-trusted-workflow-api-plan`  
+**Plan branch:** `feat/phase-52-trusted-workflow-api-plan`  \n**Implementation branch:** `feat/phase-52-workflow-api-contract-auth`  
 **Objective:** Define a narrow, authenticated browser-facing API for enqueue, status, cancellation, and idempotency while preserving the existing worker trust boundary.
 
 ## 1. Evidence-based starting point
@@ -261,11 +261,25 @@ Phase 52 is not production-ready merely because TypeScript lint or unit tests pa
 | Area | Status |
 |---|---|
 | Phase 52 architecture and contract | DOCUMENTED |
-| Route/auth implementation | NOT IMPLEMENTED |
-| Enqueue/idempotency persistence | NOT IMPLEMENTED |
-| Status/cancellation API | NOT IMPLEMENTED |
-| Disposable integration tests | NOT RUN |
+| Route parsing and request validation | IMPLEMENTED IN BRANCH; CI contract tests PASS (13 cases) |
+| JWT verification and server-derived owner | IMPLEMENTED IN BRANCH; bearer parsing covered by CI; Edge runtime integration not tested |
+| Owner-scoped status projection | IMPLEMENTED IN BRANCH; strict allowlist excludes output, input, owner IDs, and internal error fields |
+| Queued-only cancellation | IMPLEMENTED IN BRANCH; runtime race test not run |
+| Enqueue/idempotency persistence | BLOCKED; endpoint intentionally returns 501 |
+| Live migration ledger | 19 versions recorded in prior read-only reconciliation |
+| Matching migration source in this repository | NOT PRESENT in inspected tree |
+| Disposable database migration/RPC tests | NOT RUN |
+| GitHub Actions on current PR head | PASS — runs #124 and #106 on exact head `4d7a8205989548b16dcbd0b1c0fdcde27503d2a8` |
 | Production schema changes | NOT AUTHORIZED |
 | Production deployment / merge | NOT AUTHORIZED |
 
-**Safety:** This commit is a planning artifact only. It makes no runtime, database, permission, secret, billing, deployment, merge, or release change.
+See [PHASE-52-LIVE-DATABASE-CONTRACT-VERIFICATION.md](./PHASE-52-LIVE-DATABASE-CONTRACT-VERIFICATION.md) and [PHASE-52-MIGRATION-HISTORY-RECONCILIATION.md](./PHASE-52-MIGRATION-HISTORY-RECONCILIATION.md).
+
+**Safety:** Source-only GitHub changes and read-only catalog inspection were performed. No production migrations, DDL, DML, grants, revokes, RLS changes, secret changes, function deployments, production data mutations, merges, or releases were performed.
+
+
+## 10. Live database verification update
+
+See [PHASE-52-LIVE-DATABASE-CONTRACT-VERIFICATION.md](./PHASE-52-LIVE-DATABASE-CONTRACT-VERIFICATION.md) for the read-only inspection of Ashaa-INX. The live contract confirms owner-scoped RLS, authenticated INSERT/SELECT but no authenticated UPDATE on workflow_runs, a server-managed insert trigger, and the absence of API idempotency columns. This supersedes the earlier note that live schema/RPC/grants were not yet verified.
+
+PR #65 now contains the initial Edge Function contract/authentication, owner-scoped status reads, and queued-only cancellation. Enqueue intentionally returns 501 until the proposed atomic idempotency schema/RPC is reviewed and tested. The new endpoints have not been deployed or runtime-tested.
