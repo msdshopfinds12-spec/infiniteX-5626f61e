@@ -7,7 +7,7 @@ const sqlPath = new URL('../../supabase/contracts/capture-database-contract.read
 test('catalog capture is one read-only SELECT statement', async () => {
   const sql = await readFile(sqlPath, 'utf8');
   const trimmed = sql.trim();
-  assert.ok(trimmed.startsWith('WITH\nscope_schemas AS ('), 'catalog capture must begin with scoped schema CTE');
+  assert.match(trimmed, /^--[^\\n]*\\nWITH\\nscope_schemas AS \\(/, 'catalog capture must begin with scoped schema CTE');
   assert.ok(trimmed.endsWith(';'));
   assert.equal(sql.split('SELECT jsonb_build_object(').length - 1, 1);
   const mutationWords = new Set(['CREATE', 'ALTER', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'GRANT', 'REVOKE', 'CALL', 'DO']);
