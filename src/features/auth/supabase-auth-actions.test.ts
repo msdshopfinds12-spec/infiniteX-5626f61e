@@ -15,7 +15,7 @@ function createClient(overrides: Record<string, unknown> = {}) {
     signOut: async () => ({ error: null }),
     ...overrides,
   };
-  return auth as unknown as Pick<SupabaseClient<Database>, "auth">;
+  return { auth } as unknown as Pick<SupabaseClient<Database>, "auth">;
 }
 
 test("sign-in returns a safe success result without exposing SDK session data", async () => {
