@@ -1,7 +1,7 @@
 /** Injectable authentication boundaries shared by the HTTP worker adapters. */
 export async function authenticateBearerRequest({ request, env, createClient }) {
-  const authorization = request.headers.get("Authorization") ?? "";
-  const tokenMatch = authorization.match(/^Bearer\\s+(.+)$/i);
+  const authorization = (request.headers.get("Authorization") ?? "").trim();
+  const tokenMatch = authorization.match(/^Bearer\s+(\S+)$/i);
   if (!tokenMatch) return { ok: false, status: 401, error: "missing_bearer_token" };
   const token = tokenMatch[1];
   const supabaseUrl = env.get("SUPABASE_URL");
