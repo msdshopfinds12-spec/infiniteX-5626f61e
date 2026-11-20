@@ -122,7 +122,7 @@ test("request input preserves __proto__ as data without changing object prototyp
   const cloned = request.input as Record<string, Json>;
 
   assert.equal(Object.getPrototypeOf(cloned), Object.prototype);
-  assert.equal(Object.hasOwn(cloned, "__proto__"), true);
+  assert.equal(Object.prototype.hasOwnProperty.call(cloned, "__proto__"), true);
   assert.deepEqual(cloned.__proto__, { polluted: true });
   assert.equal(({} as { polluted?: boolean }).polluted, undefined);
 });
