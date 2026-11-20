@@ -1,47 +1,50 @@
 # InfiniteX Phase 50 — Backend API Contract
 
-**Status:** PROPOSED CONTRACT — not deployed  
+**Status:** Initial fail-closed endpoint implemented; authoritative capability grants are intentionally unavailable  
 **Branch:** `feat/phase-50-trusted-authorization`
 
 ## Common request requirements
 
-- HTTPS only in deployed environments.
+- HTTPS in deployed environments.
 - Authorization: Bearer <Supabase access token>.
-- Validate token using Supabase Auth server-side `getUser(token)`.
-- Enforce exact configured CORS origins; reject unlisted browser origins.
-- Accept JSON only, enforce a small request-body limit, and reject unknown fields.
-- Responses containing identity or account data use `Cache-Control: no-store`.
+- Verify identity with Supabase Auth server-side `getUser(token)`.
+- Enforce exact configured CORS origins using the existing shared helper.
+- Accept JSON only; cap the streamed request body at 1 KiB.
+- Reject unknown request fields.
+- Responses use `Cache-Control: no-store`.
 - Never log access tokens, API keys, hashes, or sensitive request bodies.
 
 ## POST /functions/v1/authorization
 
-Purpose: return a minimal UI capability projection after server-side identity verification and authoritative policy lookup.
+**Implemented behavior:** validates the request, verifies the Supabase user, then returns `503 POLICY_UNAVAILABLE` with an empty permission list because the authoritative membership/role source has not yet been verified.
 
 Request:
 ```json
 {}
 ```
 
-Unknown fields are rejected. The browser cannot submit a subject, owner, role, or permission list.
+The endpoint rejects caller-supplied subject, owner, role, or permissions fields.
 
-Success response (only after policy source is implemented):
-```json
-{
-  "subjectId": "verified-auth-user-id",
-  "permissions": ["workspace.read"],
-  "expiresAt": 0
-}
-```
+Expected responses:
+- `200` is NOT currently returned; no capability grant is implemented.
+- `400 INVALID_REQUEST` — malformed JSON or unknown request fields.
+- `401 UNAUTHENTICATED` — missing or invalid user token.
+- `403 ORIGIN_NOT_ALLOWED` — browser origin not in the exact allowlist.
+- `405 METHOD_NOT_ALLOWED` — unsupported method.
+- `413 INVALID_REQUEST` — request body exceeds the limit.
+- `415 UNSUPPORTED_MEDIA_TYPE` — request is not JSON.
+- `503 POLICY_UNAVAILABLE` — identity verified, but authorization policy is not yet authoritative; permissions are always empty.
+- `500 INTERNAL_ERROR` — missing server configuration or unexpected failure.
 
-Until an authoritative membership/role source is verified, the implementation MUST return an empty permission set and a non-granting policy status. It must not infer administrator access from user metadata.
+The endpoint does not use `user_metadata`, client-supplied claims, or an unverified role assumption. This is an authentication boundary and deny-by-default placeholder, not a complete authorization system.
 
-## POST /functions/v1/account-data
+## Future: POST /functions/v1/account-data
 
-Future read-only endpoint. It must derive the subject from the verified token, validate a fixed resource allowlist, use explicit column projections, and rely on RLS. Do not accept `owner_id` or arbitrary table/column names.
+Read-only endpoint. Derive the subject from the verified token, validate a fixed resource allowlist, use explicit column projections, and rely on RLS. Do not accept `owner_id` or arbitrary table/column names.
 
-## POST /functions/v1/workflow-enqueue
+## Future: POST /functions/v1/workflow-enqueue
 
-Future enqueue-only endpoint. Request contains only a workflow identifier and strictly validated execution parameters. Server verifies ownership and eligibility, then creates a queued run using a server-selected initial state. It rejects all client-supplied lifecycle/result fields. Idempotency and rate limiting are required before enabling execution.
+Enqueue-only endpoint. Accept a workflow identifier and strictly validated execution parameters. Verify ownership and eligibility, then create a queued run using server-selected initial state. Reject all client-supplied lifecycle/result fields. Idempotency and rate limiting are required before enabling execution.
 
 ## API-key metadata
 
@@ -49,13 +52,13 @@ Use a fixed safe-column projection. `key_hash` must never cross the browser boun
 
 ## Error contract
 
-Use stable non-sensitive codes:
-- `UNAUTHENTICATED` — token missing/invalid/expired.
-- `FORBIDDEN` — authenticated but not authorized.
-- `POLICY_UNAVAILABLE` — authoritative policy cannot be established; deny.
-- `INVALID_REQUEST` — malformed or unexpected input.
-- `NOT_FOUND` — resource absent or not visible to the caller.
-- `RATE_LIMITED` — request limit reached.
-- `INTERNAL_ERROR` — generic response; details stay in protected server logs.
+Stable non-sensitive codes include:
+- `UNAUTHENTICATED`
+- `FORBIDDEN`
+- `POLICY_UNAVAILABLE`
+- `INVALID_REQUEST`
+- `NOT_FOUND`
+- `RATE_LIMITED`
+- `INTERNAL_ERROR`
 
 Never reveal whether another user's resource exists.
