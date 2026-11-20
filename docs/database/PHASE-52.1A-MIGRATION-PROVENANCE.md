@@ -15,7 +15,7 @@ The existing 19-entry recovered manifest remains unchanged. The additional API-k
 ## Controls added
 
 1. A provenance validator checks exact file coverage, disjoint versions/paths, safe paths, candidate status fields, and SHA-256 values.
-2. Regression tests cover untracked files, duplicate/overlapping versions, missing files, and attempted candidate promotion.
+2. Regression tests cover untracked files, duplicate/overlapping versions and paths, missing files, and attempted candidate promotion.
 3. The database-contract workflow runs the provenance validator and its tests before the existing recovered-manifest checks.
 4. Existing offline-only CI and production-safety messaging remain intact.
 
