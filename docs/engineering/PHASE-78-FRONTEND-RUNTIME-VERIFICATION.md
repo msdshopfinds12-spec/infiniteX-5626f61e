@@ -165,3 +165,14 @@ No hosted database, production secrets, deployment, billing, or release state wa
 - The pinned workflow completed successfully in run [44822769822](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44822769822) on exact commit `97d991784c8c528a9b01e227d8054bd3a981e113`.
 - The exact-head run passed npm install, lint, full Node test suite, auth/read-service regressions, browser secret-boundary test, Edge Function security tests, all 23 Deno tests, production build, and artifact upload.
 - This verifies that the SHA-pinned action references work in this workflow. It does not resolve the remaining browser E2E, live PostgreSQL HTTP integration, Android device QA, or production parity gaps.
+
+
+## 11. Browser smoke verification — passed
+
+- Added standalone Playwright Chromium smoke runner at `scripts/phase-78-browser-smoke.mjs`. It is deliberately outside the Node test discovery tree so the regular `npm test` suite does not require Playwright to be preinstalled.
+- Added ephemeral Playwright installation and Chromium setup to the Phase 78 workflow; the runner is isolated against the built Vite preview on loopback and uses no production credentials or backend account.
+- First attempt `44822952779` exposed a harness integration issue: Node's automatic test discovery picked up the Playwright file before the ephemeral Playwright package installation. The fix moved the runner to `scripts/` and invoked it explicitly after installation.
+- **VERIFIED:** Run [44823037694](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44823037694) succeeded on exact commit `300c17d5d0f35103a585e57537152f156f1b7112`. Node tests, auth/read-service regressions, browser secret-boundary checks, Edge Function security tests, 23 Deno tests, production build, isolated preview startup, Chromium smoke tests, and artifact upload all passed.
+- Browser assertions cover HTTP 200, fail-closed authentication UI when public Supabase configuration is absent, accessible alert, retry control without auth bypass, no protected workspace rendering, mobile 390×844 and desktop 1440×900 horizontal overflow, and uncaught page errors.
+- Playwright is installed ephemerally (no committed dependency or lockfile mutation); the workflow now pins its version and includes `scripts/**` in relevant path filters.
+- **Limitations:** This is a real Chromium browser smoke test of the fail-closed bootstrap state, not authenticated login/account-switch E2E, full workflow interaction coverage, cross-browser matrix, screen-reader audit, or physical Android device QA. Live HTTP-to-PostgreSQL and deployed Supabase parity remain NOT VERIFIED.
