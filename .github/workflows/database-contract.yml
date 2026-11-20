@@ -35,12 +35,18 @@ jobs:
           node --check scripts/check-migration-integrity.mjs
           node --check scripts/check-database-contract.mjs
           node --check scripts/verify-recovered-migration-manifest.mjs
+          node --check scripts/verify-migration-provenance.mjs
           node --check scripts/audit-migration-side-effects.mjs
           node --check tests/database/migration-side-effect-audit.test.mjs
           node --check tests/database/catalog-capture-readonly.test.mjs
           node --check tests/database/check-database-contract.test.mjs
           node --check tests/database/check-migration-integrity.test.mjs
           node --check tests/database/platform-api-key-column-grants.test.mjs
+          node --check tests/database/migration-provenance.test.mjs
+      - name: Verify applied versus candidate migration provenance
+        run: node scripts/verify-migration-provenance.mjs
+      - name: Run migration provenance regression tests
+        run: node --test tests/database/migration-provenance.test.mjs
       - name: Verify recovered migration SHA-256 manifest
         run: node scripts/verify-recovered-migration-manifest.mjs
       - name: Audit recovered migration side effects against reviewed policy
