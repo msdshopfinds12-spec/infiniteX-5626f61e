@@ -68,8 +68,8 @@ function_contract AS (
    SELECT DISTINCT CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE r.rolname END AS role_name
    FROM pg_catalog.aclexplode(COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
    LEFT JOIN pg_catalog.pg_roles r ON r.oid=a.grantee WHERE a.privilege_type='EXECUTE'
-  ) q WHERE role_name IS NOT NULL),'[]'::jsonb) AS execute_roles,
-  FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+  ) q WHERE role_name IS NOT NULL),'[]'::jsonb) AS execute_roles
+ FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
  JOIN pg_catalog.pg_language l ON l.oid=p.prolang
  WHERE n.nspname IN ('public','private') AND p.prokind IN ('f','p')
 ),
