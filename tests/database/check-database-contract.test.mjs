@@ -25,7 +25,9 @@ const valid={
  extensions:[{name:'pgcrypto',schema:'extensions',version:'1.3'}],
  types:[{schema_name:'public',name:'profile_state',kind:'enum',formatted_type:'profile_state',enum_labels:['active'],base_type:null,not_null:false}],
  roles:[{name:'authenticated',superuser:false,inherit:true,create_role:false,create_db:false,can_login:false,replication:false,bypass_rls:false,connection_limit:-1}],
- roleMemberships:[{member:'authenticated',role:'anon',adminOption:false,inheritOption:true,setOption:true}],\n defaultPrivileges:[{owner:'postgres',objectType:'TABLES',schema:'public',grants:[{grantor:'postgres',grantee:'authenticated',privilege:'SELECT',grantable:false}]}],\n partitionDependencies:[{parentSchema:'public',parentTable:'events',childSchema:'public',childTable:'events_2026',sequence:1}]
+ roleMemberships:[{member:'authenticated',role:'anon',adminOption:false,inheritOption:true,setOption:true}],
+ defaultPrivileges:[{owner:'postgres',objectType:'TABLES',schema:'public',grants:[{grantor:'postgres',grantee:'authenticated',privilege:'SELECT',grantable:false}]}],
+ partitionDependencies:[{parentSchema:'public',parentTable:'events',childSchema:'public',childTable:'events_2026',sequence:1}]
 };
 test('missing snapshot blocks with exit 2',async t=>{const r=await run(t);assert.equal(r.status,2);assert.match(r.stderr,/not present/);});
 test('pending approval blocks with exit 2',async t=>{const r=await run(t,JSON.stringify({...valid,reviewStatus:'PENDING_HUMAN_REVIEW'}));assert.equal(r.status,2);assert.match(r.stderr,/awaits explicit human approval/);});
