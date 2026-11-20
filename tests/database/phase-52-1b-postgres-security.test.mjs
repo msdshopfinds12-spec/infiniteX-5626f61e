@@ -15,7 +15,7 @@ test('PostgreSQL behavior harness applies the exact reviewed migrations in dispo
     '20261103134251_ashaa_backend_api_keys_and_webhook_idempotency.sql',
     '20261120120000_harden_platform_api_key_column_access.sql',
   ]) {
-    assert.ok(sql.includes(migration), \`missing migration from disposable behavior test: \${migration}\`);
+    assert.ok(sql.includes(migration), 'missing migration from disposable behavior test: ' + migration);
   }
   assert.match(sql, /^BEGIN;/m);
   assert.match(sql, /^ROLLBACK;/m);
@@ -37,7 +37,7 @@ test('behavior harness covers tenant isolation, secret columns, webhook grants, 
     'user B modified user A API key',
     'search_path=""',
   ]) {
-    assert.ok(sql.includes(token), \`missing security assertion: \${token}\`);
+    assert.ok(sql.includes(token), 'missing security assertion: ' + token);
   }
 });
 
