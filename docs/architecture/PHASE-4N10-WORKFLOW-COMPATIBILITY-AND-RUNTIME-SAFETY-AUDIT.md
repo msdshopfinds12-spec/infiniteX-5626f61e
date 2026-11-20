@@ -265,3 +265,56 @@ The security advisor returned one informational finding: `public.billing_webhook
 | Production migration / function deployment | NOT AUTHORIZED | No production changes performed |
 
 **Updated decision:** use the recovered live schema metadata to finish a source-to-database compatibility review. Keep PR #35 and PR #46 isolated and in Draft. The next implementation gate is a disposable PostgreSQL/Supabase test environment using a verified schema snapshot, mandatory two-worker concurrency tests, and complete worker-writer review. Do not deploy the candidate functions or apply the fencing migration to the live project as part of this phase.
+
+
+## 11. PR #35 source-level correctness review and test-quality gate
+
+**Reviewed source:** PR #35 head `3b19c7c502ddfa17261ba457ee6757311b5e2032`  
+**Reviewed files:** transactional migration, worker call sites, SQL grant test, Deno integration test, and CI workflow.
+
+### 11.1 Positive implementation properties
+
+- The RPC uses a fixed empty `search_path` and schema-qualified table references.
+- The RPC is `SECURITY DEFINER` and explicitly revokes execution from `PUBLIC`, `anon`, and `authenticated`, granting execution to `service_role`.
+- Every transition first locks the parent `workflow_runs` row with `FOR UPDATE`.
+- The RPC checks parent owner, `running` status, exact attempt generation, workflow ownership, and step membership.
+- Terminal transitions require a matching running step row with the exact attempt generation.
+- Both worker paths call the same RPC rather than independently mutating step-run rows.
+
+### 11.2 Required corrections / unresolved proof
+
+1. **The CI integration test is allowed to skip.** Its `ignore: !configured` condition means the job can pass without running the two-client race. PR #38 explicitly confirms that the test was ignored because fixture variables were not supplied. A green CI result is therefore not a concurrency pass.
+2. **The current integration test mutates its fixture.** It advances the parent attempt after the start race and does not restore it. This is acceptable only for an isolated disposable fixture, never a shared or production database.
+3. **The fixture preflight is incomplete.** It reads the selected step but does not assert that `step.workflow_id === run.workflow_id`. The RPC itself checks membership, but the test should verify the fixture is correctly constructed before exercising the race.
+4. **The SQL test is grant-only.** It proves function presence and role grants, not transition semantics, stale-generation rejection, rollback behavior, or lock interaction with claim/recovery.
+5. **Cross-writer lock-order proof remains incomplete.** The live claim/recovery routine and every worker finalization path must be reviewed together with the new parent-row lock. Do not infer deadlock freedom from the isolated RPC body.
+6. **The CI workflow has no provisioned disposable database fixture.** It runs the Deno integration test without guaranteed fixture variables; the test is therefore optional rather than a required release gate.
+
+### 11.3 Next safe engineering change
+
+Do not modify or apply the live database. Keep PR #35 Draft. Build a dedicated CI-only PostgreSQL 17 harness from a reviewed, minimal test schema contract, then execute the migration and semantic tests against that disposable database. The harness must:
+- fail if the integration test is skipped;
+- verify service-role-only execution and deny anon/authenticated execution;
+- verify valid start/succeed/fail transitions;
+- reject wrong owner, wrong workflow-step membership, invalid transition, and stale generation;
+- prove exactly one same-generation concurrent start succeeds;
+- prove stale completion cannot overwrite a newer generation;
+- exercise lock interaction with the actual claim/recovery SQL or explicitly retain that check as BLOCKED;
+- use generated fixture IDs and a teardown/reset strategy;
+- never receive production Supabase URLs, service-role keys, or production data.
+
+A standalone PostgreSQL harness may validate the SQL RPC and locking contract, but it must not be represented as a full Supabase Auth/PostgREST/Edge Runtime integration test. Keep those boundaries explicit.
+
+### 11.4 Updated release gate
+
+| Gate | Status | Evidence required |
+|---|---|---|
+| RPC source review | PARTIAL PASS | Static review of PR #35 migration and both worker call sites |
+| RPC least-privilege grants | PARTIAL | SQL assertions authored; execution not evidenced |
+| Semantic SQL tests | BLOCKED | Disposable PostgreSQL 17 execution |
+| Concurrent start race | NOT VERIFIED | Test currently skippable; actual two-session run required |
+| Stale-generation completion | NOT VERIFIED | Actual disposable DB test required |
+| Claim/recovery lock-order interaction | BLOCKED | Complete writer inventory and race/deadlock tests |
+| Production migration | NOT AUTHORIZED | Explicit approval after all gates |
+
+**Decision:** no merge, migration, Edge Function deployment, or production release based solely on current PR #35 CI. The next implementation unit is the disposable PostgreSQL 17 semantic/concurrency harness, with skip treated as failure.
