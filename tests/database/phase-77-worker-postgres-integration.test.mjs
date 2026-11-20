@@ -49,8 +49,8 @@ test("workflow executes exact PostgreSQL replay, concurrency, stress, and securi
 
 test("shell harness is guarded against accidental production execution", async () => {
   const script = await read("../../scripts/test-phase-77-worker-state-machine.sh");
-  assert.match(script, /PGHOST:\?\?/);
-  assert.match(script, /PGDATABASE:\?\?/);
-  assert.match(script, /PGUSER:\?\?/);
+  assert.match(script, /PGHOST:\?/);
+  assert.match(script, /PGDATABASE:\?/);
+  assert.match(script, /PGUSER:\?/);
   assert.match(script, /trap cleanup EXIT/);
 });
