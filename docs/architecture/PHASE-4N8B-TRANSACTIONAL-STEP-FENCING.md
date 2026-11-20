@@ -110,3 +110,13 @@ rows. It also requires HTTPS for remote fixture endpoints (localhost/127.0.0.1
 are allowed for a local disposable stack). This is a defense-in-depth guard,
 not a replacement for dedicated disposable credentials, fixture isolation,
 and teardown controls.
+
+
+## Migration schema-contract test
+
+The SQL test now checks the RPC privilege boundary, every relation/column
+referenced by the transition function, and the exact unique key
+`workflow_step_runs(run_id, step_id)`. This is a catalog-level compatibility
+check only. It does not prove transition semantics, transaction rollback,
+concurrent-session behavior, lock-order safety, or Edge Function integration;
+those remain separate test gates.
