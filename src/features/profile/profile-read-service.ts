@@ -8,10 +8,10 @@ export type OwnProfile = Pick<
 
 export type ProfileReadResult =
   | Readonly<{ status: "success"; data: OwnProfile | null }>
-  | Readonly<{ status: "error"; code: "invalid_user_id" | "query_failed" | "network_unavailable" }>;
+  | Readonly<{ status: "error"; code: "query_failed" | "network_unavailable" }>;
 
 export type ProfileReadService = Readonly<{
-  getOwnProfile: (userId: string) => Promise<ProfileReadResult>;
+  getOwnProfile: () => Promise<ProfileReadResult>;
 }>;
 
 const PROFILE_COLUMNS = "display_name,avatar_url,created_at,updated_at" as const;
@@ -24,17 +24,13 @@ export function createProfileReadService(
   client: Pick<SupabaseClient<Database>, "from">,
 ): ProfileReadService {
   return Object.freeze({
-    async getOwnProfile(userId) {
-      const normalizedUserId = userId.trim();
-      if (!normalizedUserId) {
-        return { status: "error", code: "invalid_user_id" } as const;
-      }
-
+    async getOwnProfile() {
       try {
+        // PostgreSQL RLS derives the visible profile from auth.uid().
+        // No caller-controlled identity is accepted or sent in the query.
         const { data, error } = await client
           .from("profiles")
           .select(PROFILE_COLUMNS)
-          .eq("id", normalizedUserId)
           .maybeSingle();
 
         if (error) return { status: "error", code: "query_failed" } as const;
