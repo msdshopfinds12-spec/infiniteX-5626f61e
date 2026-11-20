@@ -1,5 +1,4 @@
 name: Database Contract Gate
-
 on:
   pull_request:
     branches: [main]
@@ -10,14 +9,11 @@ on:
       - "docs/database/**"
       - ".github/workflows/database-contract.yml"
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: database-contract-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   offline-contract:
     name: Offline migration and contract checks
@@ -26,25 +22,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-
       - name: Syntax-check validation scripts and tests
         run: |
           node --check scripts/check-migration-integrity.mjs
           node --check scripts/check-database-contract.mjs
           node --check tests/database/check-database-contract.test.mjs
           node --check tests/database/check-migration-integrity.test.mjs
-
       - name: Run database contract validator regression tests
         run: node --test tests/database/check-database-contract.test.mjs
-
       - name: Run migration integrity regression tests
         run: node --test tests/database/check-migration-integrity.test.mjs
-
       - name: Check migration naming and content integrity
         id: migration_integrity
         shell: bash
@@ -59,7 +50,6 @@ jobs:
             exit 0
           fi
           exit "$status"
-
       - name: Validate reviewed database contract snapshot
         id: contract_snapshot
         if: always() && steps.migration_integrity.outcome != 'skipped'
@@ -71,11 +61,10 @@ jobs:
           set -e
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
           if [ "$status" -eq 2 ]; then
-            echo "Reviewed snapshot unavailable: classified as BLOCKED, not a validator defect."
+            echo "Contract snapshot unavailable or awaiting explicit human approval: classified as BLOCKED."
             exit 0
           fi
           exit "$status"
-
       - name: Summarize source readiness
         if: always()
         env:
@@ -85,7 +74,7 @@ jobs:
           classify() {
             case "$1" in
               0) echo "PASS" ;;
-              2) echo "BLOCKED — authoritative source missing" ;;
+              2) echo "BLOCKED — source missing or human approval pending" ;;
               "") echo "NOT RUN" ;;
               *) echo "FAIL — validator detected invalid source (exit $1)" ;;
             esac
@@ -95,10 +84,9 @@ jobs:
             echo "- Migration source: $(classify "$MIGRATION_EXIT_CODE")"
             echo "- Contract snapshot: $(classify "$CONTRACT_EXIT_CODE")"
             echo "- Missing historical migrations must be recovered, not fabricated."
-            echo "- Missing contract snapshots must be captured from an authorized read-only catalog export."
-            echo "- Structural validity is not proof of live schema parity."
+            echo "- Captured snapshots require explicit human approval."
+            echo "- Structural validity is not proof of schema parity."
           } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Enforce merge-blocking source readiness gate
         if: always()
         env:
@@ -106,10 +94,9 @@ jobs:
           CONTRACT_EXIT_CODE: ${{ steps.contract_snapshot.outputs.exit_code }}
         run: |
           if [ "$MIGRATION_EXIT_CODE" != "0" ] || [ "$CONTRACT_EXIT_CODE" != "0" ]; then
-            echo "BLOCKED: authoritative migration sources and reviewed contract snapshot are required."
+            echo "BLOCKED: authoritative migration sources and human-approved contract snapshot are required."
             exit 1
           fi
-
   production-safety:
     name: Production safety invariant
     runs-on: ubuntu-latest

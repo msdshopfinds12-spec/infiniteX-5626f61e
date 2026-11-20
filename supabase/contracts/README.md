@@ -1,35 +1,15 @@
 # Database contract snapshot
 
-This directory holds sanitized, read-only catalog evidence. Do not commit production data, secrets, credentials, connection strings, or raw API-key values.
+This directory contains sanitized, read-only catalog evidence. Never commit application rows, credentials, connection strings, raw API keys, or secret values.
 
-The CI verifier expects `database-contract.snapshot.json` with this top-level structure:
+## Human approval gate
 
-```json
-{
-  "schemaVersion": 1,
-  "capturedAt": "2026-11-20T00:00:00Z",
-  "source": "authorized-read-only-catalog-capture",
-  "tables": [
-    {
-      "schema": "public",
-      "name": "example_table",
-      "rlsEnabled": true,
-      "policies": []
-    }
-  ],
-  "functions": [
-    {
-      "schema": "public",
-      "name": "example_function",
-      "identityArguments": "arg_type",
-      "securityDefiner": false,
-      "searchPath": null,
-      "executeRoles": ["authenticated"]
-    }
-  ]
-}
-```
+A snapshot must contain `reviewStatus: "APPROVED"` and non-empty `review.reviewedBy`, valid `review.reviewedAt`, and non-empty `review.reviewEvidence`. Captured but unreviewed evidence exits with code 2 (BLOCKED). Invalid evidence exits with code 1 (FAIL).
 
-The example above is illustrative only and must not be committed as a claim about the live project. Replace it with a reviewed catalog export. Include all relevant policy definitions and function ACL details in the finalized contract format before relying on automated authorization assertions.
+## Captured metadata
 
-The checker currently validates snapshot structure and duplicate identities; it does not connect to Supabase or prove parity.
+The snapshot includes relation identities, columns, defaults, nullability, RLS state, policy definitions, constraints, indexes, table grants, triggers, function overload identities, return types, owners, languages, volatility, SECURITY DEFINER, search_path, EXECUTE roles, function-definition hashes, and extension metadata.
+
+The current candidate deliberately remains `PENDING_HUMAN_REVIEW`. Some table-definition fields reuse the earlier read-only catalog capture and have been cross-checked against current relation, RLS, and policy counts. Full definition-by-definition parity remains a reviewer task.
+
+This is not a data backup, canonical bootstrap, or replayable migration baseline. Structural validity does not prove schema parity.
