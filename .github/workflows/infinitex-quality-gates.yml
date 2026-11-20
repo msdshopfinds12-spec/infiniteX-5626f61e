@@ -1,0 +1,49 @@
+name: InfiniteX Quality Gates
+
+on:
+  pull_request:
+    branches:
+      - eng/infinitex-unified-ui-backend-2026-11-20
+  push:
+    branches:
+      - eng/infinitex-p0-p1-auth-2026-11-20
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Install, audit, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install from lockfile
+        run: npm ci
+
+      - name: Dependency security audit
+        run: npm audit --audit-level=low
+
+      - name: TypeScript lint
+        run: npm run lint
+
+      - name: Unit and regression tests
+        run: npm test
+
+      - name: Edge Function and worker security tests
+        run: npm run test:edge-function-security
+
+      - name: Production build
+        run: npm run build
