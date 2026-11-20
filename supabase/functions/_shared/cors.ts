@@ -6,7 +6,7 @@ export function createCorsHeaders(origin: string | null, configured: string): Co
   const allowed = !origin || allowedOrigins.has(origin);
   const headers = new Headers({
     "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, idempotency-key",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     "Vary": "Origin",
