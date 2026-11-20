@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 READY_FILE="$TMP_DIR/session-a-holds-parent.lock"
 B_STARTED_FILE="$TMP_DIR/session-b-is-connected"
-export READY_FILE B_STARTED_FILE
+export READY_FILE B_STARTED_FILE DATABASE_URL
 SESSION_A_PID=""
 SESSION_B_PID=""
 cleanup() {
@@ -51,7 +51,6 @@ select public.simula_transition_workflow_step(
   '20000000-0000-4000-8000-000000000001',
   1, 'start', '{"session":"A"}'::jsonb, null, null
 );
-select pg_sleep(0.25);
 commit;
 SQL
 
@@ -83,7 +82,7 @@ if [[ ! -f "$READY_FILE" ]]; then
   exit 1
 fi
 
-timeout 30s psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$TMP_DIR/session-b.sql" >"$TMP_DIR/session-b.log" 2>&1 &
+PGAPPNAME=phase4n8b-session-b timeout 30s psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$TMP_DIR/session-b.sql" >"$TMP_DIR/session-b.log" 2>&1 &
 SESSION_B_PID=$!
 if wait "$SESSION_B_PID"; then
   SESSION_B_PID=""
