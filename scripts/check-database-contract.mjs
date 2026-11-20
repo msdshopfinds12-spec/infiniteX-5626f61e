@@ -43,6 +43,12 @@ else{
  if(Array.isArray(s.capture.scopeSchemas))for(const x of ['public','private'])if(!s.capture.scopeSchemas.includes(x))errors.push('capture.scopeSchemas missing '+x+'.');
 }
 named(s.schemas,'schemas',['name'],[['owner','string']]);
+if(Array.isArray(s.schemas)){
+ const capturedSchemaNames=new Set(s.schemas.filter(obj).map(schema=>schema.name));
+ for(const requiredSchema of ['public','private']){
+  if(!capturedSchemaNames.has(requiredSchema))errors.push('schemas missing required captured schema: '+requiredSchema+'.');
+ }
+}
 if(arr(s.schemas,'schemas'))for(const [i,schema] of s.schemas.entries()){
  if(!obj(schema))continue;
  if(arr(schema.grants,'schemas['+i+'].grants'))for(const [j,g] of schema.grants.entries()){
