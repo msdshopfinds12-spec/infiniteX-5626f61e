@@ -33,9 +33,11 @@ Rehearse the recovered migration history in timestamp order on an isolated Supab
 7. Only after all recovered entries pass, apply the candidate migration as a separate disposable-only step.
 8. Emit a machine-readable JSON report and a GitHub Actions summary.
 
-## Known blocker before runtime
+## Baseline recovery update — Phase 52.1D
 
-The recovered migration set is not demonstrably self-contained: the initial core migration does not create the workflow tables required by subsequent scheduler/worker migrations. The rehearsal must not fabricate those tables to make the chain appear complete. If no authoritative baseline source is present in the repository, the expected outcome is BLOCKED at the first missing workflow relation. Recover the real schema source or a reviewed baseline before attempting a complete replay.
+The original 52.1C run confirmed the missing workflow-domain baseline at migration 5. Phase 52.1D adds a separately labelled RECONSTRUCTED_DISPOSABLE_FIXTURE derived from the older noncanonical catalog metadata artifact. The runner applies it only after recovered migrations 1–4 and before migration 5, then asserts the expected five tables, 51 columns, 27 constraints, 14 baseline indexes, six RLS policies, and RLS enablement.
+
+This removes the known missing-relation prerequisite for a disposable replay attempt, but it does NOT establish original migration-source recovery or live schema parity. The fixture is not an applied migration, is never used against hosted Supabase, and must not be promoted as canonical. Any later extension/platform dependency remains a BLOCKED result, not a pass.
 
 ## Acceptance criteria
 
