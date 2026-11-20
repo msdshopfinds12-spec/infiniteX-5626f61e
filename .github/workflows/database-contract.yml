@@ -47,22 +47,68 @@ jobs:
 
       - name: Check migration naming and content integrity
         id: migration_integrity
-        run: node scripts/check-migration-integrity.mjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/check-migration-integrity.mjs
+          status=$?
+          set -e
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" -eq 2 ]; then
+            echo "Source unavailable: classified as BLOCKED, not a validator defect."
+            exit 0
+          fi
+          exit "$status"
 
       - name: Validate reviewed database contract snapshot
+        id: contract_snapshot
         if: always() && steps.migration_integrity.outcome != 'skipped'
-        run: node scripts/check-database-contract.mjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/check-database-contract.mjs
+          status=$?
+          set -e
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" -eq 2 ]; then
+            echo "Reviewed snapshot unavailable: classified as BLOCKED, not a validator defect."
+            exit 0
+          fi
+          exit "$status"
 
       - name: Summarize source readiness
         if: always()
+        env:
+          MIGRATION_EXIT_CODE: ${{ steps.migration_integrity.outputs.exit_code }}
+          CONTRACT_EXIT_CODE: ${{ steps.contract_snapshot.outputs.exit_code }}
         run: |
+          classify() {
+            case "$1" in
+              0) echo "PASS" ;;
+              2) echo "BLOCKED — authoritative source missing" ;;
+              "") echo "NOT RUN" ;;
+              *) echo "FAIL — validator detected invalid source (exit $1)" ;;
+            esac
+          }
           {
             echo "## Database source readiness"
-            echo "- Migration integrity step: ${{ steps.migration_integrity.outcome }}"
+            echo "- Migration source: $(classify "$MIGRATION_EXIT_CODE")"
+            echo "- Contract snapshot: $(classify "$CONTRACT_EXIT_CODE")"
             echo "- Missing historical migrations must be recovered, not fabricated."
             echo "- Missing contract snapshots must be captured from an authorized read-only catalog export."
-            echo "- A successful syntax check is not evidence of live schema parity."
+            echo "- Structural validity is not proof of live schema parity."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce merge-blocking source readiness gate
+        if: always()
+        env:
+          MIGRATION_EXIT_CODE: ${{ steps.migration_integrity.outputs.exit_code }}
+          CONTRACT_EXIT_CODE: ${{ steps.contract_snapshot.outputs.exit_code }}
+        run: |
+          if [ "$MIGRATION_EXIT_CODE" != "0" ] || [ "$CONTRACT_EXIT_CODE" != "0" ]; then
+            echo "BLOCKED: authoritative migration sources and reviewed contract snapshot are required."
+            exit 1
+          fi
 
   production-safety:
     name: Production safety invariant
