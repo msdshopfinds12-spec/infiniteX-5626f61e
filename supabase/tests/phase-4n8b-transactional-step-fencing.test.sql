@@ -7,7 +7,6 @@ declare
   );
   v_required record;
   v_table regclass;
-  v_column text;
   v_has_unique boolean;
 begin
   if v_signature is null then
