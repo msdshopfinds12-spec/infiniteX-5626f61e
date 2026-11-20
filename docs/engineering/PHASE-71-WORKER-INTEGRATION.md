@@ -29,7 +29,7 @@ This phase extracts the authentication/privilege boundary from the two Deno work
 Run:
 
 ```sh
-deno test --no-check supabase/functions/simula-workflow-worker/index.test.ts
+deno test --no-check supabase/functions/simula-workflow-worker/index.deno.ts
 npm run test:worker-http-boundary
 npm run test:workers
 npm run test:edge-function-security
