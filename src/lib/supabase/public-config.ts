@@ -12,6 +12,38 @@ export type PublicEnvironment = Readonly<
   Record<"VITE_SUPABASE_URL" | "VITE_SUPABASE_PUBLISHABLE_KEY", string | undefined>
 >;
 
+function isLegacyAnonJwt(key: string): boolean {
+  const segments = key.split(".");
+  if (segments.length !== 3 || segments.some((segment) => segment.length === 0)) {
+    return false;
+  }
+
+  try {
+    const payload = segments[1].replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = atob(payload.padEnd(Math.ceil(payload.length / 4) * 4, "="));
+    const claims: unknown = JSON.parse(decoded);
+    return (
+      typeof claims === "object" &&
+      claims !== null &&
+      "role" in claims &&
+      claims.role === "anon"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isBrowserSafeKey(key: string): boolean {
+  const publishablePrefix = "sb_publishable_";
+  if (key.startsWith(publishablePrefix)) {
+    return key.length > publishablePrefix.length;
+  }
+
+  // Legacy anon keys are JWTs whose role claim must be anon. A JWT-shaped
+  // string alone is not enough: service_role and arbitrary JWTs are rejected.
+  return isLegacyAnonJwt(key);
+}
+
 /**
  * Validates only browser-safe Supabase configuration.
  *
@@ -59,14 +91,7 @@ export function readPublicSupabaseConfig(
     return { status: "invalid", reason: "invalid-url" };
   }
 
-  // Supabase publishable keys (sb_publishable_*) and legacy anon JWTs are
-  // browser-safe. Reject known privileged key formats before they can ship.
-  if (
-    !publishableKey ||
-    /^sb_secret_/i.test(publishableKey) ||
-    /service[_-]?role/i.test(publishableKey) ||
-    /secret[_-]?key/i.test(publishableKey)
-  ) {
+  if (!isBrowserSafeKey(publishableKey!)) {
     return { status: "invalid", reason: "invalid-key" };
   }
 
@@ -74,7 +99,7 @@ export function readPublicSupabaseConfig(
     status: "ready",
     config: {
       url: parsedUrl.origin,
-      publishableKey,
+      publishableKey: publishableKey!,
     },
   };
 }
