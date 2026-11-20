@@ -108,10 +108,10 @@ export default function App({ authState, authActions, recoveryMode = false, work
             )}
             {signOutError && <p className="auth-inline-error" role="alert">{signOutError}</p>}
             <div className="demo-notice" role="status">
-              <strong>{authState.status === "authenticated" && workflowReadService ? "LIMITED LIVE" : "DEMO MODE"}</strong>
+              <strong>{authState.status === "authenticated" && workflowReadService ? "READ-ONLY INTEGRATION" : "DEMO MODE"}</strong>
               <span>
                 {authState.status === "authenticated" && workflowReadService
-                  ? "Your workflow list is read-only live data protected by database RLS. Overview metrics, agents, logs and security posture remain demo or unverified."
+                  ? "The Workflows page uses an authenticated read-only Supabase query protected by database RLS. Records appear only after a successful query; overview metrics, agents, logs and security posture remain demo or unverified."
                   : "Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified."}
               </span>
             </div>
