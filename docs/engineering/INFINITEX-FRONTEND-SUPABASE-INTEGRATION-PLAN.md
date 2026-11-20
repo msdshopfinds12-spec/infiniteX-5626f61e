@@ -13,8 +13,10 @@ This plan began as a demo-to-Supabase implementation proposal. The isolated Phas
 - `createBrowserSupabaseClient` validates public URL/publishable-key configuration and fails closed when configuration is missing or invalid.
 - Supabase Auth session adapter, auth-state coordinator, React provider, sign-in/sign-up/recovery/sign-out flows, and related tests exist.
 - `createWorkflowReadService` provides bounded, read-only workflow, run-history, and event-log queries with explicit safe-column projections and no caller-supplied owner ID.
+- `createProfileReadService` reads only safe profile fields through the current authenticated Supabase session and RLS; it no longer accepts a caller-supplied user ID.
+- `createProjectReadService` provides bounded read-only project metadata; the Projects navigation and view are connected to it, while project JSON content and ownership columns are not selected.
 - The Pipelines view renders an authenticated, identity-fenced workflow list with expandable run history and event timeline, loading, empty, error, retry, and search states. Run history excludes input/output/raw error text; event logs exclude the JSON `details` payload.
-- Overview metrics, agent cards, sample logs, workflow execution/mutations, and security posture remain demo or unverified.
+- Overview metrics, agent cards, sample logs, workflow execution/mutations, and security posture remain demo or unverified. Projects are read-only; project creation/edit/delete is not enabled.
 - GitHub Actions run #44805498658 and disposable PostgreSQL run #44805508557 passed on exact head `060c0516f9d3d3964e1c292b8c856f026083f3c6`.
 
 These results verify source behavior and isolated CI. They do not prove that a browser session has successfully queried the intended live Supabase project, that two-user browser RLS tests have passed, or that production deployment is ready.
