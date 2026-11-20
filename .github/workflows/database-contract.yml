@@ -1,7 +1,6 @@
 name: Database Contract Gate
 on:
   pull_request:
-    branches: [main]
     paths:
       - "supabase/**"
       - "scripts/check-*.mjs"
@@ -126,3 +125,46 @@ jobs:
           echo "This workflow is offline-only."
           echo "No Supabase URL, service-role key, database password, or production mutation command is used."
           echo "Production migration and deployment require a separate human-approved workflow."
+
+  postgresql-readonly-sql:
+    name: PostgreSQL 17 disposable catalog execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: infinitex_contract_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d infinitex_contract_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Execute metadata-only catalog query on disposable PostgreSQL
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_contract_test
+        run: |
+          psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE infinitex_contract_reader NOLOGIN;
+          CREATE SCHEMA private;
+          CREATE TABLE public.contract_probe (id bigint, private_note text);
+          CREATE SEQUENCE public.contract_probe_seq;
+          GRANT SELECT ON public.contract_probe TO infinitex_contract_reader;
+          GRANT SELECT (private_note) ON public.contract_probe TO infinitex_contract_reader;
+          GRANT USAGE ON SEQUENCE public.contract_probe_seq TO infinitex_contract_reader;
+          GRANT USAGE ON SCHEMA private TO infinitex_contract_reader;
+          SQL
+          psql -X -v ON_ERROR_STOP=1 -qAt -f supabase/contracts/capture-database-contract.readonly.sql > /tmp/database-contract-snapshot.json
+          node --input-type=module -e "import fs from 'node:fs'; const s=JSON.parse(fs.readFileSync('/tmp/database-contract-snapshot.json','utf8')); const t=s.tables.find(x=>x.schema==='public'&&x.name==='contract_probe'); if(s.schemaVersion!==2 || s.reviewStatus!=='PENDING_HUMAN_REVIEW' || !Array.isArray(s.tables) || !Array.isArray(s.schemas) || !t?.grants.some(x=>x.grantor==='postgres'&&x.grantee==='infinitex_contract_reader'&&x.privilege==='SELECT') || !t?.columnGrants.some(x=>x.grantor==='postgres'&&x.grantee==='infinitex_contract_reader'&&x.column==='private_note') || !s.schemas.find(x=>x.name==='private') ) process.exit(1); console.log('PostgreSQL 17 catalog query passed: relation, column, and schema ACL metadata captured; human review remains pending.');"
