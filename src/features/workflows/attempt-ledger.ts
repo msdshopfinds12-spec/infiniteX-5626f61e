@@ -11,7 +11,7 @@ import { decideStepRetry, type RetryFailureKind } from "./retry-policy.ts";
 export type StepAttemptStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
 export type JsonPrimitive = string | number | boolean | null;
-export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+export type JsonValue = JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 
 export type StepAttempt = Readonly<{
   id: string;
