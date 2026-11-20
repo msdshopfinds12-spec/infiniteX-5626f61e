@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
+const completionHelper = "../../supabase/functions/_shared/workflow-completion.ts";
 
 test("authenticated worker uses bounded input and exact-origin policy", async () => {
   const source = await read("../../supabase/functions/simula-workflow-worker/index.ts");
