@@ -18,15 +18,15 @@ Fourteen public tables were reported, all with RLS enabled: profiles, tools, use
 
 ## Confirmed privilege risks
 
-### P0: platform_api_keys.key_hash is SELECTable by authenticated
-The live column-grant query confirms authenticated SELECT on public.platform_api_keys.key_hash. Owner-scoped RLS does not make credential hashes safe for browser exposure.
+### P1: platform_api_keys.key_hash is SELECTable by authenticated
+The live column-grant query confirms authenticated SELECT on public.platform_api_keys.key_hash. The owner-scoped RLS policy limits exposure to the owner's own rows, and the inspected API-key manager omits the hash from its response, but direct table access still exposes a sensitive verifier unnecessarily.
 
 Remediation design: revoke client SELECT on key_hash; expose only approved metadata columns; keep hash verification server-side. Review frontend consumers before preparing a migration.
 
-### P0: workflow_runs lifecycle fields are client INSERTable
-Authenticated INSERT grants include status, attempt, started_at, finished_at, output, error_message, scheduled_for, owner_id, workflow_id and input. The owner/workflow RLS check and enforce_workflow_run_insert_defaults trigger exist, but the grants still create a client-controlled surface that must be verified against the trigger body and adversarial tests.
+### P1: workflow_runs exposes lifecycle columns to client INSERT, with a protective trigger
+Authenticated INSERT grants include status, attempt, started_at, finished_at, output, error_message, scheduled_for, owner_id, workflow_id and input. The inspected trigger body `private.enforce_workflow_run_insert_defaults()` verifies `auth.uid()` against owner and workflow, then overwrites status to queued, attempt to zero, and output/error/start/finish fields to null for authenticated requests. This is a meaningful protection. However, broad client INSERT grants remain unnecessary exposure and the trigger does not overwrite every worker-related field (for example scheduled_for).
 
-Remediation design: browser sends a minimal enqueue request; trusted server derives owner and lifecycle fields; worker owns transitions and results. Do not assume the trigger neutralizes every supplied field until its exact implementation is reviewed.
+Remediation design: browser sends a minimal enqueue request; trusted server derives owner and lifecycle fields; worker owns transitions and results. Keep the trigger as defense in depth, but narrow client INSERT privileges to the minimal required columns after verifying all current client insert paths. Add tests proving forged lifecycle values are overwritten.
 
 ### INFO: billing_webhook_events has RLS but no policies
 Security Advisor reports one INFO finding. This may be intentional for a server-only table. Verify browser roles have no grants and webhook processing uses a trusted server path. Do not add a broad policy merely to clear the notice.
@@ -37,6 +37,12 @@ Security Advisor reports one INFO finding. This may be intentional for a server-
 - workflows has owner-scoped ALL policy.
 - workflow_runs has owner-scoped SELECT and owner/workflow-scoped INSERT.
 RLS controls rows; SQL privileges control which operations and columns are available.
+
+## Edge Function source review
+
+- `ashaa-api-key-manager` verifies the caller with Auth `getUser(token)`, derives `owner_id` from the verified user, uses a server-side service-role client for writes, and its list projection omits `key_hash`. It returns the raw API key once and stores only a SHA-256 digest. This is a safer pattern than exposing the hash through direct table reads. Its CORS configuration currently uses wildcard origin; tighten to the deployed app origin allowlist before production hardening.
+- `simula-workflow-worker` verifies the caller via `getUser(token)`, derives the owner from the verified user, claims only that user's queued runs, and uses a service-role client for worker-owned transitions. Its CORS configuration currently uses wildcard origin. The inspected code reads workflow steps by workflow ID; the claim RPC's owner-scoped result is the upstream boundary and should remain covered by isolation tests. The declared `timeout_seconds` field is not enforced by the inspected action execution loop; treat timeout enforcement as a functional reliability gap, not proof of a security bypass.
+- `simula-workflow-cron-worker` has platform JWT verification disabled, but checks a supplied worker secret via `simula_verify_worker_secret` before accessing the queue with service role. This is an intentional alternate authentication path if the RPC performs strong hash/secret verification and secret rotation is operationally sound. Do not enable or disable JWT verification without reviewing the scheduler invocation and secret lifecycle.
 
 ## Edge Function inventory
 - simula-workflow-cron-worker: ACTIVE, verify_jwt=false.
