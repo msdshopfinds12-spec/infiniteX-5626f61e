@@ -62,12 +62,13 @@ test("authenticated adapter delegates bearer identity validation before user-sco
     "return { ok: true, userClient",
     "authenticated boundary must verify identity before returning the user client",
   );
+  assert.match(authenticatedWorker, /deps\.authenticateBearerRequest \?\? authenticateBearerRequest/);
   assert.match(authenticatedWorker, /isClaimedRunOwnedBy\(run, ownerId\)/);
   assertOrdered(
     authenticatedWorker,
-    "authenticateBearerRequest({",
+    "await authenticate({",
     'userClient.rpc(\n    "simula_claim_workflow_runs"',
-    "authenticated queue claim must only be reachable after the boundary succeeds",
+    "authenticated queue claim must only be reachable after the default or injected boundary succeeds",
   );
   assert.match(authenticatedWorker, /\.eq\("id", run\.workflow_id\)\.eq\("owner_id", ownerId\)/);
 });
