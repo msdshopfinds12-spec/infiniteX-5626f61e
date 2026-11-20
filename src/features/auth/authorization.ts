@@ -48,10 +48,19 @@ export function evaluateCapabilityAccess(
   if (!snapshot) {
     return { allowed: false, reason: "snapshot-unavailable" };
   }
+  if (
+    typeof snapshot.subjectId !== "string" ||
+    snapshot.subjectId.trim().length === 0 ||
+    !Array.isArray(snapshot.permissions) ||
+    snapshot.permissions.some((permission) => !WORKSPACE_CAPABILITIES.includes(permission)) ||
+    !Number.isFinite(snapshot.expiresAt)
+  ) {
+    return { allowed: false, reason: "snapshot-unavailable" };
+  }
   if (snapshot.subjectId !== authState.userId) {
     return { allowed: false, reason: "identity-mismatch" };
   }
-  if (!Number.isFinite(snapshot.expiresAt) || snapshot.expiresAt <= now) {
+  if (snapshot.expiresAt <= now) {
     return { allowed: false, reason: "snapshot-expired" };
   }
   if (!snapshot.permissions.includes(capability)) {
