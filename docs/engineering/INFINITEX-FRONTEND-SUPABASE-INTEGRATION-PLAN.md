@@ -29,7 +29,7 @@ Relevant live worker RPCs include `public.simula_claim_workflow_runs`, `public.s
 
 ## 3. Dependency decision
 
-Use the official `@supabase/supabase-js` client, pinned to an exact stable version and committed with a regenerated npm lockfile. A Node 22 / npm 10.9.9 GitHub Actions experiment resolved `@supabase/supabase-js` to v2.119.2. The generated candidate lockfile completed `npm ci --ignore-scripts` and `npm audit` with zero reported vulnerabilities. The artifact is not yet committed to the application manifest/lockfile; select an exact version and commit both files atomically before importing the SDK.
+Use the official `@supabase/supabase-js` client. The reviewed Node 22 / npm 10.9.9 experiment resolved v2.119.2 and generated a matching npm lockfile candidate. That candidate completed `npm ci --ignore-scripts` and `npm audit` with zero reported vulnerabilities in GitHub Actions. Treat v2.119.2 as the current candidate, not an installed application dependency: review the artifact, then commit the exact version declaration and matching lockfile atomically before importing the SDK.
 
 Do not hand-edit `package-lock.json`. Generate it using npm in a clean Node 22 environment, then run `npm ci`, `npm audit`, lint, tests, and build. The repository currently uses Node 22 in CI.
 
@@ -166,7 +166,7 @@ Do not run destructive tests against the live project. Use synthetic accounts an
 
 ## 10. Implementation order
 
-1. Create a clean Node 22 workspace on the PR #50 head.
+1. Create a clean Node 22 workspace from the current PR #60 implementation branch.
 2. Install pinned `@supabase/supabase-js` and regenerate lockfile.
 3. Add env validation and typed client factory.
 4. Add AuthProvider and auth screen.
