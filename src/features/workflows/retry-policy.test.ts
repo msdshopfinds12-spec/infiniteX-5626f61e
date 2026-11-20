@@ -172,6 +172,8 @@ test("step summary state machine allows only documented transitions", () => {
   assert.equal(canTransitionStepStatus("succeeded", "queued"), false);
   assert.equal(canTransitionStepStatus("skipped", "running"), false);
   assert.equal(canTransitionStepStatus("queued", "succeeded"), false);
+  assert.equal(canTransitionStepStatus("unknown" as StepSummaryStatus, "running"), false);
+  assert.equal(canTransitionStepStatus("queued", "unknown" as StepSummaryStatus), false);
 
   assert.throws(
     () => assertStepStatusTransition("succeeded", "queued"),
