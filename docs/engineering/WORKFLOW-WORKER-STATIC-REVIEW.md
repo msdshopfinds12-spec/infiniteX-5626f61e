@@ -15,7 +15,7 @@ Do not enable the workflow workers against production yet. The candidate contain
 
 The initial review found that both workers selected `retry_limit` but did not use it. This has been addressed in the candidate branch: both authenticated and cron workers validate the configured limit and call the shared `executeWithRetry` helper.
 
-The contract defines `retry_limit` as additional retries after the initial attempt, accepts 0–5 retries, retries only explicitly tagged transient codes, uses capped exponential full jitter, and enforces one aggregate step timeout across attempts and backoff. Deterministic validation, authorization, malformed-input, and unsupported-action failures are not retried.
+The contract defines `retry_limit` as additional retries after the initial attempt, accepts 0–10 retries, retries only explicitly tagged transient codes, uses capped exponential full jitter, and enforces one aggregate step timeout across attempts and backoff. Deterministic validation, authorization, malformed-input, and unsupported-action failures are not retried.
 
 The current action allowlist is deterministic and local, so it does not presently emit retryable transient errors. The helper is ready for future external adapters, but those adapters must add idempotency, explicit transient-error mapping, cancellation, and integration tests before retries can be exercised.
 
