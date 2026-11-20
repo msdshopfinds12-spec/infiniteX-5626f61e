@@ -66,7 +66,7 @@ The authenticated worker and cron worker now import the same runtime-neutral `wo
 
 1. Capture genuine read-only database metadata from the intended Supabase project and independently compare it with `src/lib/supabase/database.types.ts`.
 2. Verify indexes, constraints, RLS policies, function definitions, function grants, and worker-secret storage/rotation design.
-3. Expand isolated PostgreSQL tests into high-volume concurrent claim stress, simultaneous duplicate insert races, and full worker-adapter end-to-end tests. Current row-lock test is real database-session evidence but not a high-volume stress test.
+3. Expand the passing 16-session / 80-run isolated PostgreSQL stress test into repeated randomized rounds and sustained load; add full worker-adapter end-to-end tests. Phase 69 currently verifies bounded parallel claims and duplicate-insert uniqueness, not production throughput.
 4. Retry semantics are now implemented and covered by Node/Deno tests; external action adapters still need idempotency and integration tests before retrying real upstream calls.
 5. Add tests for malformed claim RPC rows, duplicate step-run insertion races, stale generations, partial failure, and logging failures.
 6. Run all candidate CI checks on the exact resulting commit.
@@ -81,3 +81,8 @@ The authenticated worker and cron worker now import the same runtime-neutral `wo
 ## Scope boundaries
 
 This review does not prove that functions are deployed, secrets exist, cron is scheduled, schema matches, RLS is correct, or real workflows execute. No migration, secret change, function deployment, production data write, billing change, merge, or release was performed.
+
+
+## Phase 69 test evidence
+
+The isolated PostgreSQL workflow now runs `scripts/test-workflow-claim-stress.sh`: 16 independent claim sessions, 80 synthetic queued runs, exact-once unique claim assertions, generation assertions, zero remaining queued fixtures, and a two-session duplicate step-run insert check. Exact-head PR CI passed: [PostgreSQL replay/stress/security](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44796503703), [quality gates](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44796503555).
