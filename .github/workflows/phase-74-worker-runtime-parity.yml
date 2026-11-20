@@ -1,0 +1,33 @@
+name: Phase 74 Worker Runtime Parity
+on:
+  push:
+    branches:
+      - phase-74/worker-runtime-parity
+    paths:
+      - 'supabase/functions/**'
+      - 'tests/workers/**'
+      - 'docs/engineering/PHASE-74-WORKER-RUNTIME-PARITY.md'
+      - 'package.json'
+      - '.github/workflows/phase-74-worker-runtime-parity.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  worker-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test worker security helpers
+        run: npm run test:edge-worker-security
+      - name: Test exact-origin CORS policy
+        run: npm run test:edge-function-cors
+      - name: Test worker authentication boundary
+        run: npm run test:worker-http-boundary
+      - name: Test handler-level runtime parity contracts
+        run: npm run test:worker-runtime-parity
