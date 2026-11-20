@@ -1,0 +1,59 @@
+name: InfiniteX Phase 83 Frontend Data Access Audit
+
+on:
+  push:
+    branches:
+      - phase-83-frontend-data-access-audit
+    paths:
+      - ".github/workflows/phase-83-frontend-data-access-audit.yml"
+      - "src/**"
+      - "supabase/functions/ashaa-api-key-manager/**"
+      - "tests/security/phase-83-frontend-data-access-contract.test.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+  pull_request:
+    paths:
+      - ".github/workflows/phase-83-frontend-data-access-audit.yml"
+      - "src/**"
+      - "supabase/functions/ashaa-api-key-manager/**"
+      - "tests/security/phase-83-frontend-data-access-contract.test.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-phase-83-frontend-data-access-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-data-access:
+    name: Node 22 / Browser data access security contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Configure Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run frontend data access security contracts
+        run: node --test tests/security/phase-83-frontend-data-access-contract.test.mjs
+      - name: Run existing security and worker regression gates
+        run: |
+          npm run test:worker-http-boundary
+          npm run test:worker-runtime-parity
+          npm run test:edge-function-security
+          npm test
+      - name: Lint and type-check production source
+        run: npm run lint
+      - name: Production build
+        run: npm run build
