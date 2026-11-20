@@ -57,4 +57,4 @@ The runner applies the fixture after recovered migrations 1–4 and before recov
 
 ## Disposable cryptographic prerequisite
 
-The rehearsal container generates a fresh random pgsodium server key at CI runtime and masks it in job output. The key is passed only to the ephemeral PostgreSQL container to allow the checked-in Vault/pgsodium migration behavior to be exercised. It is not stored in repository files or GitHub secrets, is not reused, and is not a production key. The container is removed after the job.
+The rehearsal uses the Supabase PostgreSQL image's supported `pgsodium.getkey_script` and `vault.getkey_script` settings, pointing to its bundled `/usr/lib/postgresql/bin/pgsodium_getkey.sh`. The bundled script creates a fresh root-key file inside the disposable container when one is absent. The key is not stored in repository files or GitHub secrets, is not reused, and is not a production key. The container is removed after the job.
