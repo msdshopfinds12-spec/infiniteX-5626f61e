@@ -112,3 +112,33 @@ Exact tested commit: `b921c94d9d5bca7e88e7b684a717baea872a8dec`
 - The Vercel build status contexts still report a build-rate-limit failure; the successful GitHub Actions build is separate evidence and does not clear those Vercel contexts.
 
 **Phase 47 release status:** Code and CI verified; live provider integration and security acceptance remain pending. PR #60 stays Draft.
+
+
+### Phase 47 follow-up hardening — latest exact-head verification
+
+A first quality run found a malformed synthetic test client fixture (the fixture omitted the SDK client's `auth` property wrapper). The fixture was corrected; the production adapter contract was not weakened.
+
+Additional hardening:
+- Sign-in, sign-up, and sign-out now normalize both returned SDK errors and thrown network/provider exceptions.
+- Sign-out exceptions are converted into safe action results instead of escaping as unhandled UI errors.
+- A regression test verifies network exception normalization without rendering internal provider details.
+- A regression test verifies sign-out exceptions remain contained.
+- Existing sign-in accepts legacy passwords shorter than the new-account minimum; sign-up retains the 8-character minimum and 128-character maximum.
+
+Latest exact tested commit: `8b31883e9a637f59f33c370ea6b1fc576a96065f`.
+
+Latest GitHub Actions evidence:
+- [InfiniteX Quality Gates run](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44699196931): SUCCESS.
+- [InfiniteX dependency/build verification](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44699205488): SUCCESS; production build artifact uploaded to Actions storage only.
+
+Latest measured results:
+- `npm ci`: PASS — 43 packages installed; 44 audited.
+- `npm audit`: PASS — 0 vulnerabilities.
+- `npm run lint`: PASS.
+- `npm test`: PASS — 94 passed, 0 failed.
+- Edge Function CORS tests: PASS — 8 passed.
+- Worker security tests: PASS — 10 passed.
+- `npm run build`: PASS — 1,616 modules transformed.
+- No Vercel deployment was triggered by this verification workflow.
+
+The following documentation-only commit is not the exact source-tested commit; any subsequent source changes must trigger these checks again. Vercel build-rate-limit contexts remain independent failures and are not represented as cleared.
