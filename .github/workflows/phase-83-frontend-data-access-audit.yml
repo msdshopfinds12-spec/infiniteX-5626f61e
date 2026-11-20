@@ -9,6 +9,7 @@ on:
       - "src/**"
       - "supabase/functions/ashaa-api-key-manager/**"
       - "tests/security/phase-83-frontend-data-access-contract.test.mjs"
+      - "tests/security/phase-85-workflow-run-ui-contract.test.mjs"
       - "package.json"
       - "package-lock.json"
       - "tsconfig*.json"
@@ -18,6 +19,7 @@ on:
       - "src/**"
       - "supabase/functions/ashaa-api-key-manager/**"
       - "tests/security/phase-83-frontend-data-access-contract.test.mjs"
+      - "tests/security/phase-85-workflow-run-ui-contract.test.mjs"
       - "package.json"
       - "package-lock.json"
       - "tsconfig*.json"
@@ -47,6 +49,8 @@ jobs:
         run: npm ci
       - name: Run frontend data access security contracts
         run: node --test tests/security/phase-83-frontend-data-access-contract.test.mjs
+      - name: Run Phase 85 workflow queue UI contracts
+        run: node --test tests/security/phase-85-workflow-run-ui-contract.test.mjs
       - name: Run existing security and worker regression gates
         run: |
           npm run test:worker-http-boundary
