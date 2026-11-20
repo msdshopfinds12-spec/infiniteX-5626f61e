@@ -39,10 +39,23 @@ jobs:
           node --check scripts/check-database-contract.mjs
 
       - name: Check migration naming and content integrity
+        id: migration_integrity
         run: node scripts/check-migration-integrity.mjs
 
       - name: Validate reviewed database contract snapshot
+        if: always() && steps.migration_integrity.outcome != 'skipped'
         run: node scripts/check-database-contract.mjs
+
+      - name: Summarize source readiness
+        if: always()
+        run: |
+          {
+            echo "## Database source readiness"
+            echo "- Migration integrity step: ${{ steps.migration_integrity.outcome }}"
+            echo "- Missing historical migrations must be recovered, not fabricated."
+            echo "- Missing contract snapshots must be captured from an authorized read-only catalog export."
+            echo "- A successful syntax check is not evidence of live schema parity."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   production-safety:
     name: Production safety invariant
