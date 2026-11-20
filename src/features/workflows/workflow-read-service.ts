@@ -83,7 +83,7 @@ export function createWorkflowReadService(
           .limit(limit);
 
         if (error) return { status: "error", code: "query_failed" } as const;
-        return { status: "success", data: (data ?? []) as WorkflowListItem[] } as const;
+        return { status: "success", data: data ?? [] } as const;
       } catch {
         return { status: "error", code: "network_unavailable" } as const;
       }
@@ -106,7 +106,7 @@ export function createWorkflowReadService(
           .limit(limit);
 
         if (error) return { status: "error", code: "query_failed" } as const;
-        return { status: "success", data: (data ?? []) as WorkflowRunSummary[] } as const;
+        return { status: "success", data: data ?? [] } as const;
       } catch {
         return { status: "error", code: "network_unavailable" } as const;
       }
@@ -129,7 +129,7 @@ export function createWorkflowReadService(
           .limit(limit);
 
         if (error) return { status: "error", code: "query_failed" } as const;
-        return { status: "success", data: (data ?? []) as WorkflowLogSummary[] } as const;
+        return { status: "success", data: data ?? [] } as const;
       } catch {
         return { status: "error", code: "network_unavailable" } as const;
       }
