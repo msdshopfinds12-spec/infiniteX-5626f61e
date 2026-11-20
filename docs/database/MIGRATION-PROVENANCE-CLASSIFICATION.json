@@ -22,6 +22,16 @@
       "sha256": "6e8e3dba38a27fc752744c362802c688e9496cf3c0c0fca178379450439d5e00",
       "reason": "Phase 84 candidate only. Rehearsed only in disposable PostgreSQL CI; no live migration evidence or production approval.",
       "productionApproval": "NOT_GRANTED"
+    },
+    {
+      "version": "20261121000200",
+      "name": "simula_transactional_workflow_outbox",
+      "path": "supabase/migrations/20261121000200_simula_transactional_workflow_outbox.sql",
+      "classification": "PROPOSED_NOT_APPLIED",
+      "sourceStatus": "NOT_VERIFIED_LIVE",
+      "sha256": "51f907f2be04339deb61cfb4bfe90b66ac66dc244b6b0a5361dd5c3a36d801b8",
+      "reason": "Phase 87.1 candidate only. Rehearsal and integration are limited to disposable PostgreSQL CI; no live migration evidence or production approval.",
+      "productionApproval": "NOT_GRANTED"
     }
   ]
 }
