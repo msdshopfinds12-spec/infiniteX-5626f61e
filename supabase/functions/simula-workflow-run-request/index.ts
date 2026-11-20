@@ -21,10 +21,10 @@ type Dependencies = Readonly<{
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_BODY_KEYS = new Set(["workflow_id", "request_id", "input"]);
 
-function response(req: Request, status: number, payload: JsonRecord, cors: typeof corsHeadersForRequest) {
+function response(status: number, payload: JsonRecord, corsHeaders: HeadersInit) {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { ...corsHeadersForRequest(req).headers, "Content-Type": "application/json; charset=utf-8" },
+    headers: { ...Object.fromEntries(new Headers(corsHeaders).entries()), "Content-Type": "application/json; charset=utf-8" },
   });
 }
 
@@ -79,34 +79,34 @@ export function createWorkflowRunRequestHandler(deps: Dependencies) {
     }
 
     const auth = await authenticate({ request: req, env: deps.env, createClient: deps.createClient });
-    if (!auth.ok) return response(req, auth.status, { ok: false, error: auth.error }, deps.corsHeadersForRequest);
+    if (!auth.ok) return response(auth.status, { ok: false, error: auth.error }, cors.headers);
 
     const bodyResult = await readJsonBodyLimited(req, 20 * 1024);
     if (!bodyResult.ok) {
       const status = bodyResult.reason === "payload_too_large" ? 413 : 400;
-      return response(req, status, { ok: false, error: bodyResult.reason }, deps.corsHeadersForRequest);
+      return response(status, { ok: false, error: bodyResult.reason }, cors.headers);
     }
     if (!bodyResult.value || typeof bodyResult.value !== "object" || Array.isArray(bodyResult.value)) {
-      return response(req, 400, { ok: false, error: "invalid_json_object" }, deps.corsHeadersForRequest);
+      return response(400, { ok: false, error: "invalid_json_object" }, cors.headers);
     }
 
     const body = bodyResult.value as JsonRecord;
     if (Object.keys(body).some((key) => !ALLOWED_BODY_KEYS.has(key))) {
-      return response(req, 400, { ok: false, error: "unsupported_request_field" }, deps.corsHeadersForRequest);
+      return response(400, { ok: false, error: "unsupported_request_field" }, cors.headers);
     }
     const workflowId = typeof body.workflow_id === "string" ? body.workflow_id : "";
     const requestId = typeof body.request_id === "string" ? body.request_id : "";
     const input = body.input === undefined ? {} : body.input;
     if (!UUID_PATTERN.test(workflowId) || !UUID_PATTERN.test(requestId)) {
-      return response(req, 400, { ok: false, error: "invalid_workflow_or_request_id" }, deps.corsHeadersForRequest);
+      return response(400, { ok: false, error: "invalid_workflow_or_request_id" }, cors.headers);
     }
     if (!input || typeof input !== "object" || Array.isArray(input)) {
-      return response(req, 400, { ok: false, error: "workflow_input_must_be_object" }, deps.corsHeadersForRequest);
+      return response(400, { ok: false, error: "workflow_input_must_be_object" }, cors.headers);
     }
     try {
       assertJsonByteLimit(input, 16 * 1024);
     } catch {
-      return response(req, 413, { ok: false, error: "workflow_input_too_large" }, deps.corsHeadersForRequest);
+      return response(413, { ok: false, error: "workflow_input_too_large" }, cors.headers);
     }
 
     const { data, error } = await auth.userClient.rpc("simula_enqueue_workflow_run", {
@@ -117,15 +117,15 @@ export function createWorkflowRunRequestHandler(deps: Dependencies) {
     if (error) {
       const mapped = mapRpcError(error);
       if (mapped.status === 500) console.error("workflow_enqueue_rpc_failed", error.code ?? "unknown");
-      return response(req, mapped.status, { ok: false, error: mapped.code }, deps.corsHeadersForRequest);
+      return response(mapped.status, { ok: false, error: mapped.code }, cors.headers);
     }
 
     const run = data?.[0];
     if (!run || !UUID_PATTERN.test(run.id) || typeof run.status !== "string"
       || typeof run.created_at !== "string" || typeof run.replayed !== "boolean") {
-      return response(req, 502, { ok: false, error: "invalid_enqueue_response" }, deps.corsHeadersForRequest);
+      return response(502, { ok: false, error: "invalid_enqueue_response" }, cors.headers);
     }
-    return response(req, run.replayed ? 200 : 201, {
+    return response(run.replayed ? 200 : 201, {
       ok: true,
       run: {
         id: run.id,
@@ -133,7 +133,7 @@ export function createWorkflowRunRequestHandler(deps: Dependencies) {
         created_at: run.created_at,
         replayed: run.replayed,
       },
-    }, deps.corsHeadersForRequest);
+    }, cors.headers);
   };
 }
 
