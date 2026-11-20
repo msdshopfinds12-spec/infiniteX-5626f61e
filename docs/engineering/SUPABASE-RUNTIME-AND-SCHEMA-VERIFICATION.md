@@ -155,3 +155,20 @@ A fresh read-only catalog inspection reconfirmed the exact definitions of both p
 The candidate branch has no `supabase/config.toml` and no `supabase/migrations/` directory, while the connected database reports 19 applied migrations. Consequently, the repository cannot currently recreate the live workflow schema from a clean local stack. A faithful pgTAP or concurrent integration suite must wait until the exact migration source is recovered and committed. Do not replace missing migrations with a guessed schema.
 
 See [Phase 67 — Database Concurrency Verification](PHASE-67-DATABASE-CONCURRENCY-VERIFICATION.md) for the RPC definitions, verified constraints, test acceptance criteria, and safety boundary.
+
+
+## 10. Phase 68 — migration restoration and isolated concurrency evidence
+
+The candidate branch now includes the 19 ledger-recovered SQL statements, their SHA-256 manifest, applied-versus-candidate classification, noncanonical disposable baseline fixture, replay harness, and a candidate-specific PostgreSQL 17 CI workflow.
+
+Exact candidate implementation commit `37863d751532e8293a0a4f69c9fb16d1a7b7c278` passed:
+- [Push candidate quality gates](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795384077)
+- [PR candidate quality gates](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795393670)
+- [Push PostgreSQL replay/concurrency/security](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795384056)
+- [PR PostgreSQL replay/concurrency/security](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44795393676)
+
+The disposable PostgreSQL job executes the 19 recovered statements and separately classified candidate migration in a Supabase PostgreSQL 17 container. It then runs a real multi-session row-lock contention test for `FOR UPDATE SKIP LOCKED`, verifies distinct claim generations, exercises stale lease recovery below attempt 5 and terminal failure at attempt 5, checks step-run uniqueness and stale-generation update rejection, runs the separate security behavior suite, and removes the container.
+
+**Scope precision:** the row-lock harness is real PostgreSQL session testing, not a high-volume claim stress test. It does not prove the deployed Edge Functions have been updated or that a live workflow completes end to end. No production SQL writes, migration, function deployment, secret change, cron change, merge, or release occurred.
+
+The exact candidate CI pass is code evidence for the candidate branch. It is not a substitute for full live catalog parity, deployed source reconciliation, operational monitoring, and a separately approved rollout.
