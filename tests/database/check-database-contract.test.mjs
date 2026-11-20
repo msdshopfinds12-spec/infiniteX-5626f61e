@@ -21,7 +21,7 @@ const valid={
   indexes:[{name:'profiles_pkey',definition:'CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)',unique:true,primary:true,valid:true,ready:true}],
   policies:[{name:'profiles_read',command:'SELECT',roles:['authenticated'],using:'true',check:null}],
   grants:[{grantor:'postgres',grantee:'postgres',privilege:'SELECT',grantable:true}],columnGrants:[],triggers:[]}],
- functions:[{schema:'public',name:'get_profile',owner:'postgres',language:'sql',resultType:'uuid',identityArguments:'user_id uuid',securityDefiner:false,searchPath:'',volatility:'STABLE',parallelSafety:'SAFE',strict:false,leakproof:false,executeRoles:['authenticated']}],
+ functions:[{schema:'public',name:'get_profile',kind:'FUNCTION',owner:'postgres',language:'sql',resultType:'uuid',identityArguments:'user_id uuid',securityDefiner:false,searchPath:'',volatility:'STABLE',parallelSafety:'SAFE',strict:false,leakproof:false,executeRoles:['authenticated']}],
  extensions:[{name:'pgcrypto',schema:'extensions',version:'1.3'}],
  types:[{schema_name:'public',name:'profile_state',kind:'enum',formatted_type:'profile_state',enum_labels:['active'],base_type:null,not_null:false}],
  roles:[{name:'authenticated',superuser:false,inherit:true,create_role:false,create_db:false,can_login:false,replication:false,bypass_rls:false,connection_limit:-1}],
@@ -30,6 +30,26 @@ const valid={
 test('missing snapshot blocks with exit 2',async t=>{const r=await run(t);assert.equal(r.status,2);assert.match(r.stderr,/not present/);});
 test('pending approval blocks with exit 2',async t=>{const r=await run(t,JSON.stringify({...valid,reviewStatus:'PENDING_HUMAN_REVIEW'}));assert.equal(r.status,2);assert.match(r.stderr,/awaits explicit human approval/);});
 test('complete approved v2 fixture passes',async t=>{const r=await run(t,JSON.stringify(valid));assert.equal(r.status,0,r.stderr);assert.match(r.stdout,/Database contract v2 structurally valid/);});
+test('procedure metadata with null result type passes',async t=>{
+ const value=structuredClone(valid);
+ value.functions[0]={...value.functions[0],name:'refresh_profiles',kind:'PROCEDURE',resultType:null};
+ const r=await run(t,JSON.stringify(value));
+ assert.equal(r.status,0,r.stderr);
+});
+test('procedure metadata cannot claim a function result type',async t=>{
+ const value=structuredClone(valid);
+ value.functions[0]={...value.functions[0],kind:'PROCEDURE',resultType:'uuid'};
+ const r=await run(t,JSON.stringify(value));
+ assert.equal(r.status,1);
+ assert.match(r.stderr,/resultType must be null for PROCEDURE/);
+});
+test('unknown routine kind is rejected',async t=>{
+ const value=structuredClone(valid);
+ value.functions[0].kind='AGGREGATE';
+ const r=await run(t,JSON.stringify(value));
+ assert.equal(r.status,1);
+ assert.match(r.stderr,/kind must be FUNCTION or PROCEDURE/);
+});
 test('legacy v1 snapshot blocks pending fresh capture',async t=>{const r=await run(t,JSON.stringify({...valid,schemaVersion:1}));assert.equal(r.status,2);assert.match(r.stderr,/legacy or incomplete/);});
 test('unverified project identity is rejected',async t=>{const r=await run(t,JSON.stringify({...valid,projectRef:'UNVERIFIED_MANUAL_ENTRY_REQUIRED'}));assert.equal(r.status,1);assert.match(r.stderr,/projectRef must be filled/);});
 test('missing required metadata category is rejected',async t=>{const r=await run(t,JSON.stringify({...valid,capture:{...valid.capture,metadataCategories:['tables']}}));assert.equal(r.status,1);assert.match(r.stderr,/metadataCategories missing columns/);});
