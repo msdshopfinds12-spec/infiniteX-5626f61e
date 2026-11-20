@@ -66,3 +66,21 @@ test("accepts only bounded opaque idempotency keys", () => {
   }
   assert.equal(IDEMPOTENCY_KEY_PATTERN.test("safe.key:123-abc"), true);
 });
+
+import { parseWorkflowApiRoute } from "./workflow-api-contract.mjs";
+
+test("parses collection route with or without the function gateway prefix", () => {
+  assert.deepEqual(parseWorkflowApiRoute("/runs"), { resource: "runs" });
+  assert.deepEqual(parseWorkflowApiRoute("/functions/v1/simula-workflow-api/runs"), { resource: "runs" });
+});
+
+test("parses only a single UUID run resource", () => {
+  const id = "a3b2564d-88b8-43f3-8aa7-b2370ec866f1";
+  assert.deepEqual(parseWorkflowApiRoute("/functions/v1/simula-workflow-api/runs/" + id), {
+    resource: "run", runId: id,
+  });
+  assert.equal(parseWorkflowApiRoute("/runs/not-a-uuid"), null);
+  assert.equal(parseWorkflowApiRoute("/runs/" + id + "/cancel"), null);
+  assert.equal(parseWorkflowApiRoute("/runs/" + id + "/extra"), null);
+  assert.equal(parseWorkflowApiRoute("/unrelated/runs"), null);
+});
