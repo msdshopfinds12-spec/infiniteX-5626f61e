@@ -100,3 +100,13 @@ evidence of database concurrency correctness. The configured endpoint must be a
 dedicated disposable test project, never the production Supabase project.
 Fixture provisioning, teardown automation, and proof that the endpoint is isolated
 remain release gates.
+
+
+## Destructive-test endpoint guard
+
+The Deno integration test now rejects the known production Supabase hostname
+`vepacoemkhudamfaccah.supabase.co` before creating a client or reading fixture
+rows. It also requires HTTPS for remote fixture endpoints (localhost/127.0.0.1
+are allowed for a local disposable stack). This is a defense-in-depth guard,
+not a replacement for dedicated disposable credentials, fixture isolation,
+and teardown controls.
