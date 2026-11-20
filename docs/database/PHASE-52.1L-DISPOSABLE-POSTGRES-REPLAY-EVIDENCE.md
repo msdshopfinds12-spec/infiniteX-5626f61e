@@ -42,10 +42,28 @@ This is actual disposable execution evidence, not merely static SQL validation.
    - Manifest: `9866d287017b845e869f00510c69e9a9a660cdf5`
    - Runner: `be45a53a3b2d4f30fddc6bbdcf1e4fc937822e53`
    - Workflow: `df3dd917b09f60b173d057451f911f8b3ed86813`
-3. Exact per-file SQL blob equivalence between the prior run commit and the current Phase 52.1K branch has not yet been independently established in this evidence review. Therefore do not state that the exact current branch was replayed.
+3. Exact per-file SQL blob equivalence was subsequently established for all 19 applied migration paths and the separately classified candidate migration at inspected Phase 52.1K head `4ade4ae72ca875e073f1f589277168e0ded2dbca` (20/20 identical Git blob SHAs). The prior replay therefore covers those exact SQL inputs, although no fresh workflow run was triggered on that branch head.
 4. Replay success does not prove original Git migration provenance, canonical bootstrap status, or parity with the live Supabase catalog.
 5. The reconstructed application baseline is a test fixture only. It is not a canonical historical migration and must not be promoted to production.
 6. The candidate hardening migration was tested separately in the disposable rehearsal; this is not authorization to apply it to a live database.
+
+
+## Exact source-blob equivalence — verified after initial report
+
+A read-only recursive Git tree comparison was performed between:
+- Prior successful replay commit: `80697a74e0a893b5b0d722d7d50e7261d7a7b044`
+- Current Phase 52.1K branch head at comparison time: `4ade4ae72ca875e073f1f589277168e0ded2dbca`
+
+The comparison included all 19 manifest-listed applied migration paths plus the separately classified candidate migration:
+- Compared paths: 20
+- Identical Git blob SHA values: 20
+- Missing or different paths: 0
+
+This establishes byte-identical Git blob content for all 20 SQL paths between the prior replay commit and the inspected Phase 52.1K branch head. Because the prior replay runner and manifest blobs were also previously verified identical across those commits, the earlier disposable replay is now strong source-equivalence evidence for the inspected 52.1K head.
+
+**Updated evidence assessment:** the 19 recovered migration SQL inputs and the candidate SQL input on the inspected Phase 52.1K head are identical to the inputs in the successful prior disposable PostgreSQL 17.6 replay. The prior replay therefore applies to these exact SQL blobs. This does not constitute a fresh workflow run on the 52.1K head, and the overall workflow remains red due to the separate Schema Contract V2 gate.
+
+The branch advanced later for this documentation update; the tree comparison specifically names the exact head SHA above. Any subsequent SQL-file modification requires a new comparison/replay.
 
 ## Independent workflow failure
 
