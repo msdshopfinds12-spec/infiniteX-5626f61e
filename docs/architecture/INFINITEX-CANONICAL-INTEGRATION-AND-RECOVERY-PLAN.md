@@ -504,3 +504,68 @@ The transactional fencing implementation now has meaningful isolated PostgreSQL 
 The correct next step is not to invent or apply a historical migration chain. It is to obtain a read-only schema/migration inventory from the authoritative Supabase project and reconcile it with available backups, archived branches, CI artifacts and repository history. Only after provenance is proven should a separate forward-only migration plan be prepared.
 
 Production release remains NOT READY and NOT AUTHORIZED.
+
+
+## 17. IQ Core cross-repository source and CI evidence review — 2026-11-20
+
+Repository inspected: `msdshopfinds12-spec/msdshopfinds12-spec-infiniteGX.7-IQ-Core`.
+
+### 17.1 Candidate PR inventory (read-only)
+
+| IQ Core PR | Exact head SHA | Reusable design value | Verification state |
+|---|---|---|---|
+| #155 governed workflow/events | `34f1146537bd18ab3d30c1799f8efcc7ff5aa4f5` | Sequential fail-closed orchestration, lifecycle events, observer failure capture | CI startup failures; tests NOT VERIFIED |
+| #156 backend/frontend/IQ integration | `36b835a7ac763e3319d9bad34b69ea0c21a90a89` | Server-registered workflow templates; principal/tenant derived from authenticated server context | CI startup failures; tests NOT VERIFIED |
+| #163 runtime hardening | `ad4841adb7a46aead3343021c5185786e5eb92ba` | Defensive task snapshots, explicit handler injection, event subscriber isolation | CI startup failures; tests NOT VERIFIED |
+| #164 blueprint alignment | `033e79a6722f346f93bcdf04cea401d51e95d94e` | Canonical `iq_core/` package mapping; no duplicate package tree; explicit production boundaries | CI startup failures; tests NOT VERIFIED |
+| #342 test discovery repair | `7be1760ffb6d4643115e4306cfbaa653503b4962` | Moves unittest main guard after class methods, addressing invalid test module structure | CI startup failures; Python syntax/tests NOT VERIFIED |
+| #404 runner evidence recovery | `a92fb6a3282dc13c1553bf1a539c8679a24ceadd` | Distinguishes runner/log evidence failure from source test failure | Workflow conclusions failed; individual test execution NOT VERIFIED |
+
+All six PRs were open when inspected; none is treated as merged production code. The #404 PR is a diagnostics/evidence document, not an application runtime feature.
+
+### 17.2 CI interpretation
+
+For PRs #155, #156, #163, #164 and #342, the exact-head workflow runs inspected returned `startup_failure`. This is not evidence that Python unit tests failed; the available run metadata does not establish that test steps executed.
+
+For PR #404, two exact-head Fast CI runs returned overall `failure`. The PR's own incident record reports missing job steps/log URLs and a log retrieval `BlobNotFound` response. Individual test execution and source failure remain UNKNOWN.
+
+Do not mark any of these candidate PRs as tested or green. Do not suppress or weaken required checks to force a pass.
+
+### 17.3 Architecture extraction — reuse contracts, not repository wholesale
+
+The most valuable candidate design patterns are:
+1. **Trusted workflow catalog:** browser callers submit only a registered workflow key and bounded business input. Agent names, permissions, actions, policy context and principal identity are server-owned.
+2. **Explicit capability injection:** agent descriptors do not imply a real provider, search tool, code executor or scanner. Missing handlers fail closed.
+3. **Defensive task boundaries:** copy mutable inputs/outputs and return defensive task snapshots to prevent caller mutation from corrupting engine state.
+4. **Fail-closed governance:** permission → policy → approval → registered handler remains the only execution path.
+5. **Observable but non-authoritative events:** synchronous in-process event callbacks are not a durable event log or message broker.
+6. **One canonical Python package:** keep `iq_core/`; do not add a duplicate `iq-core/` directory.
+
+### 17.4 Required InfiniteX adapter contract
+
+Do not import IQ Core Python modules directly into the React/Vite browser bundle. Treat IQ Core as a separately versioned server-side capability or port only reviewed domain contracts into the canonical TypeScript backend.
+
+Recommended boundary:
+- Frontend: submit a registered workflow ID and validated input only.
+- Authentication middleware: verify session/token and derive principal + tenant.
+- Workflow catalog: resolve immutable server-side template/version.
+- Policy layer: evaluate tenant, permission, risk, budget and approval requirements.
+- IQ adapter: invoke a pinned IQ Core release/commit behind a narrow interface.
+- Durable execution: persist run, attempt, step, idempotency key and audit events in PostgreSQL; use a durable worker/queue.
+- Tool handlers: explicit allowlisted capabilities with timeout, bounded payload, rate limit and budget.
+- Result API: expose typed status and sanitized output; never leak secrets or internal policy context.
+
+Minimum adapter contract:
+`executeWorkflow({ tenantContext, principalContext, workflowKey, workflowVersion, input, idempotencyKey, traceId }) -> { runId, status }`.
+The server constructs tenant/principal context. The client must never submit authoritative owner IDs, roles, permissions, tool names or approval decisions.
+
+### 17.5 Next gates before any IQ Core code import
+
+1. Obtain successful exact-head Python compile and focused test evidence for selected source commits.
+2. Review license, dependency lockfiles, package import graph and transitive vulnerabilities.
+3. Inspect full source for network access, subprocess/code execution, filesystem writes, dynamic imports and credential handling.
+4. Add adapter contract tests and compatibility/version pin.
+5. Prove tenant isolation and approval enforcement in the InfiniteX backend.
+6. Verify durable persistence and retry/idempotency semantics independently of the in-process IQ Core engine.
+
+**Decision:** IQ Core is a valuable reference and candidate execution component, but it is not yet an approved production dependency. Selective reuse is approved at the architecture/design level only; code import remains BLOCKED pending provenance, license, security and exact-head test evidence.
