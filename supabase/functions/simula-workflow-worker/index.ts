@@ -69,12 +69,14 @@ export type AuthenticatedWorkerDependencies = {
   env: { get(name: string): string | undefined };
   corsHeadersForRequest: typeof corsHeadersForRequest;
   executeSafeAction: typeof executeSafeAction;
+  authenticateBearerRequest?: typeof authenticateBearerRequest;
   now?: () => Date;
 };
 
 export function createAuthenticatedWorkerHandler(deps: AuthenticatedWorkerDependencies) {
   const { createClient, env, corsHeadersForRequest, executeSafeAction } = deps;
   const now = deps.now ?? (() => new Date());
+  const authenticate = deps.authenticateBearerRequest ?? authenticateBearerRequest;
   const respond = (req: Request, status: number, body: JsonRecord) =>
     new Response(JSON.stringify(body), { status, headers: corsHeadersForRequest(req).headers });
   return async (req: Request) => {
@@ -86,7 +88,7 @@ export function createAuthenticatedWorkerHandler(deps: AuthenticatedWorkerDepend
   }
   if (req.method !== "POST") return respond(req, 405, { ok: false, error: "method_not_allowed" });
 
-  const authentication = await authenticateBearerRequest({
+  const authentication = await authenticate({
     request: req,
     env,
     createClient,
