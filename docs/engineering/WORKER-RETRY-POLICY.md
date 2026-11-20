@@ -1,8 +1,16 @@
 # InfiniteX Workflow Worker Retry Policy
 
-**Status:** Implemented in the candidate branch; CI pending for the latest head  
+**Status:** Implemented in the candidate branch; implementation CI verified on commit `60883052e45aac062197b49f26982bc6e57c7f39`  
 **Scope:** Authenticated and cron workflow workers  
 **Persistence:** Existing `workflow_step_runs.attempt` remains the workflow-claim generation fence; no schema change was made
+
+## CI evidence
+
+The implementation passed the candidate push and pull-request quality gates on commit `60883052e45aac062197b49f26982bc6e57c7f39`:
+- [Push quality gates — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44792666068)
+- [Pull request quality gates — SUCCESS](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44792675408)
+
+Verified steps: exact lockfile installation, dependency audit, TypeScript lint, unit/regression tests, Edge Function/worker security tests, and production build.
 
 ## Contract
 
