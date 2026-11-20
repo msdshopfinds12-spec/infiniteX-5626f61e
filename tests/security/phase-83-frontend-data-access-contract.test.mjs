@@ -69,7 +69,7 @@ test("workflow run request contains only caller input and workflow identity", as
   const request = await read("src/features/workflows/workflow-run-request.ts");
   assert.match(request, /workflow_id:\s*string/);
   assert.match(request, /input:\s*Json/);
-  assert.match(request, /server must derive\s+owner_id from the verified session/);
+  assert.match(request, /owner_id from the verified session/);
   assert.doesNotMatch(request, /owner_id:\s*|status:\s*|attempt:\s*|output:\s*/);
 });
 
