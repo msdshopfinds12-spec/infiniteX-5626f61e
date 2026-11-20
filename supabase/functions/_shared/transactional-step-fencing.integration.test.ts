@@ -17,16 +17,9 @@ Deno.test({
     // Fail closed: missing fixture configuration must never turn a required test green.
     assert(configured, "phase_4n8b_fixture_configuration_required");
 
-    // Hard-stop if someone accidentally points the destructive fixture test at production.
-    const fixtureUrl = new URL(url!);
     assert(
-      fixtureUrl.hostname !== "vepacoemkhudamfaccah.supabase.co",
-      "phase_4n8b_refusing_production_supabase_endpoint",
-    );
-    assert(
-      fixtureUrl.protocol === "https:" || fixtureUrl.hostname === "127.0.0.1" ||
-        fixtureUrl.hostname === "localhost",
-      "phase_4n8b_fixture_endpoint_must_use_https_or_localhost",
+      isLocalSupabaseUrl(url!),
+      "phase_4n8b_mutating_fixture_requires_local_loopback_supabase",
     );
 
     const admin = createClient(url!, serviceRoleKey!, {
@@ -132,4 +125,31 @@ Deno.test({
       assertEquals(cleanupErrors, [], "fixture_cleanup_must_restore_all_mutated_state");
     }
   },
+});
+
+
+function isLocalSupabaseUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:"
+      && ["localhost", "127.0.0.1"].includes(parsed.hostname)
+      && parsed.username.length === 0
+      && parsed.password.length === 0;
+  } catch {
+    return false;
+  }
+}
+
+const configuredUrl = Deno.env.get("SUPABASE_URL") ?? "";
+if (configuredUrl && !isLocalSupabaseUrl(configuredUrl)) {
+  throw new Error("phase_4n8b_mutating_fixture_requires_local_loopback_supabase");
+}
+
+Deno.test("accepts only loopback HTTP Supabase URLs for mutating fixtures", () => {
+  assert(isLocalSupabaseUrl("http://localhost:54321"));
+  assert(isLocalSupabaseUrl("http://127.0.0.1:54321"));
+  assert(!isLocalSupabaseUrl("https://example.supabase.co"));
+  assert(!isLocalSupabaseUrl("http://example.supabase.co"));
+  assert(!isLocalSupabaseUrl("http://user:secret@localhost:54321"));
+  assert(!isLocalSupabaseUrl("file:///tmp/supabase"));
 });
