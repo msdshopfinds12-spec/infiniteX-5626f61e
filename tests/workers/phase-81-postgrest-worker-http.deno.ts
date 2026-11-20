@@ -163,7 +163,10 @@ Deno.test({
         },
         body: JSON.stringify({ limit: 1 }),
       });
-      await blockedActionStarted;
+      await Promise.race([
+        blockedActionStarted,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("phase81_inflight_action_gate_timeout")), 10000)),
+      ]);
 
       const { data: claimedRun, error: claimReadError } = await admin
         .from("workflow_runs")
@@ -263,6 +266,7 @@ Deno.test({
         p_idempotency_key: "phase87-disposable-notification-0001",
         p_payload: { recipient_ref: "synthetic-user-a", template: "test-only" },
       };
+      console.log("phase87_outbox: seeded synthetic run and step");
       const { data: firstCompletion, error: firstCompletionError } = await admin.rpc(
         "simula_complete_step_with_outbox",
         completionArgs,
@@ -286,6 +290,7 @@ Deno.test({
       });
       assert(Boolean(conflictError), "same idempotency key with different payload must be rejected");
 
+      console.log("phase87_outbox: atomic completion and idempotent replay passed");
       const claimArgs = { p_limit: 5 };
       const [claimA, claimB] = await Promise.all([
         admin.rpc("simula_claim_workflow_outbox", claimArgs),
@@ -298,6 +303,7 @@ Deno.test({
         "parallel claimers must lease the same outbox event to exactly one worker");
       const firstLease = claimedOutbox[0];
 
+      console.log("phase87_outbox: concurrent claim passed");
       const { data: failedFinish, error: failedFinishError } = await admin.rpc(
         "simula_finish_workflow_outbox",
         { p_id: outboxId, p_lock_token: firstLease.lock_token, p_succeeded: false, p_error: "synthetic_transient_failure" },
@@ -323,6 +329,7 @@ Deno.test({
       });
       assert(Boolean(staleLeaseError), "stale outbox lease token must not complete a newer delivery attempt");
 
+      console.log("phase87_outbox: retry lease and stale token fencing passed");
       const { data: successfulFinish, error: successfulFinishError } = await admin.rpc(
         "simula_finish_workflow_outbox",
         { p_id: outboxId, p_lock_token: secondLease.lock_token, p_succeeded: true, p_error: null },
