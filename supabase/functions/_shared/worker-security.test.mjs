@@ -11,6 +11,7 @@ import {
   isClaimedRunOwnedBy,
   isClaimedRunValid,
   isValidAttempt,
+  isAttemptGenerationNewer,
   isWorkflowOwnedBy,
   readJsonBodyLimited,
   validateStepTimeoutSeconds,
@@ -201,4 +202,30 @@ test("enforces one aggregate elapsed budget across attempts and backoff", async 
   }), /step_timeout_exceeded/);
   assert.equal(calls, 3);
   assert.deepEqual(delays, [30, 30, 10]);
+});
+
+test("accepts only strictly newer valid attempt generations", () => {
+  assert.equal(isAttemptGenerationNewer(1, 2), true);
+  assert.equal(isAttemptGenerationNewer(2, 2), false);
+  assert.equal(isAttemptGenerationNewer(3, 2), false);
+  for (const [stored, candidate] of [[0, 1], [-1, 2], [1, 0], [1.5, 2], [1, 2.5], ["1", 2]]) {
+    assert.equal(isAttemptGenerationNewer(stored, candidate), false);
+  }
+});
+
+test("model: stale completion cannot overwrite a newer generation", async () => {
+  const state = { attempt: 1, output: null };
+  const apply = (attempt, output) => {
+    if (!isValidAttempt(attempt)) return false;
+    if (state.attempt > attempt) return false;
+    if (state.attempt === attempt && state.output !== null) return false;
+    state.attempt = attempt;
+    state.output = output;
+    return true;
+  };
+
+  // New lease wins first; old worker returns late.
+  assert.equal(apply(2, "new-result"), true);
+  assert.equal(apply(1, "stale-result"), false);
+  assert.deepEqual(state, { attempt: 2, output: "new-result" });
 });
