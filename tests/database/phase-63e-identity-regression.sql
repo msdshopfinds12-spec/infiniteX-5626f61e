@@ -1,4 +1,4 @@
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 -- Every identity column must be rejected independently on a queued row.
 DO $identity$
