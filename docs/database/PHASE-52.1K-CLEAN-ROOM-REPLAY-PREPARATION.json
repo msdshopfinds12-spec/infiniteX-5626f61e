@@ -12,7 +12,7 @@
   "original_git_blob_equivalence": "NOT_ESTABLISHED",
   "canonical_bootstrap": "NOT_ESTABLISHED",
   "phase_52_1k": "PREPARATION_DOCUMENTED",
-  "phase_52_1l_replay": "NOT_RUN",
+  "phase_52_1l_replay": "BLOCKED_PENDING_SEMANTIC_REVIEW_AND_PINNED_PLATFORM_DEPENDENCIES",
   "database_engine_target": "PostgreSQL 17",
   "replay_scope": "19 manifest-listed ledger-recovered migration SQL files only",
   "excluded_candidate_migration": "supabase/migrations/20261120120000_harden_platform_api_key_column_access.sql",
@@ -35,5 +35,22 @@
     "machine-readable result manifest",
     "disposable environment destruction confirmation"
   ],
-  "decision": "Do not mark replay PASS or establish schema parity until an isolated PostgreSQL 17 run produces all required evidence."
+  "decision": "Do not mark replay PASS or establish schema parity until an isolated PostgreSQL 17 run produces all required evidence.",
+  "sql_dependency_triage": {
+    "scanned_files": 19,
+    "scan_type": "READ_ONLY_LEXICAL_TRIAGE_NOT_FULL_SEMANTIC_REVIEW",
+    "observed_signals": [
+      "Supabase-managed schemas and roles",
+      "GRANT statements",
+      "SECURITY DEFINER routines",
+      "RLS policies",
+      "extensions",
+      "cron/Vault references",
+      "net schema/network calls",
+      "triggers"
+    ],
+    "plain_postgres_17_sufficiency": "NOT_ESTABLISHED",
+    "recommended_rehearsal_target": "Pinned disposable Supabase-compatible PostgreSQL 17 environment, only after semantic dependency review",
+    "prohibition": "Do not fabricate security-sensitive Supabase platform behavior or use production credentials"
+  }
 }
