@@ -165,4 +165,69 @@ BEGIN
 END;
 $$;
 
+-- Cross-language canonical key vectors (JavaScript encodeURIComponent parity).
+DO $
+BEGIN
+  IF phase62.encode_uri_component('run:/%') <> 'run%3A%2F%25' THEN
+    RAISE EXCEPTION 'URI component encoding mismatch for reserved characters';
+  END IF;
+  IF phase62.encode_uri_component('step !*''()') <> 'step%20!*''()' THEN
+    RAISE EXCEPTION 'URI component encoding mismatch for encodeURIComponent safe set';
+  END IF;
+  IF phase62.encode_uri_component('café') <> 'caf%C3%A9' THEN
+    RAISE EXCEPTION 'URI component encoding mismatch for UTF-8';
+  END IF;
+END;
+$;
+
+-- A colliding retry key with a different request fingerprint must fail closed.
+INSERT INTO workflow_step_attempts(
+  id, owner_id, run_id, step_id, attempt_number, idempotency_key,
+  request_fingerprint, status, scheduled_at, finished_at, failure_kind
+) VALUES
+  ('attempt-conflict-fp-1', 'owner-a', 'run-conflict-fp', 'step-g', 1,
+   'step-attempt:v1:run-conflict-fp:step-g:1', 'fingerprint-original',
+   'failed', clock_timestamp() - interval '2 seconds', clock_timestamp(), 'transient'),
+  ('attempt-conflict-fp-2', 'owner-a', 'run-conflict-fp', 'step-g', 2,
+   'step-attempt:v1:run-conflict-fp:step-g:2', 'fingerprint-different',
+   'queued', clock_timestamp());
+DO $
+BEGIN
+  BEGIN
+    PERFORM phase62.fail_and_schedule_retry(
+      'attempt-conflict-fp-1', 'owner-a', 1, clock_timestamp(), 3,
+      'transient', 'unused-conflict-fp'
+    );
+    RAISE EXCEPTION 'expected retry_idempotency_conflict for fingerprint mismatch';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'retry_idempotency_conflict' THEN RAISE; END IF;
+  END;
+END;
+$;
+
+-- A colliding retry key bound to a different run identity must also fail closed.
+INSERT INTO workflow_step_attempts(
+  id, owner_id, run_id, step_id, attempt_number, idempotency_key,
+  request_fingerprint, status, scheduled_at, finished_at, failure_kind
+) VALUES
+  ('attempt-conflict-run-1', 'owner-a', 'run-conflict-run', 'step-h', 1,
+   'step-attempt:v1:run-conflict-run:step-h:1', 'fingerprint-h',
+   'failed', clock_timestamp() - interval '2 seconds', clock_timestamp(), 'transient'),
+  ('attempt-conflict-run-2', 'owner-a', 'different-run', 'step-h', 2,
+   'step-attempt:v1:run-conflict-run:step-h:2', 'fingerprint-h',
+   'queued', clock_timestamp());
+DO $
+BEGIN
+  BEGIN
+    PERFORM phase62.fail_and_schedule_retry(
+      'attempt-conflict-run-1', 'owner-a', 1, clock_timestamp(), 3,
+      'transient', 'unused-conflict-run'
+    );
+    RAISE EXCEPTION 'expected retry_idempotency_conflict for run mismatch';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'retry_idempotency_conflict' THEN RAISE; END IF;
+  END;
+END;
+$;
+
 SELECT 'phase-62-sql-contract-tests-passed' AS result;
