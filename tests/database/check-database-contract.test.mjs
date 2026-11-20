@@ -34,6 +34,19 @@ test('legacy v1 snapshot blocks pending fresh capture',async t=>{const r=await r
 test('unverified project identity is rejected',async t=>{const r=await run(t,JSON.stringify({...valid,projectRef:'UNVERIFIED_MANUAL_ENTRY_REQUIRED'}));assert.equal(r.status,1);assert.match(r.stderr,/projectRef must be filled/);});
 test('missing required metadata category is rejected',async t=>{const r=await run(t,JSON.stringify({...valid,capture:{...valid.capture,metadataCategories:['tables']}}));assert.equal(r.status,1);assert.match(r.stderr,/metadataCategories missing columns/);});
 test('declared scope cannot hide a missing private schema record',async t=>{const value=structuredClone(valid);value.schemas=value.schemas.filter(schema=>schema.name!=='private');const r=await run(t,JSON.stringify(value));assert.equal(r.status,1);assert.match(r.stderr,/schemas missing required captured schema: private/);});
+test('schema inventory and relation metadata cannot escape declared capture scope',async t=>{
+ const value=structuredClone(valid);
+ value.schemas.push({name:'auth',owner:'postgres',grants:[]});
+ value.tables[0].schema='auth';
+ value.functions[0].schema='auth';
+ value.types[0].schema_name='auth';
+ const r=await run(t,JSON.stringify(value));
+ assert.equal(r.status,1);
+ assert.match(r.stderr,/schemas contains record outside capture.scopeSchemas: auth/);
+ assert.match(r.stderr,/tables\[0\]\.schema is outside capture.scopeSchemas: auth/);
+ assert.match(r.stderr,/functions\[0\]\.schema is outside capture.scopeSchemas: auth/);
+ assert.match(r.stderr,/types\[0\]\.schema_name is outside capture.scopeSchemas: auth/);
+});
 test('unsafe capture flag is rejected',async t=>{const r=await run(t,JSON.stringify({...valid,capture:{...valid.capture,applicationRowsRead:true}}));assert.equal(r.status,1);assert.match(r.stderr,/applicationRowsRead must be false/);});
 test('duplicate relation identity is rejected',async t=>{const r=await run(t,JSON.stringify({...valid,tables:[...valid.tables,...valid.tables]}));assert.equal(r.status,1);assert.match(r.stderr,/Duplicate table entry/);});
 test('missing nested table metadata is rejected',async t=>{const v=structuredClone(valid);delete v.tables[0].columnGrants;const r=await run(t,JSON.stringify(v));assert.equal(r.status,1);assert.match(r.stderr,/columnGrants must be an array/);});
