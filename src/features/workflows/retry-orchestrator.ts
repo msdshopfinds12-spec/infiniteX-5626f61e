@@ -51,7 +51,7 @@ export type ScheduleRetryInput = Readonly<{
   expectedLeaseGeneration: number;
   nowMs: number;
   retryLimit: number;
-  failureKind: RetryFailureKind;
+  failureKind: Exclude<RetryFailureKind, "cancelled">;
   errorCode?: string | null;
   nextAttemptId: string;
   baseDelayMs?: number;
@@ -72,7 +72,9 @@ function sameRetryIdentity(expected: StepAttempt, actual: StepAttempt): boolean 
     actual.ownerId === expected.ownerId &&
     actual.attemptNumber === expected.attemptNumber &&
     actual.idempotencyKey === expected.idempotencyKey &&
-    actual.requestFingerprint === expected.requestFingerprint;
+    actual.requestFingerprint === expected.requestFingerprint &&
+    actual.id === expected.id &&
+    actual.scheduledAtMs === expected.scheduledAtMs;
 }
 
 function requireSafeText(value: string, name: string): void {
@@ -92,6 +94,9 @@ export async function failAndScheduleRetryAtomically(
   requireSafeText(input.attemptId, "attempt_id");
   requireSafeText(input.ownerId, "owner_id");
   requireSafeText(input.nextAttemptId, "next_attempt_id");
+  if ((input.failureKind as RetryFailureKind) === "cancelled") {
+    throw new Error("cancellation_requires_cancel_operation");
+  }
 
   return store.transaction(async (tx) => {
     const current = await tx.lockAttempt({ attemptId: input.attemptId, ownerId: input.ownerId });
