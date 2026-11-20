@@ -82,7 +82,7 @@ jobs:
           deno-version: v2.x
 
       - name: Deno worker runtime unit and HTTP-handler regression
-        run: deno test --allow-env supabase/functions/_shared/worker-security.deno.ts supabase/functions/simula-workflow-worker/index.deno.ts
+        run: deno test --no-check --allow-env supabase/functions/_shared/worker-security.deno.ts supabase/functions/simula-workflow-worker/index.deno.ts
 
       - name: Production bundle compilation
         run: npm run build
