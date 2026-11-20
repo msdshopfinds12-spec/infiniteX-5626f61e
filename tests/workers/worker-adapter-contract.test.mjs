@@ -99,7 +99,8 @@ test("both adapters fence step and workflow terminal writes by owner and attempt
     ["cron", cronWorker],
   ]) {
     assert.match(source, /\.lt\("attempt", stepAttempt\)/, `${name} adapter must use monotonic step-run CAS`);
-    assert.match(source, /\.eq\("attempt", stepAttempt\)/, `${name} adapter must fence terminal step writes`);
+    assert.match(source, /simula_complete_step_with_outbox/, name + " adapter must use transactional step completion");
+    assert.match(source, /p_attempt:\s*stepAttempt/, name + " adapter must pass the claimed step generation to the RPC");
     assert.match(source, /\.eq\("attempt", run\.attempt\)/, `${name} adapter must fence terminal workflow writes`);
     assert.match(source, /\.eq\("owner_id", ownerId\)/, `${name} adapter must scope writes to owner`);
     assert.match(source, /attempt_generation_changed/);
@@ -111,7 +112,7 @@ test("both adapters treat a lost terminal compare-and-set as superseded, not suc
     ["authenticated", authenticatedWorker],
     ["cron", cronWorker],
   ]) {
-    assert.match(source, /if \(!finishedStep\) throw new Error\("workflow_step_attempt_superseded"\)/);
+    assert.match(source, /if \(!completion\?\.step_run_id\) throw new Error\("workflow_step_attempt_superseded"\)/);
     assert.match(source, /if \(!finishedRun\) throw new Error\("workflow_run_attempt_superseded"\)/);
     assert.ok(source.includes("superseded"), `${name} adapter must report superseded work`);
   }

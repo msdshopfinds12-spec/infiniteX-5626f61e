@@ -214,6 +214,7 @@ class StatefulDatabase {
   tables: Record<string, DbRow[]>;
   failures: Record<string, { code?: string; message: string }> = {};
   private sequence = 0;
+  completionCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
   claimedRun: DbRow;
   constructor() {
     this.claimedRun = {
@@ -240,10 +241,26 @@ class StatefulDatabase {
           error: key === "publishable" ? null : new Error("wrong key"),
         }),
       },
-      rpc: async (name: string) => {
+      rpc: async (name: string, args: Record<string, unknown> = {}) => {
         if (name === "simula_verify_worker_secret") return { data: true, error: null };
         if (name === "simula_claim_workflow_runs" || name === "simula_claim_workflow_runs_internal") {
           return { data: [this.claimedRun], error: null };
+        }
+        if (name === "simula_complete_step_with_outbox") {
+          this.completionCalls.push({ name, args });
+          const injected = this.failures["rpc:" + name];
+          if (injected) { delete this.failures["rpc:" + name]; return { data: null, error: injected }; }
+          const row = this.tables.workflow_step_runs.find(step => step.run_id === args.p_run_id &&
+            step.step_id === args.p_step_id && step.owner_id === args.p_owner_id &&
+            step.attempt === args.p_attempt && step.status === "running");
+          const run = this.tables.workflow_runs.find(item => item.id === args.p_run_id &&
+            item.owner_id === args.p_owner_id && item.attempt === args.p_attempt && item.status === "running");
+          if (!row || !run || !args.p_output || typeof args.p_output !== "object") {
+            return { data: null, error: { code: "40001", message: "workflow_step_generation_superseded" } };
+          }
+          row.status = "succeeded"; row.output = args.p_output; row.error_message = null;
+          row.finished_at = "2026-01-02T03:04:05.000Z";
+          return { data: [{ step_run_id: row.id, outbox_id: null, replayed: false }], error: null };
         }
         return { data: null, error: { message: "unexpected rpc: " + name } };
       },
@@ -281,6 +298,7 @@ Deno.test("authenticated worker executes and persists a two-step workflow using 
   assert(db.tables.workflow_step_runs.length === 2, "expected both step-run rows to persist");
   assert(db.tables.workflow_step_runs.every(row => row.status === "succeeded" && row.attempt === 1), "expected both step runs to succeed at attempt 1");
   assert(db.tables.workflow_runs[0].status === "succeeded", "expected workflow run to persist succeeded state");
+  assert(db.completionCalls.length === 2, "authenticated worker must complete every step through the transactional RPC");
   assert(db.tables.workflow_runs[0].output.transform === "-two", "expected second step output to become final output");
   assert(db.tables.workflow_logs.length === 3, "expected two step logs and one workflow log");
 });
@@ -303,9 +321,26 @@ Deno.test("cron worker executes the same workflow using verified privileged clai
   assert(body.claimed === 1 && body.succeeded === 1 && body.failed === 0, "expected one successful cron workflow");
   assert(db.tables.workflow_step_runs.length === 2, "expected cron step-run rows to persist");
   assert(db.tables.workflow_runs[0].status === "succeeded", "expected cron workflow run to persist succeeded state");
+  assert(db.completionCalls.length === 2, "cron worker must complete every step through the transactional RPC");
   assert(db.tables.workflow_logs.length === 3, "expected cron step and workflow logs");
 });
 
+
+Deno.test("authenticated worker fails closed when transactional completion RPC fails", async () => {
+  const db = new StatefulDatabase();
+  db.failures["rpc:simula_complete_step_with_outbox"] = { code: "XX000", message: "synthetic RPC failure" };
+  const handler = createAuthenticatedWorkerHandler({ createClient: statefulCreateClient(db), env: configuredEnv,
+    corsHeadersForRequest: cors, executeSafeAction: transformAction as never, now: deterministicNow });
+  const response = await handler(new Request("https://worker.test", { method: "POST",
+    headers: { Authorization: "Bearer valid-token" }, body: JSON.stringify({ limit: 1 }) }));
+  const body = await response.json();
+  assert(response.status === 200 && body.failed === 1 && body.succeeded === 0,
+    "RPC failure must fail the workflow rather than report success");
+  assert(db.completionCalls.length === 1, "completion RPC must be attempted exactly once before failure");
+  assert(db.tables.workflow_step_runs[0].status === "running",
+    "worker must not bypass failed RPC with a direct succeeded update");
+  assert(db.tables.workflow_runs[0].status === "failed", "failed atomic completion must not mark the workflow succeeded");
+});
 
 Deno.test("authenticated worker fences a stale claimed attempt from newer persisted step state", async () => {
   const db = new StatefulDatabase();
@@ -478,4 +513,37 @@ Deno.test("cron worker cannot commit a step after a newer generation takes over 
   assert(db.tables.workflow_step_runs[0].attempt === 2 && db.tables.workflow_step_runs[0].status === "running",
     "newer cron step generation must not be overwritten by stale completion");
   assert(db.tables.workflow_logs.length === 0, "stale cron generation must not write success logs");
+});
+
+
+Deno.test("cron worker fails closed when transactional completion RPC fails", async () => {
+  const db = new StatefulDatabase();
+  db.failures["rpc:simula_complete_step_with_outbox"] = {
+    code: "XX000",
+    message: "synthetic RPC failure",
+  };
+  const handler = createCronWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    executeSafeAction: transformAction as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST",
+    headers: { "x-simula-worker-secret": "s".repeat(40) },
+    body: JSON.stringify({ limit: 1 }),
+  }));
+  const body = await response.json();
+
+  assert(response.status === 200, "cron reports per-run failure in its batch summary");
+  assert(body.claimed === 1 && body.failed === 1 && body.succeeded === 0,
+    "cron RPC failure must never be counted as workflow success");
+  assert(db.completionCalls.length === 1,
+    "cron must attempt transactional completion exactly once");
+  assert(db.tables.workflow_step_runs.length === 1,
+    "the first step-run record must remain available for failure-state inspection");
+  assert(db.tables.workflow_step_runs[0].status === "running",
+    "failed completion RPC must not be bypassed with a direct succeeded update");
+  assert(db.tables.workflow_runs[0].status === "failed",
+    "cron must fail the workflow rather than mark it succeeded");
 });
