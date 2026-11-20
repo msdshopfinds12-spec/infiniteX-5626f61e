@@ -43,6 +43,7 @@ jobs:
           node --check tests/database/check-migration-integrity.test.mjs
           node --check tests/database/platform-api-key-column-grants.test.mjs
           node --check tests/database/migration-provenance.test.mjs
+          node --check tests/database/phase-52-1b-postgres-security.test.mjs
       - name: Verify applied versus candidate migration provenance
         run: node scripts/verify-migration-provenance.mjs
       - name: Run migration provenance regression tests
@@ -59,6 +60,8 @@ jobs:
         run: node --test tests/database/check-database-contract.test.mjs
       - name: Run API-key column privilege regression tests
         run: node --test tests/database/platform-api-key-column-grants.test.mjs
+      - name: Run Phase 52.1B PostgreSQL harness guard tests
+        run: node --test tests/database/phase-52-1b-postgres-security.test.mjs
       - name: Run migration integrity regression tests
         run: node --test tests/database/check-migration-integrity.test.mjs
       - name: Check migration naming and content integrity
@@ -174,3 +177,35 @@ jobs:
           SQL
           psql -X -v ON_ERROR_STOP=1 -qAt -f supabase/contracts/capture-database-contract.readonly.sql > /tmp/database-contract-snapshot.json
           node --input-type=module -e "import fs from 'node:fs'; const s=JSON.parse(fs.readFileSync('/tmp/database-contract-snapshot.json','utf8')); const t=s.tables.find(x=>x.schema==='public'&&x.name==='contract_probe'); if(s.schemaVersion!==2 || s.reviewStatus!=='PENDING_HUMAN_REVIEW' || !Array.isArray(s.tables) || !Array.isArray(s.schemas) || !t?.grants.some(x=>x.grantor==='postgres'&&x.grantee==='infinitex_contract_reader'&&x.privilege==='SELECT') || !t?.columnGrants.some(x=>x.grantor==='postgres'&&x.grantee==='infinitex_contract_reader'&&x.column==='private_note') || !s.schemas.find(x=>x.name==='private') ) process.exit(1); console.log('PostgreSQL 17 catalog query passed: relation, column, and schema ACL metadata captured; human review remains pending.');"
+
+
+  postgresql-security-behavior:
+    name: PostgreSQL 17 disposable security behavior tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: infinitex_security_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d infinitex_security_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Execute actual migration security behavior suite on disposable PostgreSQL
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_security_test
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-52-1b-postgres-security.sql
