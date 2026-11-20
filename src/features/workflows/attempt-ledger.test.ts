@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   cancelStepAttempt,
+  canonicalStepAttemptIdempotencyKey,
   claimStepAttempt,
   createQueuedStepAttempt,
   finishStepAttempt,
@@ -93,9 +94,9 @@ test("stale generation and expired lease cannot heartbeat or complete", () => {
   );
 });
 
-test("successful completion is terminal and preserves validated output reference", () => {
+test("successful completion stores a detached deeply immutable JSON snapshot", () => {
   const active = claimed();
-  const output = { result: "synthetic" };
+  const output = { result: "synthetic", nested: { values: [1, 2] } };
   const done = finishStepAttempt(active, {
     nowMs: 1_100,
     expectedLeaseGeneration: 1,
@@ -105,7 +106,13 @@ test("successful completion is terminal and preserves validated output reference
   assert.equal(done.status, "succeeded");
   assert.equal(done.finishedAtMs, 1_100);
   assert.equal(done.leaseExpiresAtMs, null);
-  assert.equal(done.output, output);
+  assert.notEqual(done.output, output);
+  assert.deepEqual(done.output, output);
+  assert.equal(Object.isFrozen(done.output), true);
+  assert.equal(Object.isFrozen((done.output as { nested: object }).nested), true);
+  assert.equal(Object.isFrozen((done.output as { nested: { values: unknown[] } }).nested.values), true);
+  output.nested.values.push(3);
+  assert.deepEqual(done.output, { result: "synthetic", nested: { values: [1, 2] } });
   assert.throws(
     () => finishStepAttempt(done, { nowMs: 1_200, expectedLeaseGeneration: 1, outcome: "succeeded" }),
     /terminal_attempt_immutable/,
@@ -156,7 +163,7 @@ test("retry creates a new queued attempt and never reopens the failed attempt", 
     assert.equal(plan.nextAttempt.attemptNumber, 2);
     assert.equal(plan.nextAttempt.leaseGeneration, 1);
     assert.equal(plan.nextAttempt.scheduledAtMs, 3_000);
-    assert.equal(plan.nextAttempt.idempotencyKey, "run-1:step-1:attempt:1:attempt:2");
+    assert.equal(plan.nextAttempt.idempotencyKey, "step-attempt:v1:run-1:step-1:2");
   }
 });
 
@@ -212,5 +219,113 @@ test("lease expiry arithmetic rejects unsafe integer overflow", () => {
       nextLeaseGeneration: 1,
     }),
     /lease_expiry_overflow/,
+  );
+});
+
+
+test("canonical retry idempotency keys are stable, versioned, and unambiguous", () => {
+  const first = canonicalStepAttemptIdempotencyKey("run:a", "step/b", 2);
+  const same = canonicalStepAttemptIdempotencyKey("run:a", "step/b", 2);
+  const differentAttempt = canonicalStepAttemptIdempotencyKey("run:a", "step/b", 3);
+  assert.equal(first, same);
+  assert.notEqual(first, differentAttempt);
+  assert.match(first, /^step-attempt:v1:/);
+});
+
+test("heartbeat and completion timestamps cannot move backwards", () => {
+  const active = claimed();
+  assert.throws(
+    () => heartbeatStepAttempt(active, {
+      nowMs: 999, expectedLeaseGeneration: 1, leaseDurationMs: 500,
+    }),
+    /timestamp_regression/,
+  );
+  const laterHeartbeat = heartbeatStepAttempt(active, {
+    nowMs: 1_200, expectedLeaseGeneration: 1, leaseDurationMs: 500,
+  });
+  assert.throws(
+    () => finishStepAttempt(laterHeartbeat, {
+      nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "succeeded",
+    }),
+    /timestamp_regression/,
+  );
+});
+
+test("cancellation timestamp cannot precede the attempt lifecycle", () => {
+  assert.throws(
+    () => cancelStepAttempt(queued(), { nowMs: 999, expectedLeaseGeneration: 0 }),
+    /timestamp_regression/,
+  );
+  assert.throws(
+    () => cancelStepAttempt(claimed(), { nowMs: 999, expectedLeaseGeneration: 1 }),
+    /timestamp_regression/,
+  );
+});
+
+test("malformed, executable, cyclic, and exotic output values fail closed", () => {
+  const active = claimed();
+  const invalidOutputs: unknown[] = [
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    BigInt(1),
+    () => "not-json",
+    new Date(0),
+  ];
+  for (const output of invalidOutputs) {
+    assert.throws(
+      () => finishStepAttempt(active, {
+        nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "succeeded", output,
+      }),
+      StepAttemptDomainError,
+    );
+  }
+
+  const cyclic: { self?: unknown } = {};
+  cyclic.self = cyclic;
+  assert.throws(
+    () => finishStepAttempt(active, {
+      nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "succeeded", output: cyclic,
+    }),
+    /output_cycle_detected/,
+  );
+
+  const accessor = Object.defineProperty({}, "secret", {
+    enumerable: true,
+    get() { throw new Error("getter must not execute"); },
+  });
+  assert.throws(
+    () => finishStepAttempt(active, {
+      nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "succeeded", output: accessor,
+    }),
+    /output_accessor_invalid/,
+  );
+});
+
+test("oversized, deeply nested, and sparse output payloads are rejected", () => {
+  const active = claimed();
+  assert.throws(
+    () => finishStepAttempt(active, {
+      nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "succeeded",
+      output: "x".repeat(65 * 1024),
+    }),
+    /output_size_limit_exceeded/,
+  );
+
+  let deeplyNested: unknown = "leaf";
+  for (let index = 0; index < 22; index += 1) deeplyNested = { child: deeplyNested };
+  assert.throws(
+    () => finishStepAttempt(active, {
+      nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "succeeded", output: deeplyNested,
+    }),
+    /output_depth_limit_exceeded/,
+  );
+
+  const sparse = new Array(2);
+  sparse[1] = "value";
+  assert.throws(
+    () => finishStepAttempt(active, {
+      nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "succeeded", output: sparse,
+    }),
+    /output_sparse_array_invalid/,
   );
 });
