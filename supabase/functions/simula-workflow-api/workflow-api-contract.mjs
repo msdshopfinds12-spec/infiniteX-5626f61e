@@ -35,6 +35,12 @@ function inspectJson(value, depth, budget) {
   return null;
 }
 
+export function parseBearerToken(value) {
+  if (typeof value !== "string") return null;
+  const match = value.match(/^Bearer\\s+([^\\s]+)$/i);
+  return match?.[1] ?? null;
+}
+
 export function validateIdempotencyKey(value) {
   return typeof value === "string" && IDEMPOTENCY_KEY_PATTERN.test(value);
 }
