@@ -87,15 +87,21 @@ function cloneAndFreezeJson(value: unknown, ancestors: WeakSet<object>): Json {
  */
 export function createWorkflowRunRequest(
   workflowId: string,
-  input: Json = {},
+  input?: Json,
 ): WorkflowRunRequest {
   const normalizedWorkflowId = workflowId.trim();
   if (!normalizedWorkflowId) {
     throw new TypeError("A workflow ID is required.");
   }
 
+  if (arguments.length > 1 && input === undefined) {
+    throw new TypeError("Workflow input must contain JSON-compatible values only.");
+  }
+
+  const normalizedInput = input === undefined ? {} : input;
+
   return Object.freeze({
     workflow_id: normalizedWorkflowId,
-    input: cloneAndFreezeJson(input, new WeakSet<object>()),
+    input: cloneAndFreezeJson(normalizedInput, new WeakSet<object>()),
   });
 }
