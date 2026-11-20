@@ -135,5 +135,5 @@ test("workflow run history normalizes database errors and validates its limit", 
 test("workflow read service does not accept a caller-supplied owner identity", () => {
   const { client } = createClient({ data: [], error: null });
   const service = createWorkflowReadService(client);
-  assert.deepEqual(Object.keys(service), ["listOwnWorkflows"]);
+  assert.deepEqual(Object.keys(service).sort(), ["listOwnWorkflows", "listWorkflowRuns"].sort());
 });
