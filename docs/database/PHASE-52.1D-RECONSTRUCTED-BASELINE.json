@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "classification": "RECONSTRUCTED_DISPOSABLE_FIXTURE",
+  "canonical": false,
+  "productionApproval": "NOT_GRANTED",
+  "liveParity": "NOT_VERIFIED",
+  "purpose": "Supply the five missing workflow-domain tables to the disposable Phase 52.1C migration rehearsal only.",
+  "sourceArtifact": {
+    "path": "docs/database/live-schema-metadata.snapshot.json",
+    "gitBlobSha": "f67a81de26ebf2ba9b3de0340663379bd550af82",
+    "capturedAt": "2026-11-20T02:07:20.142926+00:00",
+    "postgresVersion": "17.11",
+    "captureSource": "Read-only PostgreSQL catalog metadata; public schema only",
+    "captureDisclaimer": "Metadata inventory only; not a pg_dump, bootstrap schema, replayable migration chain, or approval for production use."
+  },
+  "reconstructedObjects": [
+    "public.workflows",
+    "public.workflow_steps",
+    "public.workflow_runs",
+    "public.workflow_step_runs",
+    "public.workflow_logs"
+  ],
+  "knownLaterMigrationObjectsOmitted": [
+    {
+      "object": "public.workflow_runs.scheduled_for",
+      "introducedBy": "20261025201001_simula_workflow_cron_scheduler.sql"
+    },
+    {
+      "object": "public.workflow_runs_workflow_scheduled_for_uidx",
+      "introducedBy": "20261025201001_simula_workflow_cron_scheduler.sql"
+    },
+    {
+      "object": "public.workflow_logs_run_id_idx",
+      "introducedBy": "20261025202536_simula_worker_foundation_indexes_and_pg_net.sql"
+    },
+    {
+      "object": "public.workflow_logs_workflow_id_idx",
+      "introducedBy": "20261025202536_simula_worker_foundation_indexes_and_pg_net.sql"
+    },
+    {
+      "object": "public.workflow_step_runs_owner_id_idx",
+      "introducedBy": "20261025202536_simula_worker_foundation_indexes_and_pg_net.sql"
+    },
+    {
+      "object": "public.workflow_step_runs_step_id_idx",
+      "introducedBy": "20261025202536_simula_worker_foundation_indexes_and_pg_net.sql"
+    }
+  ],
+  "limitations": [
+    "This fixture is reconstructed from post-migration metadata and known migration deltas, not recovered original CREATE TABLE SQL.",
+    "The metadata capture is not canonical and does not establish complete schema parity.",
+    "Objects not represented by the metadata snapshot, including possible triggers, grants, defaults, comments, and extension-owned dependencies, must be independently reviewed.",
+    "The fixture must never be applied to the hosted Supabase project or promoted to an applied migration."
+  ]
+}
