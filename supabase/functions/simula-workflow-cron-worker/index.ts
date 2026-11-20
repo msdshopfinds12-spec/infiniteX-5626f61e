@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
     if (authentication.status === 500) console.error("worker_environment_incomplete");
     return reply(authentication.status, { ok: false, error: authentication.error });
   }
-  const { admin, supabaseUrl, serviceRoleKey } = authentication;
+  const { admin } = authentication;
 
   const bodyResult = await readJsonBodyLimited(req, 2048);
   if (!bodyResult.ok) {
