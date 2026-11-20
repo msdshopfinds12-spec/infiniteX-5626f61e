@@ -1,0 +1,1891 @@
+{
+  "tables": [
+    {
+      "name": "billing_webhook_events",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "provider_event_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "processing_status",
+          "type": "text",
+          "default": "'received'::text",
+          "not_null": true
+        },
+        {
+          "name": "retry_count",
+          "type": "integer",
+          "default": "0",
+          "not_null": true
+        },
+        {
+          "name": "last_error",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        },
+        {
+          "name": "processed_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "billing_webhook_events_pkey",
+          "definition": "CREATE UNIQUE INDEX billing_webhook_events_pkey ON public.billing_webhook_events USING btree (id)"
+        },
+        {
+          "name": "billing_webhook_events_provider_event_unique",
+          "definition": "CREATE UNIQUE INDEX billing_webhook_events_provider_event_unique ON public.billing_webhook_events USING btree (provider, provider_event_id)"
+        },
+        {
+          "name": "billing_webhook_events_status_received_idx",
+          "definition": "CREATE INDEX billing_webhook_events_status_received_idx ON public.billing_webhook_events USING btree (processing_status, received_at)"
+        }
+      ],
+      "policies": null,
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "billing_webhook_events_event_type_check",
+          "type": "c",
+          "definition": "CHECK (char_length(event_type) >= 1 AND char_length(event_type) <= 160)"
+        },
+        {
+          "name": "billing_webhook_events_last_error_check",
+          "type": "c",
+          "definition": "CHECK (last_error IS NULL OR char_length(last_error) <= 2000)"
+        },
+        {
+          "name": "billing_webhook_events_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "billing_webhook_events_processing_status_check",
+          "type": "c",
+          "definition": "CHECK (processing_status = ANY (ARRAY['received'::text, 'processing'::text, 'processed'::text, 'failed'::text, 'ignored'::text]))"
+        },
+        {
+          "name": "billing_webhook_events_provider_check",
+          "type": "c",
+          "definition": "CHECK (char_length(provider) >= 1 AND char_length(provider) <= 40)"
+        },
+        {
+          "name": "billing_webhook_events_provider_event_id_check",
+          "type": "c",
+          "definition": "CHECK (char_length(provider_event_id) >= 1 AND char_length(provider_event_id) <= 255)"
+        },
+        {
+          "name": "billing_webhook_events_provider_event_unique",
+          "type": "u",
+          "definition": "UNIQUE (provider, provider_event_id)"
+        },
+        {
+          "name": "billing_webhook_events_retry_count_check",
+          "type": "c",
+          "definition": "CHECK (retry_count >= 0 AND retry_count <= 100)"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "credit_ledger",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "delta",
+          "type": "integer",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "reference_type",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "reference_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "idempotency_key",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "credit_ledger_owner_created_idx",
+          "definition": "CREATE INDEX credit_ledger_owner_created_idx ON public.credit_ledger USING btree (owner_id, created_at DESC)"
+        },
+        {
+          "name": "credit_ledger_owner_idempotency_unique",
+          "definition": "CREATE UNIQUE INDEX credit_ledger_owner_idempotency_unique ON public.credit_ledger USING btree (owner_id, idempotency_key)"
+        },
+        {
+          "name": "credit_ledger_pkey",
+          "definition": "CREATE UNIQUE INDEX credit_ledger_pkey ON public.credit_ledger USING btree (id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "credit_ledger_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = owner_id)",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "credit_ledger_delta_check",
+          "type": "c",
+          "definition": "CHECK (delta <> 0)"
+        },
+        {
+          "name": "credit_ledger_idempotency_key_check",
+          "type": "c",
+          "definition": "CHECK (char_length(idempotency_key) >= 1 AND char_length(idempotency_key) <= 255)"
+        },
+        {
+          "name": "credit_ledger_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "credit_ledger_owner_idempotency_unique",
+          "type": "u",
+          "definition": "UNIQUE (owner_id, idempotency_key)"
+        },
+        {
+          "name": "credit_ledger_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "credit_ledger_reason_check",
+          "type": "c",
+          "definition": "CHECK (char_length(reason) >= 1 AND char_length(reason) <= 80)"
+        },
+        {
+          "name": "credit_ledger_reference_id_check",
+          "type": "c",
+          "definition": "CHECK (reference_id IS NULL OR char_length(reference_id) <= 255)"
+        },
+        {
+          "name": "credit_ledger_reference_type_check",
+          "type": "c",
+          "definition": "CHECK (reference_type IS NULL OR char_length(reference_type) <= 80)"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "payments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "subscription_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "provider_payment_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "amount_minor",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'pending'::text",
+          "not_null": true
+        },
+        {
+          "name": "paid_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "payments_pkey",
+          "definition": "CREATE UNIQUE INDEX payments_pkey ON public.payments USING btree (id)"
+        },
+        {
+          "name": "payments_provider_payment_id_key",
+          "definition": "CREATE UNIQUE INDEX payments_provider_payment_id_key ON public.payments USING btree (provider_payment_id)"
+        },
+        {
+          "name": "payments_subscription_id_fkey_idx",
+          "definition": "CREATE INDEX payments_subscription_id_fkey_idx ON public.payments USING btree (subscription_id)"
+        },
+        {
+          "name": "payments_user_id_fkey_idx",
+          "definition": "CREATE INDEX payments_user_id_fkey_idx ON public.payments USING btree (user_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "payments_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "payments_amount_minor_check",
+          "type": "c",
+          "definition": "CHECK (amount_minor >= 0)"
+        },
+        {
+          "name": "payments_currency_check",
+          "type": "c",
+          "definition": "CHECK (currency ~ '^[A-Z]{3}$'::text)"
+        },
+        {
+          "name": "payments_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "payments_provider_payment_id_key",
+          "type": "u",
+          "definition": "UNIQUE (provider_payment_id)"
+        },
+        {
+          "name": "payments_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'refunded'::text, 'canceled'::text]))"
+        },
+        {
+          "name": "payments_subscription_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "payments_user_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "platform_api_keys",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "key_prefix",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "key_hash",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "scopes",
+          "type": "text[]",
+          "default": "ARRAY['api:read'::text]",
+          "not_null": true
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "platform_api_keys_key_hash_key",
+          "definition": "CREATE UNIQUE INDEX platform_api_keys_key_hash_key ON public.platform_api_keys USING btree (key_hash)"
+        },
+        {
+          "name": "platform_api_keys_owner_created_idx",
+          "definition": "CREATE INDEX platform_api_keys_owner_created_idx ON public.platform_api_keys USING btree (owner_id, created_at DESC)"
+        },
+        {
+          "name": "platform_api_keys_pkey",
+          "definition": "CREATE UNIQUE INDEX platform_api_keys_pkey ON public.platform_api_keys USING btree (id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "platform_api_keys_revoke_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = owner_id)",
+          "command": "w",
+          "with_check": "(( SELECT auth.uid() AS uid) = owner_id)"
+        },
+        {
+          "name": "platform_api_keys_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = owner_id)",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "platform_api_keys_key_hash_check",
+          "type": "c",
+          "definition": "CHECK (char_length(key_hash) = 64)"
+        },
+        {
+          "name": "platform_api_keys_key_hash_key",
+          "type": "u",
+          "definition": "UNIQUE (key_hash)"
+        },
+        {
+          "name": "platform_api_keys_key_prefix_check",
+          "type": "c",
+          "definition": "CHECK (char_length(key_prefix) >= 4 AND char_length(key_prefix) <= 24)"
+        },
+        {
+          "name": "platform_api_keys_label_check",
+          "type": "c",
+          "definition": "CHECK (char_length(label) >= 1 AND char_length(label) <= 100)"
+        },
+        {
+          "name": "platform_api_keys_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "platform_api_keys_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "platform_api_keys_scopes_nonempty",
+          "type": "c",
+          "definition": "CHECK (cardinality(scopes) > 0)"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "profiles",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "avatar_url",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "default": "'user'::text",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "profiles_pkey",
+          "definition": "CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "profiles_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = id)",
+          "command": "r",
+          "with_check": null
+        },
+        {
+          "name": "profiles_update_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = id)",
+          "command": "w",
+          "with_check": "(( SELECT auth.uid() AS uid) = id)"
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "profiles_avatar_url_check",
+          "type": "c",
+          "definition": "CHECK (avatar_url IS NULL OR char_length(avatar_url) <= 2048)"
+        },
+        {
+          "name": "profiles_display_name_check",
+          "type": "c",
+          "definition": "CHECK (display_name IS NULL OR char_length(display_name) <= 100)"
+        },
+        {
+          "name": "profiles_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "profiles_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "profiles_role_check",
+          "type": "c",
+          "definition": "CHECK (role = ANY (ARRAY['user'::text, 'admin'::text]))"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "subscriptions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "plan_code",
+          "type": "text",
+          "default": "'free'::text",
+          "not_null": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'active'::text",
+          "not_null": true
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "provider_customer_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "provider_subscription_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "current_period_start",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "current_period_end",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "cancel_at_period_end",
+          "type": "boolean",
+          "default": "false",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "subscriptions_pkey",
+          "definition": "CREATE UNIQUE INDEX subscriptions_pkey ON public.subscriptions USING btree (id)"
+        },
+        {
+          "name": "subscriptions_provider_subscription_id_key",
+          "definition": "CREATE UNIQUE INDEX subscriptions_provider_subscription_id_key ON public.subscriptions USING btree (provider_subscription_id)"
+        },
+        {
+          "name": "subscriptions_user_id_fkey_idx",
+          "definition": "CREATE INDEX subscriptions_user_id_fkey_idx ON public.subscriptions USING btree (user_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "subscriptions_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "subscriptions_check",
+          "type": "c",
+          "definition": "CHECK (current_period_end IS NULL OR current_period_start IS NULL OR current_period_end >= current_period_start)"
+        },
+        {
+          "name": "subscriptions_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "subscriptions_plan_code_check",
+          "type": "c",
+          "definition": "CHECK (plan_code = ANY (ARRAY['free'::text, 'pro'::text, 'business'::text]))"
+        },
+        {
+          "name": "subscriptions_provider_subscription_id_key",
+          "type": "u",
+          "definition": "UNIQUE (provider_subscription_id)"
+        },
+        {
+          "name": "subscriptions_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['trialing'::text, 'active'::text, 'past_due'::text, 'canceled'::text, 'expired'::text]))"
+        },
+        {
+          "name": "subscriptions_user_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "tools",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "default": "''::text",
+          "not_null": true
+        },
+        {
+          "name": "is_active",
+          "type": "boolean",
+          "default": "false",
+          "not_null": true
+        },
+        {
+          "name": "public_config",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "tools_pkey",
+          "definition": "CREATE UNIQUE INDEX tools_pkey ON public.tools USING btree (id)"
+        },
+        {
+          "name": "tools_slug_key",
+          "definition": "CREATE UNIQUE INDEX tools_slug_key ON public.tools USING btree (slug)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "tools_select_active",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "is_active",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "tools_name_check",
+          "type": "c",
+          "definition": "CHECK (char_length(name) >= 1 AND char_length(name) <= 120)"
+        },
+        {
+          "name": "tools_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "tools_public_config_check",
+          "type": "c",
+          "definition": "CHECK (jsonb_typeof(public_config) = 'object'::text)"
+        },
+        {
+          "name": "tools_slug_check",
+          "type": "c",
+          "definition": "CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text)"
+        },
+        {
+          "name": "tools_slug_key",
+          "type": "u",
+          "definition": "UNIQUE (slug)"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "usage_logs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "tool_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "units",
+          "type": "integer",
+          "default": "1",
+          "not_null": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'success'::text",
+          "not_null": true
+        },
+        {
+          "name": "request_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "usage_logs_pkey",
+          "definition": "CREATE UNIQUE INDEX usage_logs_pkey ON public.usage_logs USING btree (id)"
+        },
+        {
+          "name": "usage_logs_tool_id_fkey_idx",
+          "definition": "CREATE INDEX usage_logs_tool_id_fkey_idx ON public.usage_logs USING btree (tool_id)"
+        },
+        {
+          "name": "usage_logs_user_id_fkey_idx",
+          "definition": "CREATE INDEX usage_logs_user_id_fkey_idx ON public.usage_logs USING btree (user_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "usage_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "usage_logs_action_check",
+          "type": "c",
+          "definition": "CHECK (char_length(action) >= 1 AND char_length(action) <= 100)"
+        },
+        {
+          "name": "usage_logs_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "usage_logs_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['success'::text, 'failed'::text, 'blocked'::text]))"
+        },
+        {
+          "name": "usage_logs_tool_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (tool_id) REFERENCES tools(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "usage_logs_units_check",
+          "type": "c",
+          "definition": "CHECK (units >= 0 AND units <= 1000000)"
+        },
+        {
+          "name": "usage_logs_user_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "user_projects",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "tool_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "project_type",
+          "type": "text",
+          "default": "'general'::text",
+          "not_null": true
+        },
+        {
+          "name": "content",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "user_projects_pkey",
+          "definition": "CREATE UNIQUE INDEX user_projects_pkey ON public.user_projects USING btree (id)"
+        },
+        {
+          "name": "user_projects_tool_id_fkey_idx",
+          "definition": "CREATE INDEX user_projects_tool_id_fkey_idx ON public.user_projects USING btree (tool_id)"
+        },
+        {
+          "name": "user_projects_user_id_fkey_idx",
+          "definition": "CREATE INDEX user_projects_user_id_fkey_idx ON public.user_projects USING btree (user_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "projects_delete_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "d",
+          "with_check": null
+        },
+        {
+          "name": "projects_insert_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": null,
+          "command": "a",
+          "with_check": "(( SELECT auth.uid() AS uid) = user_id)"
+        },
+        {
+          "name": "projects_select_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "r",
+          "with_check": null
+        },
+        {
+          "name": "projects_update_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(( SELECT auth.uid() AS uid) = user_id)",
+          "command": "w",
+          "with_check": "(( SELECT auth.uid() AS uid) = user_id)"
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "user_projects_content_check",
+          "type": "c",
+          "definition": "CHECK (jsonb_typeof(content) = 'object'::text)"
+        },
+        {
+          "name": "user_projects_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "user_projects_project_type_check",
+          "type": "c",
+          "definition": "CHECK (char_length(project_type) <= 80)"
+        },
+        {
+          "name": "user_projects_title_check",
+          "type": "c",
+          "definition": "CHECK (char_length(title) >= 1 AND char_length(title) <= 200)"
+        },
+        {
+          "name": "user_projects_tool_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (tool_id) REFERENCES tools(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "user_projects_user_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "workflow_logs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "workflow_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "level",
+          "type": "text",
+          "default": "'info'::text",
+          "not_null": true
+        },
+        {
+          "name": "event",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "details",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "workflow_logs_owner_created_idx",
+          "definition": "CREATE INDEX workflow_logs_owner_created_idx ON public.workflow_logs USING btree (owner_id, created_at DESC)"
+        },
+        {
+          "name": "workflow_logs_pkey",
+          "definition": "CREATE UNIQUE INDEX workflow_logs_pkey ON public.workflow_logs USING btree (id)"
+        },
+        {
+          "name": "workflow_logs_run_id_idx",
+          "definition": "CREATE INDEX workflow_logs_run_id_idx ON public.workflow_logs USING btree (run_id)"
+        },
+        {
+          "name": "workflow_logs_workflow_id_idx",
+          "definition": "CREATE INDEX workflow_logs_workflow_id_idx ON public.workflow_logs USING btree (workflow_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "Owners view workflow logs",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(owner_id = ( SELECT auth.uid() AS uid))",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "workflow_logs_level_check",
+          "type": "c",
+          "definition": "CHECK (level = ANY (ARRAY['debug'::text, 'info'::text, 'warning'::text, 'error'::text]))"
+        },
+        {
+          "name": "workflow_logs_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflow_logs_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "workflow_logs_run_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (run_id) REFERENCES workflow_runs(id) ON DELETE SET NULL"
+        },
+        {
+          "name": "workflow_logs_workflow_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE SET NULL"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "workflow_runs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "workflow_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'queued'::text",
+          "not_null": true
+        },
+        {
+          "name": "input",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "not_null": true
+        },
+        {
+          "name": "output",
+          "type": "jsonb",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "attempt",
+          "type": "integer",
+          "default": "0",
+          "not_null": true
+        },
+        {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        },
+        {
+          "name": "scheduled_for",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "workflow_runs_owner_created_idx",
+          "definition": "CREATE INDEX workflow_runs_owner_created_idx ON public.workflow_runs USING btree (owner_id, created_at DESC)"
+        },
+        {
+          "name": "workflow_runs_pkey",
+          "definition": "CREATE UNIQUE INDEX workflow_runs_pkey ON public.workflow_runs USING btree (id)"
+        },
+        {
+          "name": "workflow_runs_queue_idx",
+          "definition": "CREATE INDEX workflow_runs_queue_idx ON public.workflow_runs USING btree (created_at) WHERE (status = 'queued'::text)"
+        },
+        {
+          "name": "workflow_runs_workflow_scheduled_for_uidx",
+          "definition": "CREATE UNIQUE INDEX workflow_runs_workflow_scheduled_for_uidx ON public.workflow_runs USING btree (workflow_id, scheduled_for)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "Owners create workflow runs",
+          "roles": [
+            "authenticated"
+          ],
+          "using": null,
+          "command": "a",
+          "with_check": "((owner_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1\n   FROM workflows w\n  WHERE ((w.id = workflow_runs.workflow_id) AND (w.owner_id = ( SELECT auth.uid() AS uid))))))"
+        },
+        {
+          "name": "Owners view workflow runs",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(owner_id = ( SELECT auth.uid() AS uid))",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "workflow_runs_attempt_check",
+          "type": "c",
+          "definition": "CHECK (attempt >= 0)"
+        },
+        {
+          "name": "workflow_runs_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflow_runs_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "workflow_runs_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text]))"
+        },
+        {
+          "name": "workflow_runs_workflow_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "workflow_step_runs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "step_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'queued'::text",
+          "not_null": true
+        },
+        {
+          "name": "input",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "not_null": true
+        },
+        {
+          "name": "output",
+          "type": "jsonb",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "attempt",
+          "type": "integer",
+          "default": "0",
+          "not_null": true
+        },
+        {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "workflow_step_runs_owner_id_idx",
+          "definition": "CREATE INDEX workflow_step_runs_owner_id_idx ON public.workflow_step_runs USING btree (owner_id)"
+        },
+        {
+          "name": "workflow_step_runs_pkey",
+          "definition": "CREATE UNIQUE INDEX workflow_step_runs_pkey ON public.workflow_step_runs USING btree (id)"
+        },
+        {
+          "name": "workflow_step_runs_run_id_step_id_key",
+          "definition": "CREATE UNIQUE INDEX workflow_step_runs_run_id_step_id_key ON public.workflow_step_runs USING btree (run_id, step_id)"
+        },
+        {
+          "name": "workflow_step_runs_run_idx",
+          "definition": "CREATE INDEX workflow_step_runs_run_idx ON public.workflow_step_runs USING btree (run_id, created_at)"
+        },
+        {
+          "name": "workflow_step_runs_step_id_idx",
+          "definition": "CREATE INDEX workflow_step_runs_step_id_idx ON public.workflow_step_runs USING btree (step_id)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "Owners view step runs",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(owner_id = ( SELECT auth.uid() AS uid))",
+          "command": "r",
+          "with_check": null
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "workflow_step_runs_attempt_check",
+          "type": "c",
+          "definition": "CHECK (attempt >= 0)"
+        },
+        {
+          "name": "workflow_step_runs_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflow_step_runs_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "workflow_step_runs_run_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (run_id) REFERENCES workflow_runs(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflow_step_runs_run_id_step_id_key",
+          "type": "u",
+          "definition": "UNIQUE (run_id, step_id)"
+        },
+        {
+          "name": "workflow_step_runs_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text, 'skipped'::text]))"
+        },
+        {
+          "name": "workflow_step_runs_step_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (step_id) REFERENCES workflow_steps(id) ON DELETE CASCADE"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "workflow_steps",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "workflow_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "step_order",
+          "type": "integer",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "action_type",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "config",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "not_null": true
+        },
+        {
+          "name": "retry_limit",
+          "type": "integer",
+          "default": "3",
+          "not_null": true
+        },
+        {
+          "name": "timeout_seconds",
+          "type": "integer",
+          "default": "60",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "workflow_steps_order_idx",
+          "definition": "CREATE INDEX workflow_steps_order_idx ON public.workflow_steps USING btree (workflow_id, step_order)"
+        },
+        {
+          "name": "workflow_steps_pkey",
+          "definition": "CREATE UNIQUE INDEX workflow_steps_pkey ON public.workflow_steps USING btree (id)"
+        },
+        {
+          "name": "workflow_steps_workflow_id_step_order_key",
+          "definition": "CREATE UNIQUE INDEX workflow_steps_workflow_id_step_order_key ON public.workflow_steps USING btree (workflow_id, step_order)"
+        }
+      ],
+      "policies": [
+        {
+          "name": "Owners manage workflow steps",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(EXISTS ( SELECT 1\n   FROM workflows w\n  WHERE ((w.id = workflow_steps.workflow_id) AND (w.owner_id = ( SELECT auth.uid() AS uid)))))",
+          "command": "*",
+          "with_check": "(EXISTS ( SELECT 1\n   FROM workflows w\n  WHERE ((w.id = workflow_steps.workflow_id) AND (w.owner_id = ( SELECT auth.uid() AS uid)))))"
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "workflow_steps_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "workflow_steps_retry_limit_check",
+          "type": "c",
+          "definition": "CHECK (retry_limit >= 0 AND retry_limit <= 10)"
+        },
+        {
+          "name": "workflow_steps_step_order_check",
+          "type": "c",
+          "definition": "CHECK (step_order > 0)"
+        },
+        {
+          "name": "workflow_steps_timeout_seconds_check",
+          "type": "c",
+          "definition": "CHECK (timeout_seconds >= 1 AND timeout_seconds <= 3600)"
+        },
+        {
+          "name": "workflow_steps_workflow_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflow_steps_workflow_id_step_order_key",
+          "type": "u",
+          "definition": "UNIQUE (workflow_id, step_order)"
+        }
+      ],
+      "rls_enabled": true
+    },
+    {
+      "name": "workflows",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "not_null": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "default": "'draft'::text",
+          "not_null": true
+        },
+        {
+          "name": "trigger_type",
+          "type": "text",
+          "default": "'manual'::text",
+          "not_null": true
+        },
+        {
+          "name": "trigger_config",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "not_null": true
+        },
+        {
+          "name": "settings",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "not_null": true
+        },
+        {
+          "name": "next_run_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "workflows_owner_idx",
+          "definition": "CREATE INDEX workflows_owner_idx ON public.workflows USING btree (owner_id)"
+        },
+        {
+          "name": "workflows_pkey",
+          "definition": "CREATE UNIQUE INDEX workflows_pkey ON public.workflows USING btree (id)"
+        },
+        {
+          "name": "workflows_schedule_idx",
+          "definition": "CREATE INDEX workflows_schedule_idx ON public.workflows USING btree (next_run_at) WHERE ((status = 'active'::text) AND (trigger_type = 'schedule'::text))"
+        }
+      ],
+      "policies": [
+        {
+          "name": "Owners manage workflows",
+          "roles": [
+            "authenticated"
+          ],
+          "using": "(owner_id = ( SELECT auth.uid() AS uid))",
+          "command": "*",
+          "with_check": "(owner_id = ( SELECT auth.uid() AS uid))"
+        }
+      ],
+      "force_rls": false,
+      "constraints": [
+        {
+          "name": "workflows_owner_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "workflows_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (id)"
+        },
+        {
+          "name": "workflows_status_check",
+          "type": "c",
+          "definition": "CHECK (status = ANY (ARRAY['draft'::text, 'active'::text, 'paused'::text, 'archived'::text]))"
+        },
+        {
+          "name": "workflows_trigger_type_check",
+          "type": "c",
+          "definition": "CHECK (trigger_type = ANY (ARRAY['manual'::text, 'schedule'::text, 'webhook'::text, 'event'::text]))"
+        }
+      ],
+      "rls_enabled": true
+    }
+  ],
+  "functions": [
+    {
+      "name": "set_updated_at",
+      "config": [
+        "search_path=\"\""
+      ],
+      "volatility": "v",
+      "return_type": "trigger",
+      "execute_anon": true,
+      "security_definer": false,
+      "identity_arguments": "",
+      "execute_service_role": true,
+      "execute_authenticated": true
+    },
+    {
+      "name": "simula_claim_workflow_runs",
+      "config": [
+        "search_path=\"\""
+      ],
+      "volatility": "v",
+      "return_type": "TABLE(id uuid, workflow_id uuid, owner_id uuid, input jsonb, attempt integer)",
+      "execute_anon": false,
+      "security_definer": false,
+      "identity_arguments": "p_limit integer",
+      "execute_service_role": true,
+      "execute_authenticated": true
+    },
+    {
+      "name": "simula_claim_workflow_runs_internal",
+      "config": [
+        "search_path=\"\""
+      ],
+      "volatility": "v",
+      "return_type": "TABLE(id uuid, workflow_id uuid, owner_id uuid, input jsonb, attempt integer)",
+      "execute_anon": false,
+      "security_definer": false,
+      "identity_arguments": "p_limit integer",
+      "execute_service_role": true,
+      "execute_authenticated": false
+    },
+    {
+      "name": "simula_verify_worker_secret",
+      "config": [
+        "search_path=\"\""
+      ],
+      "volatility": "v",
+      "return_type": "boolean",
+      "execute_anon": false,
+      "security_definer": true,
+      "identity_arguments": "p_secret text",
+      "execute_service_role": true,
+      "execute_authenticated": false
+    }
+  ],
+  "captured_at": "2026-11-20T02:07:20.142926+00:00",
+  "postgres_version": "17.11",
+  "capture": {
+    "project_ref": "vepacoemkhudamfaccah",
+    "captured_at": "2026-11-20T02:07:20.142926+00:00",
+    "source": "Read-only PostgreSQL catalog metadata; public schema only",
+    "canonical_baseline": false,
+    "application_migration_ledger": [
+      {
+        "version": "20261025182821",
+        "name": "simula_app_factory_core_schema_rls"
+      },
+      {
+        "version": "20261025183121",
+        "name": "simula_fk_indexes_and_integrity_review"
+      },
+      {
+        "version": "20261025183834",
+        "name": "remove_seven_unused_nonconstraint_indexes"
+      },
+      {
+        "version": "20261025183942",
+        "name": "add_foreign_key_supporting_indexes"
+      },
+      {
+        "version": "20261025201001",
+        "name": "simula_workflow_cron_scheduler"
+      },
+      {
+        "version": "20261025201032",
+        "name": "simula_workflow_scheduler_safe_interval_validation"
+      },
+      {
+        "version": "20261025201831",
+        "name": "simula_secure_workflow_run_claiming"
+      },
+      {
+        "version": "20261025201906",
+        "name": "simula_move_claim_definer_to_private_schema"
+      },
+      {
+        "version": "20261025201915",
+        "name": "simula_allow_authenticated_claim_wrapper_access"
+      },
+      {
+        "version": "20261025202536",
+        "name": "simula_worker_foundation_indexes_and_pg_net"
+      },
+      {
+        "version": "20261025202606",
+        "name": "simula_internal_worker_queue_claiming"
+      },
+      {
+        "version": "20261025202644",
+        "name": "simula_pg_net_extension_schema_hardening"
+      },
+      {
+        "version": "20261025202741",
+        "name": "simula_secure_cron_worker_auth_and_vault"
+      },
+      {
+        "version": "20261025202809",
+        "name": "simula_schedule_secure_cron_worker"
+      },
+      {
+        "version": "20261025202850",
+        "name": "simula_worker_stale_run_recovery"
+      },
+      {
+        "version": "20261025204429",
+        "name": "restrict_workflow_table_client_privileges"
+      },
+      {
+        "version": "20261025204844",
+        "name": "harden_workflow_run_inserts_and_profile_updates"
+      },
+      {
+        "version": "20261103134251",
+        "name": "ashaa_backend_api_keys_and_webhook_idempotency"
+      },
+      {
+        "version": "20261103134302",
+        "name": "ashaa_backend_credit_ledger"
+      }
+    ],
+    "candidate_20261120000000_recorded": false,
+    "disclaimer": "Metadata inventory only; not a pg_dump, bootstrap schema, replayable migration chain, or approval for production use."
+  }
+}
