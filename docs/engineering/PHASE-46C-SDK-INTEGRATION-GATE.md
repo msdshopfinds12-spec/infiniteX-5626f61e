@@ -1,83 +1,72 @@
-# InfiniteX Phase 46C — Supabase SDK Integration Gate
+# InfiniteX Phase 46C — Supabase SDK and Auth Adapter
 
-**Status:** PARTIAL — dependency resolution experiment passed; application integration is not yet committed.
+**Status:** PARTIAL — exact SDK dependency is committed and verified; typed browser client/session adapter is wired; sign-in UI and backend data access remain out of scope.
 **Target branch:** `eng/infinitex-p0-p1-auth-2026-11-20`
 **Target PR:** #60 (Draft)
-**Decision:** Do not wire the SDK into the application until the exact manifest and npm-generated lockfile are committed and verified together.
+**Dependency commit:** `f0fd57fd8aea8c50d4a2c0061f27e33a11676a2e`
 
-## 1. Verified starting point
+## 1. Verified dependency gate
 
-The current branch contains:
-- `src/lib/supabase/public-config.ts`: browser-safe URL/key validation; rejects privileged keys and unsafe URL forms.
-- `src/lib/supabase/database.types.ts`: generated database type definitions already present.
-- `src/features/auth/auth-state.ts`: provider-neutral auth state and identity-epoch fencing.
-- `src/features/auth/auth-session-coordinator.ts`: stale initial-session result fencing.
-- `src/features/auth/auth-session-provider.tsx`: React provider that subscribes before reading the initial session and cleans up on unmount/adapter replacement.
-- `src/main.tsx`: intentionally mounts the existing demo app directly; no live provider is mounted.
+- `@supabase/supabase-js` is pinned exactly to `2.119.2` in `package.json`.
+- `package-lock.json` resolves the root dependency and SDK package to `2.119.2`.
+- The dependency manifest and lockfile were committed together in one commit.
+- Exact-head CI run `44697587720` passed clean install, audit, lint, regression tests, and production build.
 
-The app remains DEMO MODE. No live Supabase auth or data access is claimed.
+This verifies dependency installation and build compatibility at that commit. It does not prove live credentials, auth redirects, email delivery, RLS isolation, or production data access.
 
-## 2. SDK resolution evidence
+## 2. Browser client and session adapter
 
-A separate Node 22 npm-resolution experiment produced a candidate package manifest and lockfile:
-- Package: `@supabase/supabase-js`
-- Resolved package version: `2.119.2`
-- Manifest range in the experiment: `^2.0.0`
-- Lockfile format: npm lockfile v3
-- Candidate package entries: 74
-- Reported experiment: `npm ci --ignore-scripts` and `npm audit` passed in the isolated CI experiment.
+- `src/lib/supabase/client.ts` creates a typed `SupabaseClient<Database>` only after public URL/key validation.
+- Only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are accepted. Never expose service-role, `sb_secret_*`, worker, webhook, or billing secrets through Vite.
+- Auth is configured for persistent browser sessions, automatic token refresh, URL callback detection, and PKCE.
+- `src/features/auth/supabase-auth-session-adapter.ts` maps the SDK session to only `{ user: { id } }`. Tokens and raw session objects are not placed in React state.
+- Missing or invalid public configuration keeps the application in DEMO MODE and does not create a Supabase client.
+- The React provider is mounted only when the validated client is available.
+- The dashboard remains explicitly demo-only even when an auth session is detected. No live feature data services or sign-in forms are enabled in this phase.
 
-This evidence proves dependency resolution for that candidate only. It does not prove that the candidate has been installed in this application, that the application compiles against it, or that authentication works.
+## 3. Security invariants
 
-## 3. Required integration sequence
+- React route guards are UX controls only; RLS and server-side authorization remain the security boundary.
+- Never accept an owner/user ID from a form, URL, local storage, or client state as an authorization input.
+- Never select `platform_api_keys.key_hash`; use the reviewed safe-column projection.
+- Do not create workflow runs directly from the browser or set worker-owned lifecycle/output fields.
+- Account switch and sign-out must invalidate identity-epoch-scoped work and clear account-scoped caches before rendering another account's data.
+- Never log access tokens, refresh tokens, full session objects, or raw auth errors.
 
-1. Add an exact, reviewed SDK dependency to `package.json`.
-2. Generate the matching lockfile using npm in Node 22. Never hand-edit `package-lock.json`.
-3. Commit the manifest and lockfile as one atomic change.
-4. Run `npm ci`, `npm audit`, lint, tests, and production build on the exact resulting commit.
-5. Add a singleton typed browser client using `createClient<Database>`.
-6. Feed only validated `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` values into the browser client. Never use service-role, `sb_secret_*`, worker, or webhook secrets in Vite.
-7. Add a narrow SDK adapter that exposes only the authenticated user ID to the provider-neutral session contract.
-8. Mount the provider only when public configuration is valid. Missing/invalid configuration must leave the demo app usable and visibly in DEMO MODE.
-9. Add adapter tests with synthetic sessions, including initial-session rejection, sign-in, sign-out, account switching, stale callbacks, and unsubscribe behavior.
-10. Only after separate approval and isolated test evidence may account-scoped feature services or protected routes be enabled.
+## 4. Test and release gate
 
-## 4. Security invariants
+The adapter tests use synthetic session data and cover:
+- SDK session-to-identity mapping;
+- missing session / anonymous mapping;
+- rejected session reads;
+- auth-event mapping;
+- subscription cleanup.
 
-- Browser bundle contains public/publishable credentials only.
-- No client-side access to `platform_api_keys.key_hash`; use the reviewed metadata projection.
-- Browser clients must not insert workflow-run lifecycle fields directly.
-- Workflow creation must use the narrow server-side contract; owner and initial lifecycle state are server-derived.
-- Identity-epoch changes invalidate stale account-scoped async results.
-- Sign-out and account switch must clear account-scoped client caches before rendering the next account's data.
-- No credentials, tokens, session objects, or raw auth errors are written to logs.
+The resulting exact PR head must pass:
+- `npm ci`
+- `npm audit`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+
+A separate test against isolated synthetic Supabase accounts is required before any RLS-backed feature is enabled. Do not use production accounts or production data for destructive or negative tests.
 
 ## 5. Free-first alternatives
 
-Preferred: official Supabase JavaScript SDK with a committed npm-generated lockfile.
+Preferred: official Supabase SDK with a typed, narrow adapter.
 
-If dependency installation or lockfile generation is blocked:
-- Keep the provider-neutral auth state/coordinator and DEMO MODE.
-- Continue SDK-independent contract tests and UI accessibility work.
-- Do not substitute direct REST calls or hand-written auth token handling; that would increase security and maintenance risk.
-- Do not fabricate a lockfile or use a service-role key in the browser.
+If live credentials or backend integration is unavailable:
+- Keep the provider-neutral auth contract and DEMO MODE.
+- Continue UI accessibility and isolated unit tests.
+- Do not replace the official SDK with hand-written token storage or custom auth REST calls.
+- Do not use a service-role key in a browser build.
 
 ## 6. Explicitly not done
 
-- No Supabase SDK dependency committed to the application manifest/lockfile.
-- No browser client singleton or SDK adapter.
-- No provider mount or live auth UI.
-- No production database, RLS, migration, Edge Function, secret, environment, or billing changes.
+- No sign-in/sign-up/password-reset UI or OAuth callback screen.
+- No protected routes or account-scoped data services.
+- No live RLS isolation test using synthetic Supabase users.
+- No production schema, RLS, migration, Edge Function, secret, environment, or billing changes.
 - No merge, deployment, or release.
-
-## 7. Acceptance criteria
-
-Phase 46C is complete only when the exact PR head has:
-- matching npm manifest and lockfile;
-- successful exact-head `npm ci`, `npm audit`, lint, test, and build logs;
-- unit coverage for config gating and SDK adapter mapping;
-- evidence that missing configuration preserves DEMO MODE;
-- no privileged browser secret exposure;
-- documented residual risks and explicit human release approval still pending.
 
 **Release status: NOT APPROVED. Keep PR #60 Draft.**
