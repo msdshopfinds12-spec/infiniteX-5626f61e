@@ -1,0 +1,32 @@
+name: InfiniteX Edge Function source contract tests
+
+on:
+  pull_request:
+    branches:
+      - eng/infinitex-unified-ui-backend-2026-11-20
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-edge-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Node 22 source contract regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR commit
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Record runtime and commit
+        run: |
+          node --version
+          git rev-parse HEAD
+      - name: Run Edge Function source contract tests
+        run: node --test tests/edge-function-source-contract.test.mjs
