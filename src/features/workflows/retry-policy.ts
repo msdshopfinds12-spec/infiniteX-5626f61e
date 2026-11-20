@@ -66,7 +66,11 @@ function retryDelay(
 export function decideStepRetry(input: StepRetryInput): StepRetryDecision {
   requireSafeInteger(input.attemptNumber, "attempt_number", 1);
   requireSafeInteger(input.retryLimit, "retry_limit", 0);
+  if (input.retryLimit > 10) throw new RangeError("retry_limit_invalid");
   requireSafeInteger(input.nowMs, "now_ms", 0);
+  if (!["transient", "permanent", "cancelled"].includes(input.failureKind)) {
+    throw new TypeError("failure_kind_invalid");
+  }
 
   const baseDelayMs = input.baseDelayMs ?? 1_000;
   const maxDelayMs = input.maxDelayMs ?? 60_000;
