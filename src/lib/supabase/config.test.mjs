@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parseSupabaseBrowserConfig } from "./config.ts";
 
+const anonJwt = "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.signature";
+const serviceRoleJwt = "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.signature";
+
 test("keeps Supabase disabled when no public config is supplied", () => {
   assert.deepEqual(parseSupabaseBrowserConfig(undefined, undefined), {
     enabled: false,
@@ -21,12 +24,17 @@ test("accepts HTTPS URL and a publishable key", () => {
   }
 });
 
-test("accepts a legacy anon JWT format", () => {
-  const result = parseSupabaseBrowserConfig(
-    "https://example.supabase.co",
-    "header.payload.signature",
-  );
+test("accepts only a legacy anon JWT", () => {
+  const result = parseSupabaseBrowserConfig("https://example.supabase.co", anonJwt);
   assert.equal(result.enabled, true);
+  assert.throws(
+    () => parseSupabaseBrowserConfig("https://example.supabase.co", serviceRoleJwt),
+    /server-only Supabase credential/,
+  );
+  assert.throws(
+    () => parseSupabaseBrowserConfig("https://example.supabase.co", "header.payload.signature"),
+    /server-only Supabase credential/,
+  );
 });
 
 test("rejects partial configuration", () => {
@@ -70,7 +78,7 @@ test("rejects URL paths, query strings, and embedded credentials", () => {
   ]) {
     assert.throws(
       () => parseSupabaseBrowserConfig(url, "sb_publishable_example"),
-      /must be an origin only/,
+      /valid HTTPS origin/,
     );
   }
 });
