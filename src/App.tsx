@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Activity, Bot, Cpu, GitBranch, LogOut, Play, Search, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
+import { Activity, Bot, Cpu, GitBranch, LogOut, Play, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -22,6 +22,8 @@ type AppProps = Readonly<{
 
 export default function App({ authState, authActions, recoveryMode = false }: AppProps) {
   const [view, setView] = useState<ViewKey>("overview");
+  const [searchTerm, setSearchTerm] = useState("");
+  const query = searchTerm.trim().toLocaleLowerCase();
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
 
@@ -89,9 +91,9 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
   return (
     <>
       <div className="app-shell">
-        <Sidebar view={view} onChange={setView} />
+        <Sidebar view={view} onChange={(nextView) => { setView(nextView); setSearchTerm(""); }} />
         <div className="main">
-          <TopBar title={title} theme={theme} onToggleTheme={toggleTheme} />
+          <TopBar title={title} theme={theme} onToggleTheme={toggleTheme} searchTerm={searchTerm} onSearchChange={setSearchTerm} />
           <main className="content">
             {authState?.status === "authenticated" && (
               <div className="account-strip">
@@ -120,14 +122,14 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
                       <h2><Cpu size={18} /> Sample Agent Activity</h2>
                       <span className="badge badge-neutral">demo</span>
                     </div>
-                    <AgentList compact />
+                    <AgentList compact searchTerm={query} />
                   </div>
                   <div className="panel">
                     <div className="panel-head">
                       <h2><Terminal size={18} /> Sample Log Entries</h2>
                       <span className="badge badge-neutral">static</span>
                     </div>
-                    <LogStream compact />
+                    <LogStream compact searchTerm={query} />
                   </div>
                 </section>
                 <section className="panel">
@@ -137,7 +139,7 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
                       <Play size={14} /> Run all unavailable
                     </button>
                   </div>
-                  <PipelineBoard />
+                  <PipelineBoard searchTerm={query} />
                 </section>
               </>
             )}
@@ -145,12 +147,9 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
               <div className="panel">
                 <div className="panel-head">
                   <h2><Bot size={18} /> Registered AI Agents (sample)</h2>
-                  <div className="search" aria-label="Agent search unavailable in demo mode">
-                    <Search size={14} />
-                    <input placeholder="Search unavailable in demo" disabled />
-                  </div>
+                  <span className="badge badge-neutral">LOCAL DATA</span>
                 </div>
-                <AgentList />
+                <AgentList searchTerm={query} />
               </div>
             )}
             {view === "pipelines" && (
@@ -161,7 +160,7 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
                     <Play size={14} /> Creation unavailable
                   </button>
                 </div>
-                <PipelineBoard expanded />
+                <PipelineBoard expanded searchTerm={query} />
               </div>
             )}
             {view === "logs" && (
@@ -170,7 +169,7 @@ export default function App({ authState, authActions, recoveryMode = false }: Ap
                   <h2><Terminal size={18} /> Sample Log Entries</h2>
                   <span className="badge badge-neutral">static sample</span>
                 </div>
-                <LogStream />
+                <LogStream searchTerm={query} />
               </div>
             )}
             {view === "security" && (
