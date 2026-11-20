@@ -261,14 +261,21 @@ Phase 52 is not production-ready merely because TypeScript lint or unit tests pa
 | Area | Status |
 |---|---|
 | Phase 52 architecture and contract | DOCUMENTED |
-| Route/auth implementation | NOT IMPLEMENTED |
-| Enqueue/idempotency persistence | NOT IMPLEMENTED |
-| Status/cancellation API | NOT IMPLEMENTED |
-| Disposable integration tests | NOT RUN |
+| Route parsing and request validation | IMPLEMENTED IN BRANCH; contract tests added |
+| JWT verification and server-derived owner | IMPLEMENTED IN BRANCH; runtime integration not tested |
+| Owner-scoped status projection | IMPLEMENTED IN BRANCH; strict allowlist excludes output, input, owner IDs, and internal error fields |
+| Queued-only cancellation | IMPLEMENTED IN BRANCH; runtime race test not run |
+| Enqueue/idempotency persistence | BLOCKED; endpoint intentionally returns 501 |
+| Live migration ledger | 19 versions recorded in prior read-only reconciliation |
+| Matching migration source in this repository | NOT PRESENT in inspected tree |
+| Disposable database migration/RPC tests | NOT RUN |
+| GitHub Actions on current PR head | IN PROGRESS at last check |
 | Production schema changes | NOT AUTHORIZED |
 | Production deployment / merge | NOT AUTHORIZED |
 
-**Safety:** This commit is a planning artifact only. It makes no runtime, database, permission, secret, billing, deployment, merge, or release change.
+See [PHASE-52-LIVE-DATABASE-CONTRACT-VERIFICATION.md](./PHASE-52-LIVE-DATABASE-CONTRACT-VERIFICATION.md) and [PHASE-52-MIGRATION-HISTORY-RECONCILIATION.md](./PHASE-52-MIGRATION-HISTORY-RECONCILIATION.md).
+
+**Safety:** Source-only GitHub changes and read-only catalog inspection were performed. No production migrations, DDL, DML, grants, revokes, RLS changes, secret changes, function deployments, production data mutations, merges, or releases were performed.
 
 
 ## 10. Live database verification update
