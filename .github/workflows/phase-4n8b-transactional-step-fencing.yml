@@ -44,7 +44,7 @@ jobs:
         run: deno check --node-modules-dir=auto --no-lock supabase/functions/simula-workflow-cron-worker/index.ts
       - name: Type-check transactional integration test
         run: deno check --node-modules-dir=auto --no-lock supabase/functions/_shared/transactional-step-fencing.integration.test.ts
-      - name: Run transactional integration test against an isolated fixture
+      - name: Run transactional integration test against a local-only Supabase fixture
         if: ${{ vars.PHASE_4N8B_FIXTURE_READY == 'true' }}
         env:
           SUPABASE_URL: ${{ secrets.PHASE_4N8B_SUPABASE_URL }}
@@ -53,7 +53,7 @@ jobs:
           PHASE_4N8B_TEST_STEP_ID: ${{ secrets.PHASE_4N8B_TEST_STEP_ID }}
           PHASE_4N8B_TEST_OWNER_ID: ${{ secrets.PHASE_4N8B_TEST_OWNER_ID }}
           PHASE_4N8B_TEST_ATTEMPT: ${{ secrets.PHASE_4N8B_TEST_ATTEMPT }}
-        run: deno test --no-lock --allow-env --allow-net supabase/functions/_shared/transactional-step-fencing.integration.test.ts
+        run: deno test --no-lock --allow-env=SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,PHASE_4N8B_TEST_RUN_ID,PHASE_4N8B_TEST_STEP_ID,PHASE_4N8B_TEST_OWNER_ID,PHASE_4N8B_TEST_ATTEMPT --allow-net=localhost,127.0.0.1 supabase/functions/_shared/transactional-step-fencing.integration.test.ts
       - name: Report integration test as not run when no isolated fixture is configured
         if: ${{ vars.PHASE_4N8B_FIXTURE_READY != 'true' }}
         run: |
