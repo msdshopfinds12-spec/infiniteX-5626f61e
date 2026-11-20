@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const harnessUrl = new URL('./phase-52-1b-postgres-security.sql', import.meta.url);
-const workflowUrl = new URL('../../.github/workflows/database-contract.yml', import.meta.url);
+const workflowUrl = new URL('../../.github/workflows/infinitex-phase-68-database-replay.yml', import.meta.url);
 
 test('PostgreSQL behavior harness applies the exact reviewed migrations in disposable scope', async () => {
   const sql = await readFile(harnessUrl, 'utf8');
