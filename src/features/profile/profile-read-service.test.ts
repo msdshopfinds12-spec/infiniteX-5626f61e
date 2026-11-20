@@ -30,7 +30,7 @@ const sample = {
   updated_at: "2026-11-21T00:00:00.000Z",
 };
 
-test("profile service queries only safe own-profile columns using the authenticated identity", async () => {
+test("profile service queries only safe own-profile columns and relies on RLS for identity", async () => {
   const { client, calls } = createClient({ data: sample, error: null });
   const result = await createProfileReadService(client).getOwnProfile();
   assert.deepEqual(result, { status: "success", data: sample });
