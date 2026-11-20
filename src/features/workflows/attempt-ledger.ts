@@ -215,12 +215,21 @@ function freezeAttempt(attempt: StepAttempt): StepAttempt {
 function assertActiveLease(attempt: StepAttempt, input: LeaseFenceInput): void {
   requireSafeInteger(input.nowMs, "now_ms", 0);
   requireSafeInteger(input.expectedLeaseGeneration, "lease_generation", 1);
+  const startedAtMs = attempt.startedAtMs;
+  const heartbeatAtMs = attempt.heartbeatAtMs;
+  const leaseExpiresAtMs = attempt.leaseExpiresAtMs;
   if (attempt.status !== "running" ||
       attempt.leaseGeneration !== input.expectedLeaseGeneration ||
-      attempt.startedAtMs === null ||
-      attempt.heartbeatAtMs === null ||
-      attempt.leaseExpiresAtMs === null ||
-      input.nowMs >= attempt.leaseExpiresAtMs) {
+      startedAtMs === null ||
+      heartbeatAtMs === null ||
+      leaseExpiresAtMs === null ||
+      !Number.isSafeInteger(startedAtMs) ||
+      !Number.isSafeInteger(heartbeatAtMs) ||
+      !Number.isSafeInteger(leaseExpiresAtMs) ||
+      startedAtMs < 0 ||
+      heartbeatAtMs < startedAtMs ||
+      leaseExpiresAtMs <= heartbeatAtMs ||
+      input.nowMs >= leaseExpiresAtMs) {
     throw new StepAttemptDomainError("stale_or_expired_lease");
   }
 }
