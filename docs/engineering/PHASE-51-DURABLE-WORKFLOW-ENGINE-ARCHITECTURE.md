@@ -94,7 +94,7 @@ Define `retry_limit` as retries after the initial attempt:
 Only explicitly classified transient failures are retryable. Examples may include bounded network failures and temporary provider unavailability after a provider integration exists. Validation failures, unsupported action types, permission failures, malformed payloads, and deterministic business-rule errors are permanent.
 
 Use capped exponential backoff with jitter:
-`delay = min(maxDelay, baseDelay * 2^(attemptNumber - 1)) + boundedJitter`
+`rawDelay = min(maxDelayMs, baseDelayMs * 2^(attemptNumber - 1))`\n`delay = min(maxDelayMs, round(rawDelay * (1 - jitterRatio + 2 * jitterRatio * random())))`
 
 The scheduler must persist `next_retry_at`; never rely on an in-memory sleep as the durable retry mechanism.
 
