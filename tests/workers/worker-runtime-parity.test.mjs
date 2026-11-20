@@ -47,7 +47,7 @@ test("API-key manager rejects wildcard CORS and uses streamed JSON size limits",
   const source = await read("../../supabase/functions/ashaa-api-key-manager/index.ts");
   assert.match(source, /corsHeadersForRequest/);
   assert.match(source, /cors\.allowed/);
-  assert.match(source, /readJsonBodyLimited\(req,\s*4096\)/);
+  assert.match(source, /readJsonBodyLimited\(req,\s*2048\)/);
   assert.doesNotMatch(source, /Access-Control-Allow-Origin["']?\s*:\s*["']\*["']/);
   assert.doesNotMatch(source, /await\s+req\.json\(\)/);
 });
