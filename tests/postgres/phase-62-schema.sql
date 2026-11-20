@@ -168,7 +168,7 @@ BEGIN
   IF v_current.status = 'failed' THEN
     SELECT * INTO v_next
       FROM phase62.workflow_step_attempts
-     WHERE owner_id = p_owner_id AND idempotency_key = v_next_key;
+     WHERE idempotency_key = v_next_key;
     IF FOUND THEN
       IF v_next.owner_id <> v_current.owner_id
          OR v_next.run_id <> v_current.run_id
