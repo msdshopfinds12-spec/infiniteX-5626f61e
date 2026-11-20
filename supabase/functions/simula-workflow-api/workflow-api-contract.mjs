@@ -37,7 +37,7 @@ function inspectJson(value, depth, budget) {
 
 export function parseBearerToken(value) {
   if (typeof value !== "string") return null;
-  const match = value.match(/^Bearer\\s+([^\\s]+)$/i);
+  const match = value.match(/^Bearer\s+([^\s]+)$/i);
   return match?.[1] ?? null;
 }
 
