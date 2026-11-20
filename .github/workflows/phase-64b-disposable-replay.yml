@@ -1,0 +1,82 @@
+name: Phase 64B Disposable PostgreSQL Replay
+
+on:
+  push:
+    branches:
+      - engineering/phase-64b-disposable-replay
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "docs/database/PHASE-52.1*"
+      - "scripts/rehearse-migration-chain.mjs"
+      - "tests/database/phase-52-1*"
+      - ".github/workflows/phase-64b-disposable-replay.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-64b-disposable-replay-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay-and-security:
+    name: PostgreSQL 17 disposable replay and security tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Run replay harness and provenance classification tests
+        run: node --test tests/database/phase-52-1c-migration-rehearsal.test.mjs
+      - name: Start isolated Supabase PostgreSQL 17 container with scheduled jobs disabled
+        shell: bash
+        run: |
+          docker run -d --name infinitex-phase64b-replay \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_USER=supabase_admin \
+            -e POSTGRES_DB=infinitex_rehearsal \
+            -p 5432:5432 \
+            supabase/postgres:17.6.1.136 \
+            postgres -c config_file=/etc/postgresql/postgresql.conf \
+              -c shared_preload_libraries=pg_stat_statements,pgaudit,plpgsql,plpgsql_check,pg_cron,pg_net,pgsodium,auto_explain,pg_tle,plan_filter,supabase_vault \
+              -c pgsodium.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
+              -c vault.getkey_script=/usr/lib/postgresql/bin/pgsodium_getkey.sh \
+              -c cron.database_name=infinitex_rehearsal \
+              -c cron.launch_active_jobs=off
+          for attempt in $(seq 1 60); do
+            if pg_isready -h 127.0.0.1 -p 5432 -U supabase_admin -d infinitex_rehearsal; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs infinitex-phase64b-replay
+          exit 1
+      - name: Replay recovered migration chain in disposable PostgreSQL
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: node scripts/rehearse-migration-chain.mjs
+      - name: Execute disposable PostgreSQL security behavior suite
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-52-1b-postgres-security.sql
+      - name: Collect disposable PostgreSQL logs
+        if: always()
+        run: docker logs infinitex-phase64b-replay 2>&1 | tail -n 200 || true
+      - name: Remove disposable PostgreSQL container
+        if: always()
+        run: docker rm -f infinitex-phase64b-replay || true
