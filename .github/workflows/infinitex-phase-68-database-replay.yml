@@ -67,6 +67,14 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: infinitex_rehearsal
         run: node scripts/rehearse-migration-chain.mjs
+      - name: Exercise concurrent claims, lease recovery, and generation fencing
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: bash scripts/test-workflow-claim-concurrency.sh
       - name: Create isolated security test database
         env:
           PGHOST: 127.0.0.1
