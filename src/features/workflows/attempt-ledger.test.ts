@@ -35,6 +35,7 @@ function claimed() {
 
 test("creates a queued attempt with independent run, step and lease counters", () => {
   const attempt = queued();
+  assert.equal(Object.isFrozen(attempt), true);
   assert.equal(attempt.status, "queued");
   assert.equal(attempt.attemptNumber, 1);
   assert.equal(attempt.leaseGeneration, 0);
@@ -103,6 +104,7 @@ test("successful completion stores a detached deeply immutable JSON snapshot", (
     outcome: "succeeded",
     output,
   });
+  assert.equal(Object.isFrozen(done), true);
   assert.equal(done.status, "succeeded");
   assert.equal(done.finishedAtMs, 1_100);
   assert.equal(done.leaseExpiresAtMs, null);
