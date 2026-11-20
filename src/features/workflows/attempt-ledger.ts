@@ -3,12 +3,15 @@ import { decideStepRetry, type RetryFailureKind } from "./retry-policy.ts";
 /**
  * Runtime-neutral workflow attempt invariants.
  *
- * Persistence adapters must enforce these same predicates atomically in the
- * database. This module is a deterministic domain layer, not a distributed
- * lock, token generator, or persistence implementation.
+ * Persistence adapters must enforce these predicates atomically in the database.
+ * This module is a deterministic domain layer, not a distributed lock or
+ * persistence implementation.
  */
 
 export type StepAttemptStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
 export type StepAttempt = Readonly<{
   id: string;
@@ -27,7 +30,7 @@ export type StepAttempt = Readonly<{
   finishedAtMs: number | null;
   failureKind: RetryFailureKind | null;
   errorCode: string | null;
-  output: unknown | null;
+  output: JsonValue | null;
 }>;
 
 export type CreateQueuedAttemptInput = Readonly<{
@@ -53,6 +56,10 @@ export type LeaseFenceInput = Readonly<{
   expectedLeaseGeneration: number;
 }>;
 
+const MAX_OUTPUT_CHARS = 64 * 1024;
+const MAX_OUTPUT_DEPTH = 20;
+const MAX_OUTPUT_NODES = 10_000;
+
 export class StepAttemptDomainError extends Error {
   readonly code: string;
 
@@ -75,11 +82,129 @@ function requireSafeInteger(value: number, label: string, minimum: number): void
   }
 }
 
+/**
+ * Canonical, deterministic key for one logical step execution.
+ * The version prefix permits future format migrations without ambiguous parsing.
+ * Persistence must still enforce a UNIQUE constraint and compare request fingerprints.
+ */
+export function canonicalStepAttemptIdempotencyKey(
+  runId: string,
+  stepId: string,
+  attemptNumber: number,
+): string {
+  requireText(runId, "run_id");
+  requireText(stepId, "step_id");
+  requireSafeInteger(attemptNumber, "attempt_number", 1);
+  let key: string;
+  try {
+    key = "step-attempt:v1:" + encodeURIComponent(runId) + ":" +
+      encodeURIComponent(stepId) + ":" + attemptNumber;
+  } catch {
+    throw new StepAttemptDomainError("idempotency_identity_invalid");
+  }
+  requireText(key, "idempotency_key", 256);
+  return key;
+}
+
+/**
+ * Copies JSON-compatible output into a detached, deeply frozen snapshot.
+ * Rejects executable values, accessors, cycles, sparse arrays, exotic prototypes,
+ * non-finite numbers, excessive nesting, and oversized payloads.
+ */
+export function snapshotJsonOutput(value: unknown): JsonValue {
+  const seen = new WeakSet<object>();
+  let nodes = 0;
+
+  const visit = (current: unknown, depth: number): JsonValue => {
+    nodes += 1;
+    if (nodes > MAX_OUTPUT_NODES) throw new StepAttemptDomainError("output_node_limit_exceeded");
+    if (depth > MAX_OUTPUT_DEPTH) throw new StepAttemptDomainError("output_depth_limit_exceeded");
+
+    if (current === null || typeof current === "boolean") return current;
+    if (typeof current === "string") {
+      if (current.length > MAX_OUTPUT_CHARS) throw new StepAttemptDomainError("output_size_limit_exceeded");
+      return current;
+    }
+    if (typeof current === "number") {
+      if (!Number.isFinite(current)) throw new StepAttemptDomainError("output_number_invalid");
+      return current;
+    }
+    if (typeof current !== "object") {
+      throw new StepAttemptDomainError("output_type_invalid");
+    }
+
+    const objectValue = current as object;
+    if (seen.has(objectValue)) throw new StepAttemptDomainError("output_cycle_detected");
+    seen.add(objectValue);
+
+    if (Array.isArray(current)) {
+      if (Object.getPrototypeOf(current) !== Array.prototype) {
+        throw new StepAttemptDomainError("output_array_prototype_invalid");
+      }
+      const ownKeys = Reflect.ownKeys(current);
+      if (ownKeys.some((key) => key !== "length" &&
+          (typeof key !== "string" || !/^(0|[1-9][0-9]*)$/.test(key)))) {
+        throw new StepAttemptDomainError("output_array_property_invalid");
+      }
+      const copy: JsonValue[] = [];
+      for (let index = 0; index < current.length; index += 1) {
+        if (!Object.prototype.hasOwnProperty.call(current, index)) {
+          throw new StepAttemptDomainError("output_sparse_array_invalid");
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(current, String(index));
+        if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
+          throw new StepAttemptDomainError("output_accessor_invalid");
+        }
+        copy.push(visit(descriptor.value, depth + 1));
+      }
+      return Object.freeze(copy);
+    }
+
+    const prototype = Object.getPrototypeOf(current);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new StepAttemptDomainError("output_object_prototype_invalid");
+    }
+
+    const keys = Reflect.ownKeys(current);
+    if (keys.some((key) => typeof key !== "string")) {
+      throw new StepAttemptDomainError("output_symbol_key_invalid");
+    }
+    const copy: { [key: string]: JsonValue } = {};
+    for (const key of keys as string[]) {
+      const descriptor = Object.getOwnPropertyDescriptor(current, key);
+      if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
+        throw new StepAttemptDomainError("output_accessor_invalid");
+      }
+      Object.defineProperty(copy, key, {
+        value: visit(descriptor.value, depth + 1),
+        enumerable: true,
+        configurable: false,
+        writable: false,
+      });
+    }
+    return Object.freeze(copy);
+  };
+
+  const snapshot = visit(value, 0);
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(snapshot);
+  } catch {
+    throw new StepAttemptDomainError("output_serialization_invalid");
+  }
+  if (serialized.length > MAX_OUTPUT_CHARS) {
+    throw new StepAttemptDomainError("output_size_limit_exceeded");
+  }
+  return snapshot;
+}
+
 function assertActiveLease(attempt: StepAttempt, input: LeaseFenceInput): void {
   requireSafeInteger(input.nowMs, "now_ms", 0);
   requireSafeInteger(input.expectedLeaseGeneration, "lease_generation", 1);
   if (attempt.status !== "running" ||
       attempt.leaseGeneration !== input.expectedLeaseGeneration ||
+      attempt.startedAtMs === null ||
+      attempt.heartbeatAtMs === null ||
       attempt.leaseExpiresAtMs === null ||
       input.nowMs >= attempt.leaseExpiresAtMs) {
     throw new StepAttemptDomainError("stale_or_expired_lease");
@@ -99,7 +224,7 @@ function assertNotTerminal(attempt: StepAttempt): void {
   }
 }
 
-/** Creates an attempt projection with server-assigned identity supplied by a trusted adapter. */
+/** Creates an attempt projection with identity supplied by a trusted adapter. */
 export function createQueuedStepAttempt(input: CreateQueuedAttemptInput): StepAttempt {
   requireText(input.id, "attempt_id");
   requireText(input.runId, "run_id");
@@ -166,7 +291,7 @@ export function claimStepAttempt(
   };
 }
 
-/** Extends only the currently active lease; stale workers are rejected. */
+/** Extends only the currently active lease; heartbeat time cannot move backwards. */
 export function heartbeatStepAttempt(
   attempt: StepAttempt,
   input: LeaseFenceInput & Readonly<{ leaseDurationMs: number }>,
@@ -174,6 +299,9 @@ export function heartbeatStepAttempt(
   assertNotTerminal(attempt);
   assertActiveLease(attempt, input);
   requireSafeInteger(input.leaseDurationMs, "lease_duration_ms", 1);
+  if (attempt.heartbeatAtMs !== null && input.nowMs < attempt.heartbeatAtMs) {
+    throw new StepAttemptDomainError("timestamp_regression");
+  }
   const leaseExpiresAtMs = input.nowMs + input.leaseDurationMs;
   if (!Number.isSafeInteger(leaseExpiresAtMs)) {
     throw new StepAttemptDomainError("lease_expiry_overflow");
@@ -195,6 +323,9 @@ export function finishStepAttempt(
 ): StepAttempt {
   assertNotTerminal(attempt);
   assertActiveLease(attempt, input);
+  if (attempt.heartbeatAtMs !== null && input.nowMs < attempt.heartbeatAtMs) {
+    throw new StepAttemptDomainError("timestamp_regression");
+  }
   if (input.outcome === "failed" && !input.failureKind) {
     throw new StepAttemptDomainError("failure_kind_required");
   }
@@ -205,6 +336,9 @@ export function finishStepAttempt(
   if (errorCode !== null && !/^[a-z0-9_]{1,64}$/.test(errorCode)) {
     throw new StepAttemptDomainError("error_code_invalid");
   }
+  const output = input.outcome === "succeeded"
+    ? snapshotJsonOutput(input.output ?? null)
+    : null;
   return {
     ...attempt,
     status: input.outcome,
@@ -212,11 +346,11 @@ export function finishStepAttempt(
     leaseExpiresAtMs: null,
     failureKind: input.outcome === "failed" ? input.failureKind! : null,
     errorCode: input.outcome === "failed" ? errorCode : null,
-    output: input.outcome === "succeeded" ? (input.output ?? null) : null,
+    output,
   };
 }
 
-/** Owner-authorized cancellation must be enforced by the persistence/API layer. */
+/** Owner authorization and completion/cancellation arbitration belong to persistence/API. */
 export function cancelStepAttempt(
   attempt: StepAttempt,
   input: Readonly<{ nowMs: number; expectedLeaseGeneration: number }>,
@@ -229,6 +363,12 @@ export function cancelStepAttempt(
   }
   if (attempt.leaseGeneration !== input.expectedLeaseGeneration) {
     throw new StepAttemptDomainError("lease_generation_conflict");
+  }
+  const lastLifecycleTime = attempt.status === "queued"
+    ? attempt.scheduledAtMs
+    : Math.max(attempt.startedAtMs ?? 0, attempt.heartbeatAtMs ?? 0);
+  if (input.nowMs < lastLifecycleTime) {
+    throw new StepAttemptDomainError("timestamp_regression");
   }
   return {
     ...attempt,
@@ -286,7 +426,11 @@ export function planNextStepAttempt(input: Readonly<{
     stepId: failed.stepId,
     ownerId: failed.ownerId,
     attemptNumber: decision.nextAttemptNumber,
-    idempotencyKey: failed.idempotencyKey + ":attempt:" + decision.nextAttemptNumber,
+    idempotencyKey: canonicalStepAttemptIdempotencyKey(
+      failed.runId,
+      failed.stepId,
+      decision.nextAttemptNumber,
+    ),
     requestFingerprint: failed.requestFingerprint,
     scheduledAtMs: decision.scheduledAtMs,
     leaseGeneration: failed.leaseGeneration,
