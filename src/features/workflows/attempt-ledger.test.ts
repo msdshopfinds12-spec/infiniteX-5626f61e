@@ -18,7 +18,7 @@ function queued(overrides: Record<string, unknown> = {}) {
     stepId: "step-1",
     ownerId: "owner-1",
     attemptNumber: 1,
-    idempotencyKey: "run-1:step-1:attempt:1",
+    idempotencyKey: canonicalStepAttemptIdempotencyKey("run-1", "step-1", 1),
     requestFingerprint: "sha256:synthetic-fingerprint",
     scheduledAtMs: 1_000,
     ...overrides,
@@ -81,6 +81,10 @@ test("lease heartbeat extends expiry without changing fencing generation", () =>
   assert.equal(renewed.leaseGeneration, 1);
   assert.equal(renewed.heartbeatAtMs, 1_200);
   assert.equal(renewed.leaseExpiresAtMs, 2_000);
+  const shortRenewal = heartbeatStepAttempt(renewed, {
+    nowMs: 1_300, expectedLeaseGeneration: 1, leaseDurationMs: 100,
+  });
+  assert.equal(shortRenewal.leaseExpiresAtMs, 2_000, "a short heartbeat must not shorten an active lease");
 });
 
 test("stale generation and expired lease cannot heartbeat or complete", () => {
@@ -329,5 +333,30 @@ test("oversized, deeply nested, and sparse output payloads are rejected", () => 
       nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "succeeded", output: sparse,
     }),
     /output_sparse_array_invalid/,
+  );
+});
+
+
+test("queued attempt rejects non-canonical idempotency identity", () => {
+  assert.throws(
+    () => queued({ idempotencyKey: "legacy:retry:key" }),
+    /idempotency_key_mismatch/,
+  );
+});
+
+test("failure outcome rejects unknown runtime failure classes and invalid outcomes", () => {
+  const active = claimed();
+  assert.throws(
+    () => finishStepAttempt(active, {
+      nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "failed",
+      failureKind: "mystery" as "transient",
+    }),
+    /failure_kind_invalid/,
+  );
+  assert.throws(
+    () => finishStepAttempt(active, {
+      nowMs: 1_100, expectedLeaseGeneration: 1, outcome: "unknown" as "failed",
+    }),
+    /outcome_invalid/,
   );
 });
