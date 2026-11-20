@@ -23,30 +23,21 @@
 
 ## Verification evidence
 
-Latest full CI verification: commit `c8cd584830ce3612724d2fb6f10a15fa07c0d4ae`, GitHub Actions run #37: [44682790527](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44682790527). This run is associated with the exact commit and completed successfully.
+Latest full CI verification before this documentation refresh: commit `d54dbcf65699e8ca13c0b55b1bad68e0dcf6e0c0`, GitHub Actions run #41: [44683709434](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44683709434). The run was confirmed against that exact PR head and completed successfully.
 
 - Node.js 22 / npm CI workflow: PASS.
-- `npm ci`: PASS.
-- `npm audit`: PASS.
-- `npm run lint`: PASS.
-- `npm test`: PASS.
-- `npm run build`: PASS.
-- Build artifact uploaded to GitHub Actions artifact storage; it was not deployed.
-
-A first CI run exposed that Node test modules were included in the browser TypeScript project without Node type declarations. The application tsconfig now excludes `src/**/*.test.ts`, leaving those tests under the Node test runner.
-
-### SDK lockfile generation experiment
-
-A temporary, read-only GitHub Actions workflow used Node.js 22 and the official npm resolver to generate a candidate manifest/lockfile artifact for `@supabase/supabase-js`.
-
-- Resolved SDK version: `2.119.2`.
-- `npm ci --ignore-scripts`: PASS.
+- `npm ci`: PASS — 30 packages installed.
 - `npm audit`: PASS — 0 vulnerabilities reported.
-- Artifact: [workflow run #3](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44682539105), artifact ID `14604862693`.
+- `npm run lint`: PASS.
+- `npm test`: PASS — 60 tests, 60 passed, 0 failed.
+- `npm run build`: PASS — Vite 8.3.8 generated the production bundle.
+- Build artifact uploaded to GitHub Actions artifact storage only; it was not deployed.
 
-The temporary workflow was removed and the repository's `package.json` was restored so the committed package manifest and lockfile remain synchronized. The generated candidate lockfile is not committed. This experiment proves npm can resolve and install the SDK in CI; it does not complete the SDK integration or replace the repository lockfile.
+The test suite includes identity-epoch regression coverage for repeated anonymous events and re-authentication after sign-out. A first CI run had exposed Node test modules being included in the browser TypeScript project without Node type declarations; the application tsconfig excludes `src/**/*.test.ts`, while the tests run under Node's test runner.
 
-These checks verify the existing application build and regression suite, not live Supabase authentication or production readiness.
+A separate temporary, read-only GitHub Actions experiment resolved `@supabase/supabase-js` v`2.119.2` and generated a candidate lockfile. Its `npm ci --ignore-scripts` and `npm audit` both passed with zero reported vulnerabilities. See [workflow run #3](https://github.com/msdshopfinds12/infiniteX-5626f61e/actions/runs/44682539105), artifact ID `14604862693`. The candidate was not committed; repository package manifest and lockfile remain synchronized without the SDK dependency.
+
+These checks verify the current source, regression suite, and production build. They do not verify live Supabase authentication, RLS isolation, or production readiness.
 
 ## P1 integration blocker
 
