@@ -47,6 +47,9 @@ export default function ProjectList({
       } else {
         setState({ key: requestKey, status: "error", code: result.code });
       }
+    }).catch(() => {
+      // Defend the UI boundary even if an injected adapter violates its result contract.
+      if (active) setState({ key: requestKey, status: "error", code: "request_failed" });
     });
 
     return () => { active = false; };
