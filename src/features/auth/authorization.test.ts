@@ -49,7 +49,7 @@ test("denies expired or invalid snapshot timestamps", () => {
   );
   assert.deepEqual(
     evaluateCapabilityAccess(authenticated, { ...snapshot, expiresAt: Number.NaN }, "workspace.read", 1),
-    { allowed: false, reason: "snapshot-expired" },
+    { allowed: false, reason: "snapshot-unavailable" },
   );
 });
 
