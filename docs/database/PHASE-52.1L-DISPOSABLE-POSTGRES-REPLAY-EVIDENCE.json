@@ -1,0 +1,47 @@
+{
+  "artifact": "PHASE_52_1L_DISPOSABLE_POSTGRES_REPLAY_EVIDENCE_REVIEW",
+  "repository": "msdshopfinds12-spec/infiniteX-5626f61e",
+  "evidence_run": {
+    "id": 44753723123,
+    "url": "https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44753723123",
+    "head_branch": "engineering/phase-52-1d-reconstructed-baseline",
+    "head_commit": "80697a74e0a893b5b0d722d7d50e7261d7a7b044",
+    "overall_conclusion": "failure",
+    "replay_job_id": 136347892505,
+    "replay_job_name": "Supabase PostgreSQL 17 disposable migration-chain rehearsal",
+    "replay_job_conclusion": "success",
+    "postgres_version": "17.6",
+    "recovered_migrations_passed": 19,
+    "reconstructed_baseline": "PASS_DISPOSABLE_NONCANONICAL_FIXTURE",
+    "candidate_migration": "PASS_DISPOSABLE_SEPARATELY_CLASSIFIED",
+    "container_cleanup": "CONFIRMED_IN_JOB_LOG"
+  },
+  "same_blobs_between_prior_run_commit_and_current_52_1k_branch": {
+    "manifest": "9866d287017b845e869f00510c69e9a9a660cdf5",
+    "replay_runner": "be45a53a3b2d4f30fddc6bbdcf1e4fc937822e53",
+    "workflow": "df3dd917b09f60b173d057451f911f8b3ed86813"
+  },
+  "exact_19_sql_blob_equivalence": "NOT_ESTABLISHED",
+  "current_52_1k_branch_replay": "NOT_VERIFIED",
+  "independent_workflow_failure": {
+    "job": "Offline migration and contract checks",
+    "cause": "Legacy or incomplete contract snapshot; fresh Schema Contract V2 capture required",
+    "classification": "BLOCKED",
+    "gate_behavior": "Expected merge-blocking failure"
+  },
+  "original_git_provenance": "NOT_ESTABLISHED",
+  "canonical_bootstrap": "NOT_ESTABLISHED",
+  "schema_contract_v2": "BLOCKED",
+  "live_vs_replay_catalog_parity": "NOT_RUN",
+  "production_migrations_authorized": false,
+  "production_writes_authorized": false,
+  "merge_authorized": false,
+  "deployment_authorized": false,
+  "next_steps": [
+    "Compare all 19 SQL blob SHAs at the prior run commit and current Phase 52.1K branch head",
+    "Compare candidate migration blob separately",
+    "Rerun the workflow on exact current Phase 52.1K branch head if any source differs or equivalence remains unverified",
+    "Obtain approved read-only Schema Contract V2 capture",
+    "Perform exact live-vs-replay catalog parity review"
+  ]
+}
