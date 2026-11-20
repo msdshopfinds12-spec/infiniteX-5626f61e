@@ -135,3 +135,23 @@ Do not drop these indexes solely from the advisor result. Confirm workload, quer
 ## 9. Explicit non-actions
 
 No SQL writes, migrations, function deployments, cron changes, secret reads/changes, billing changes, production data writes, merges, or releases were performed. Vault secret values were not retrieved. This report does not claim successful live workflow execution.
+
+
+## 10. Phase 67 — read-only concurrency contract verification (2026-11-21)
+
+A fresh read-only catalog inspection reconfirmed the exact definitions of both private claim functions, public wrappers, and worker-secret verifier.
+
+- Authenticated claim uses `auth.uid()`, clamps the batch to 1..5, selects the caller's queued runs with `FOR UPDATE SKIP LOCKED`, then atomically sets running state and increments attempt.
+- Internal claim marks leases older than 15 minutes as failed at attempt >= 5, requeues those below 5, and then claims queued rows using `FOR UPDATE SKIP LOCKED` with an atomic attempt increment.
+- `workflow_step_runs` has the unique constraint `UNIQUE (run_id, step_id)`.
+- The public internal-claim wrapper and worker-secret verifier grants are restricted to postgres/service_role in the inspected routine privilege results; no anon/authenticated execute grants were returned.
+- The private authenticated claim function grant includes authenticated, postgres, and service_role; no anon execute grant was returned.
+- All claim and verifier SECURITY DEFINER definitions use an empty search_path and fully qualified object references.
+
+**Important limitation:** this is catalog-definition verification, not a live two-session concurrency test. No rows were inserted or changed.
+
+### GitHub reproducibility blocker
+
+The candidate branch has no `supabase/config.toml` and no `supabase/migrations/` directory, while the connected database reports 19 applied migrations. Consequently, the repository cannot currently recreate the live workflow schema from a clean local stack. A faithful pgTAP or concurrent integration suite must wait until the exact migration source is recovered and committed. Do not replace missing migrations with a guessed schema.
+
+See [Phase 67 — Database Concurrency Verification](PHASE-67-DATABASE-CONCURRENCY-VERIFICATION.md) for the RPC definitions, verified constraints, test acceptance criteria, and safety boundary.
