@@ -118,3 +118,45 @@ test("completion helper rejects malformed RPC identity and replay fields", async
     );
   }
 });
+
+
+test("allowlisted event metadata is passed atomically with a stable idempotency key", async () => {
+  let captured;
+  const input = {
+    ...validInput,
+    event: {
+      eventType: "notification.requested",
+      payload: {
+        recipient_ref: "81000000-4000-4000-8000-000000000001",
+        template_key: "welcome-v1",
+      },
+    },
+  };
+  const result = await completeWorkflowStepWithOutbox(async (name, args) => {
+    assert.equal(name, "simula_complete_step_with_outbox");
+    captured = args;
+    return { data: [{ step_run_id: "81000000-4000-4000-8000-000000000005", outbox_id: "81000000-4000-4000-8000-000000000006", replayed: false }], error: null };
+  }, input);
+  assert.equal(result.outboxId, "81000000-4000-4000-8000-000000000006");
+  assert.equal(captured.p_event_type, "notification.requested");
+  assert.equal(captured.p_idempotency_key,
+    "phase90:81000000-4000-4000-8000-000000000001:81000000-3000-4000-8000-000000000001:81000000-2000-4000-8000-000000000001:1:notification.requested");
+  assert.deepEqual(captured.p_payload, input.event.payload);
+});
+
+test("completion helper rejects unregistered event types and malformed event payloads before RPC", async () => {
+  let calls = 0;
+  const rpc = async () => { calls++; return { data: [], error: null }; };
+  await assert.rejects(() => completeWorkflowStepWithOutbox(rpc, {
+    ...validInput,
+    event: { eventType: "arbitrary.webhook", payload: {} },
+  }), /step_run_finish_invalid_event/);
+  await assert.rejects(() => completeWorkflowStepWithOutbox(rpc, {
+    ...validInput,
+    event: { eventType: "notification.requested", payload: {
+      recipient_ref: "https://example.com",
+      template_key: "welcome",
+    } },
+  }), /step_run_finish_invalid_event/);
+  assert.equal(calls, 0);
+});
