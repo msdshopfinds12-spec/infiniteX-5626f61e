@@ -70,7 +70,7 @@ export async function completeWorkflowStepWithOutbox(
       event.eventType !== "notification.requested" ||
       !payload ||
       Object.keys(payload).length !== 2 ||
-      !isUuid(recipientRef) ||
+      !isUuid(recipientRef) || recipientRef !== input.ownerId ||
       typeof templateKey !== "string" ||
       !/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(templateKey)
     ) {
