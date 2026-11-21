@@ -112,7 +112,7 @@ export default function AuthScreen({ actions }: AuthScreenProps) {
           </button>
         </div>}
 
-        <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <form className="auth-form" data-testid="auth-form" onSubmit={handleSubmit} noValidate>
           <label className="auth-label" htmlFor="auth-email">Email address</label>
           <div className="auth-input-wrap">
             <Mail size={17} aria-hidden="true" />
