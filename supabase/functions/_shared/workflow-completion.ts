@@ -30,10 +30,16 @@ export async function completeWorkflowStepWithOutbox(
   rpc: CompletionRpc,
   input: WorkflowStepCompletionInput,
 ): Promise<WorkflowStepCompletionResult> {
+  // TypeScript types do not validate values arriving across runtime boundaries.
+  // Validate the complete envelope before property access or string operations.
   if (
-    !input.ownerId.trim() || !input.runId.trim() || !input.stepId.trim() ||
+    !isRecord(input) ||
+    typeof input.ownerId !== "string" || !input.ownerId.trim() ||
+    typeof input.runId !== "string" || !input.runId.trim() ||
+    typeof input.stepId !== "string" || !input.stepId.trim() ||
     !Number.isSafeInteger(input.attempt) || input.attempt < 1 ||
-    !isRecord(input.output)
+    !isRecord(input.output) ||
+    typeof rpc !== "function"
   ) {
     throw new Error("step_run_finish_invalid_input");
   }
@@ -54,7 +60,9 @@ export async function completeWorkflowStepWithOutbox(
     throw new Error("step_run_finish_failed");
   }
 
-  if (!isRecord(response) || response.error !== null) throw new Error("step_run_finish_failed");
+  if (!isRecord(response) || response.error !== null) {
+    throw new Error("step_run_finish_failed");
+  }
 
   const row = Array.isArray(response.data) ? response.data[0] : response.data;
   if (!isRecord(row) || typeof row.step_run_id !== "string" || !row.step_run_id.trim()) {
