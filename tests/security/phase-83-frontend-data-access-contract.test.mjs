@@ -93,7 +93,7 @@ test("workspace distinguishes live account metadata from unverified capabilities
   const snapshot = await read("src/features/overview/overview-snapshot.ts");
   assert.match(app, /READ-ONLY INTEGRATION/);
   assert.match(app, /DEMO MODE/);
-  assert.match(app, /AI agent runtime/);
+  assert.match(app, /AI model provider/);
   assert.match(app, /Execution telemetry/);
   assert.match(app, /Security posture/);
   assert.match(app, /Not assessed in this UI/);
