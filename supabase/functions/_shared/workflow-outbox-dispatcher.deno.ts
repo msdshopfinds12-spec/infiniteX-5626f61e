@@ -129,3 +129,40 @@ Deno.test("dispatcher enforces method and bounded request body", async () => {
   }));
   assert(bodyResponse.status === 413, "oversized request bodies must be rejected");
 });
+
+
+Deno.test("dispatcher never reports simulation when the RPC returns no confirmed state row", async () => {
+  const handler = createOutboxDryRunDispatcherHandler({
+    authenticate: async () => ({
+      ok: true,
+      admin: {
+        rpc: async (name) => name === "simula_claim_workflow_outbox"
+          ? { data: [event], error: null }
+          : { data: [], error: null },
+      },
+    }),
+    now: () => new Date(nowMs),
+  });
+  const response = await handler(new Request("https://worker.test", { method: "POST" }));
+  const body = await response.json();
+  assert(response.status === 200, "RPC contract mismatch should be reported in summary");
+  assert(body.simulated === 0 && body.deferred === 1, "missing state row must be deferred, never reported simulated");
+});
+
+Deno.test("dispatcher never reports rejection when retry RPC returns no confirmed state row", async () => {
+  const malformed = { ...event, payload: { unexpected: "field" } };
+  const handler = createOutboxDryRunDispatcherHandler({
+    authenticate: async () => ({
+      ok: true,
+      admin: {
+        rpc: async (name) => name === "simula_claim_workflow_outbox"
+          ? { data: [malformed], error: null }
+          : { data: [], error: null },
+      },
+    }),
+    now: () => new Date(nowMs),
+  });
+  const response = await handler(new Request("https://worker.test", { method: "POST" }));
+  const body = await response.json();
+  assert(body.rejected === 0 && body.deferred === 1, "unconfirmed retry state must be deferred");
+});
