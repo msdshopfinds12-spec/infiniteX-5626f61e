@@ -53,6 +53,9 @@ Deno.test({
     const stepId = crypto.randomUUID();
     let workflowCreated = false;
     let runCreated = false;
+    let testFailed = false;
+    let primaryError: unknown;
+    const cleanupErrors: string[] = [];
 
     try {
       const ownerFixture = await admin.from("workflows")
@@ -237,21 +240,54 @@ Deno.test({
         "concurrent owner-scoped claims changed an unrelated owner run");
 
       console.log("PHASE 103.4 CONCURRENCY AND STALE-GENERATION FENCING: PASS");
+    } catch (error) {
+      testFailed = true;
+      primaryError = error;
     } finally {
-      const cleanupErrors: string[] = [];
+      // Keep cleanup independent: attempt both exact synthetic fixture deletes,
+      // but never allow a cleanup failure to erase the original test failure.
       if (runCreated) {
         try {
-          const { error } = await admin.from("workflow_runs").delete().eq("id", runId);
+          const { data, error } = await admin.from("workflow_runs")
+            .delete()
+            .eq("id", runId)
+            .eq("owner_id", ownerId)
+            .select("id")
+            .maybeSingle();
           if (error) cleanupErrors.push("run cleanup: " + error.message);
-        } catch (error) { cleanupErrors.push("run cleanup: " + String(error)); }
+          else if (data?.id !== runId) cleanupErrors.push("run cleanup: exact synthetic run deletion was not confirmed");
+        } catch (error) {
+          cleanupErrors.push("run cleanup: " + String(error));
+        }
       }
       if (workflowCreated) {
         try {
-          const { error } = await admin.from("workflows").delete().eq("id", workflowId);
+          const { data, error } = await admin.from("workflows")
+            .delete()
+            .eq("id", workflowId)
+            .eq("owner_id", ownerId)
+            .select("id")
+            .maybeSingle();
           if (error) cleanupErrors.push("workflow cleanup: " + error.message);
-        } catch (error) { cleanupErrors.push("workflow cleanup: " + String(error)); }
+          else if (data?.id !== workflowId) cleanupErrors.push("workflow cleanup: exact synthetic workflow deletion was not confirmed");
+        } catch (error) {
+          cleanupErrors.push("workflow cleanup: " + String(error));
+        }
       }
-      if (cleanupErrors.length) throw new Error("PHASE1034_FIXTURE_CLEANUP_FAILED: " + cleanupErrors.join("; "));
+    }
+
+    if (testFailed && cleanupErrors.length > 0) {
+      throw new AggregateError(
+        [primaryError, ...cleanupErrors.map((message) => new Error(message))],
+        "PHASE1034_TEST_AND_CLEANUP_FAILED: original test error preserved",
+      );
+    }
+    if (testFailed) throw primaryError;
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(
+        cleanupErrors.map((message) => new Error(message)),
+        "PHASE1034_FIXTURE_CLEANUP_FAILED",
+      );
     }
   },
 });
