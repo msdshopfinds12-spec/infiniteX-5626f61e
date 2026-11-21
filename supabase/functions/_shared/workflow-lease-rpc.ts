@@ -48,12 +48,16 @@ export async function claimWorkflowLeases(
       !Number.isInteger(leaseSeconds) || leaseSeconds < 30 || leaseSeconds > 900) {
     throw new WorkflowLeaseError("LEASE_INVALID");
   }
-  const data = await invoke(rpc, LEASE_RPC.claim, {
+  // Omit the optional UUID filter when absent. Sending an explicit JSON null
+  // can prevent PostgREST from resolving a typed optional UUID argument against
+  // its cached function signature; PostgreSQL already supplies DEFAULT NULL.
+  const args: Record<string, unknown> = {
     p_limit: limit,
     p_lease_seconds: leaseSeconds,
-    p_run_id: options.runId ?? null,
     p_owner_id: options.ownerId,
-  });
+  };
+  if (options.runId !== undefined) args.p_run_id = options.runId;
+  const data = await invoke(rpc, LEASE_RPC.claim, args);
   if (!Array.isArray(data)) throw new WorkflowLeaseError("LEASE_INVALID");
   return data.map((row) => {
     if (!row || typeof row !== "object" || Array.isArray(row)) {
