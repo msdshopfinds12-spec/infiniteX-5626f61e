@@ -52,8 +52,9 @@ Deno.test({
     const runId = crypto.randomUUID();
     let workflowCreated = false;
     try {
-      // Scope every claim to this synthetic run through the public facade's p_run_id filter.
-      // This prevents unrelated owner-A queue fixtures from changing the test outcome.
+      // The Phase 103.1 public facade filters by owner, not run ID.
+      // Owner 810...0003 is reserved for this isolated lease-test fixture in the CI seed.
+      // This keeps unrelated owner-A queue fixtures out without changing the public RPC.
       const { error: workflowError } = await admin.from("workflows").insert({
         id: workflowId, owner_id: ownerId, name: "phase-1026-lease-fixture",
         status: "draft", trigger_type: "manual",
@@ -69,7 +70,7 @@ Deno.test({
 
       // A different authenticated owner scope must never claim this run.
       const claimArgs = {
-        p_limit: 1, p_lease_seconds: 30, p_owner_id: ownerId, p_run_id: runId,
+        p_limit: 1, p_lease_seconds: 30, p_owner_id: ownerId,
       };
       const wrongOwnerClaim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
         ...claimArgs, p_owner_id: "81000000-0000-4000-8000-000000000004",
