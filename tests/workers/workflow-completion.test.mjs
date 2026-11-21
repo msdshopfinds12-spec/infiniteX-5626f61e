@@ -99,3 +99,29 @@ test("completion helper rejects multiple returned completion rows", async () => 
     { message: "workflow_step_attempt_superseded" },
   );
 });
+
+import { createWorkflowStepCompletedEvent } from "../../supabase/functions/_shared/workflow-outbox-contract.ts";
+
+test("completion helper atomically forwards only a validated optional outbox event", async () => {
+  const event = createWorkflowStepCompletedEvent({ runId: "run-1", stepId: "step-1", attempt: 1 });
+  const result = await completeWorkflowStepWithOutbox(async (_name, args) => {
+    assert.equal(args.p_event_type, "workflow.step.completed");
+    assert.equal(args.p_idempotency_key, event.idempotencyKey);
+    assert.deepEqual(args.p_payload, event.payload);
+    return { data: [{ step_run_id: "step-run-1", outbox_id: "outbox-1", replayed: false }], error: null };
+  }, { ...validInput, outboxEvent: event });
+  assert.equal(result.outboxId, "outbox-1");
+});
+
+test("completion helper rejects event identity mismatch before RPC", async () => {
+  const event = createWorkflowStepCompletedEvent({ runId: "different-run", stepId: "step-1", attempt: 1 });
+  let calls = 0;
+  await assert.rejects(
+    completeWorkflowStepWithOutbox(async () => {
+      calls++;
+      return { data: [{ step_run_id: "step-run-1" }], error: null };
+    }, { ...validInput, outboxEvent: event }),
+    { message: "step_run_finish_invalid_input" },
+  );
+  assert.equal(calls, 0);
+});
