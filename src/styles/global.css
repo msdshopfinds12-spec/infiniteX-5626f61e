@@ -1895,3 +1895,30 @@ input:disabled {
     padding: 14px;
   }
 }
+
+
+/* ---------- Workflow run status synchronization ---------- */
+.workflow-run-history-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.workflow-run-history-toolbar .workflow-meta {
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .workflow-run-history-toolbar {
+    align-items: stretch;
+  }
+
+  .workflow-run-history-toolbar .btn {
+    min-height: 40px;
+    justify-content: center;
+  }
+}
