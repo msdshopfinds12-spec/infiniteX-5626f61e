@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - phase-81/postgrest-worker-http-integration
+      - phase-90-transactional-outbox-integration
     paths:
       - ".github/workflows/phase-81-postgrest-worker-http-integration.yml"
       - "supabase/migrations/**"
