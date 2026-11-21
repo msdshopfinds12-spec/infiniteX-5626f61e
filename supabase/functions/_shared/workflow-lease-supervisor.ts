@@ -81,8 +81,9 @@ export class WorkflowLeaseSupervisor {
     this.#terminal = true;
     this.#clearTimer();
     if (!this.signal.aborted) this.#controller.abort(new WorkflowLeaseError("LEASE_CANCELLED"));
-    // Do not allow a late heartbeat result to revive the terminal supervisor.
-    if (this.#inFlight) await this.#inFlight.catch(() => undefined);
+    // Detach any in-flight request: it may be stuck at the transport layer.
+    // #renew checks #terminal before accepting a response, so a late result
+    // cannot revive this supervisor. release() must never hang on network I/O.
   }
 
   async #renew(): Promise<void> {
