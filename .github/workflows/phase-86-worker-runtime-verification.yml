@@ -51,6 +51,10 @@ jobs:
         run: npm ci
       - name: Run worker source/runtime parity contracts
         run: npm run test:worker-runtime-parity
+      - name: Type-check shared workflow lease supervisor and RPC adapter
+        run: deno check --no-lock --node-modules-dir=auto supabase/functions/_shared/workflow-lease-supervisor.test.ts supabase/functions/_shared/workflow-lease-rpc.test.ts
+      - name: Execute deterministic lease supervisor and RPC adapter tests
+        run: deno test --no-check supabase/functions/_shared/workflow-lease-supervisor.test.ts supabase/functions/_shared/workflow-lease-rpc.test.ts
       - name: Type-check authenticated and cron worker handlers
         run: deno check --no-lock --node-modules-dir=auto supabase/functions/simula-workflow-worker/index.deno.ts
       - name: Execute authenticated and cron worker handler tests
