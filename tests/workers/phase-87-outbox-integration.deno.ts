@@ -165,3 +165,73 @@ Deno.test({
     console.log("Phase 87: transactional outbox integration verified");
   },
 });
+
+Deno.test({
+  name: "Phase 87.2: concurrent same-key requests across independent runs preserve atomicity",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  fn: async () => {
+    const url = required("PHASE81_POSTGREST_URL");
+    const serviceJwt = required("PHASE81_SERVICE_JWT");
+    const userId = required("PHASE81_USER_ID");
+    const admin = createClient(url, serviceJwt, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: {
+        headers: { Authorization: "Bearer " + serviceJwt },
+        fetch: postgrestFetch,
+      },
+    });
+
+    const workflowId = "81000000-1000-4000-8000-000000000001";
+    const stepId = "81000000-2000-4000-8000-000000000001";
+    const runA = "81000000-3000-4000-8000-000000000006";
+    const runB = "81000000-3000-4000-8000-000000000007";
+    const sharedKey = "phase87-concurrent-cross-run-key-0002";
+
+    const { error: runSeedError } = await admin.from("workflow_runs").insert([
+      { id: runA, workflow_id: workflowId, owner_id: userId, status: "running", input: { test: "race-a" }, attempt: 1 },
+      { id: runB, workflow_id: workflowId, owner_id: userId, status: "running", input: { test: "race-b" }, attempt: 1 },
+    ]);
+    assert(!runSeedError, "both independent synthetic runs must be seeded: " + (runSeedError?.message ?? ""));
+
+    const { error: stepSeedError } = await admin.from("workflow_step_runs").insert([
+      { run_id: runA, step_id: stepId, owner_id: userId, status: "running", input: { test: "race-a" }, attempt: 1 },
+      { run_id: runB, step_id: stepId, owner_id: userId, status: "running", input: { test: "race-b" }, attempt: 1 },
+    ]);
+    assert(!stepSeedError, "both independent synthetic step runs must be seeded: " + (stepSeedError?.message ?? ""));
+
+    const makeArgs = (runId: string) => ({
+      p_owner_id: userId,
+      p_run_id: runId,
+      p_step_id: stepId,
+      p_attempt: 1,
+      p_output: { race: "same-key" },
+      p_event_type: "notification.requested",
+      p_idempotency_key: sharedKey,
+      p_payload: { recipient_ref: "synthetic-concurrent-recipient", template: "test-only" },
+    });
+
+    // Separate run-row locks allow both transactions to reach the unique
+    // owner/key boundary concurrently. Exactly one can own this idempotency key.
+    const results = await Promise.all([
+      admin.rpc("simula_complete_step_with_outbox", makeArgs(runA)),
+      admin.rpc("simula_complete_step_with_outbox", makeArgs(runB)),
+    ]);
+    const winners = results.filter((result) => !result.error);
+    const losers = results.filter((result) => Boolean(result.error));
+    assert(winners.length === 1 && losers.length === 1,
+      "exactly one independent run may win a shared owner/idempotency key race");
+
+    const { data: stepStates, error: stateError } = await admin
+      .from("workflow_step_runs")
+      .select("run_id,status")
+      .in("run_id", [runA, runB]);
+    assert(!stateError && stepStates?.length === 2,
+      "both step generations must remain queryable after the race");
+    const succeeded = stepStates.filter((row: { status: string }) => row.status === "succeeded");
+    const stillRunning = stepStates.filter((row: { status: string }) => row.status === "running");
+    assert(succeeded.length === 1 && stillRunning.length === 1,
+      "losing transaction must roll back its step completion when outbox uniqueness rejects it");
+  },
+});
+
