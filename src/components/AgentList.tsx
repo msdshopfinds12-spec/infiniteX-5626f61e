@@ -1,56 +1,46 @@
-import { Dot } from "lucide-react";
+import { Bot, CircleOff, ShieldCheck, Activity } from "lucide-react";
 
-interface Agent {
-  id: string;
-  name: string;
-  role: string;
-  status: "running" | "idle" | "error";
-  task: string;
-}
-
-const sampleAgents: Agent[] = [
-  { id: "a1", name: "Atlas", role: "Planner", status: "running", task: "Demo: decomposing feature spec" },
-  { id: "a2", name: "Forge", role: "Codegen", status: "running", task: "Demo: writing API endpoints" },
-  { id: "a3", name: "Sentinel", role: "Reviewer", status: "idle", task: "Demo: awaiting next diff" },
-  { id: "a4", name: "Vault", role: "Security", status: "running", task: "Demo: scanning dependencies" },
-  { id: "a5", name: "Pulse", role: "Monitor", status: "error", task: "Demo: sample timeout state" },
-  { id: "a6", name: "Quill", role: "Docs", status: "idle", task: "Demo: queued for release notes" },
-];
-
-const statusClass: Record<Agent["status"], string> = {
-  running: "status-running",
-  idle: "status-idle",
-  error: "status-error",
-};
-
-export default function AgentList({ compact = false, searchTerm = "" }: { compact?: boolean; searchTerm?: string }) {
-  const query = searchTerm.trim().toLocaleLowerCase();
-  const filtered = sampleAgents.filter((agent) =>
-    [agent.name, agent.role, agent.status, agent.task].some((value) => value.toLocaleLowerCase().includes(query))
-  );
-  const visible = compact ? filtered.slice(0, 4) : filtered;
-
-  if (visible.length === 0) {
-    return <p className="empty-state" role="status">No sample agents match "{searchTerm}".</p>;
-  }
-
+export default function AgentList() {
   return (
-    <ul className="agent-list" aria-label="Demo agent records">
-      {visible.map((agent) => (
-        <li key={agent.id} className="agent-row">
-          <div className="agent-id">
-            <span className={"agent-dot " + statusClass[agent.status]} aria-hidden="true"><Dot size={18} /></span>
-            <div>
-              <div className="agent-name">{agent.name}</div>
-              <div className="agent-role">{agent.role}</div>
-            </div>
-          </div>
-          <div className="agent-task">
-            <span className={"status-pill " + statusClass[agent.status]}>{agent.status}</span>
-            <span className="agent-task-text">{agent.task}</span>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <section className="runtime-registry" aria-label="AI runtime capability status">
+      <div className="runtime-registry-intro">
+        <div className="runtime-registry-mark" aria-hidden="true"><Bot size={24} /></div>
+        <div>
+          <h3>AI runtime is not active</h3>
+          <p>The secure server-side request boundary is implemented and CI-verified. A production model provider has not been configured or approved.</p>
+        </div>
+      </div>
+
+      <div className="runtime-status-grid">
+        <article className="runtime-status-card">
+          <span className="runtime-status-icon"><ShieldCheck size={17} /></span>
+          <span className="runtime-status-label">Server boundary</span>
+          <strong>CI verified</strong>
+          <span className="runtime-status-detail">Repository checks passed</span>
+        </article>
+        <article className="runtime-status-card">
+          <span className="runtime-status-icon"><CircleOff size={17} /></span>
+          <span className="runtime-status-label">Model provider</span>
+          <strong>Disabled</strong>
+          <span className="runtime-status-detail">No provider key or endpoint configured</span>
+        </article>
+        <article className="runtime-status-card">
+          <span className="runtime-status-icon"><Bot size={17} /></span>
+          <span className="runtime-status-label">Agent registry</span>
+          <strong>Not connected</strong>
+          <span className="runtime-status-detail">No live agent registrations available</span>
+        </article>
+        <article className="runtime-status-card">
+          <span className="runtime-status-icon"><Activity size={17} /></span>
+          <span className="runtime-status-label">Execution telemetry</span>
+          <strong>Not measured</strong>
+          <span className="runtime-status-detail">No live model executions to report</span>
+        </article>
+      </div>
+
+      <p className="runtime-registry-note" role="note">
+        No sample agents or simulated running states are displayed. Provider activation requires a separately reviewed cost, privacy, quota and deployment plan.
+      </p>
+    </section>
   );
 }
