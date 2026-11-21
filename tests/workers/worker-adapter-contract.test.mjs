@@ -81,3 +81,16 @@ test("both adapters treat a lost workflow terminal compare-and-set as superseded
     assert.ok(source.includes("superseded"), `${name} adapter must report superseded work`);
   }
 });
+
+
+test("both worker adapters resolve only allowlisted outbox events before atomic completion", async () => {
+  for (const path of [
+    "../../supabase/functions/simula-workflow-worker/index.ts",
+    "../../supabase/functions/simula-workflow-cron-worker/index.ts",
+  ]) {
+    const source = await readFile(new URL(path, import.meta.url), "utf8");
+    assert.match(source, /resolveWorkflowOutboxEvent/);
+    assert.match(source, /resolveWorkflowOutboxEvent\(step\.action_type, config\)/);
+    assert.match(source, /event: outboxEvent/);
+  }
+});
