@@ -43,3 +43,7 @@
 
 **Status before CI:** IMPLEMENTED / NOT YET VERIFIED.
 **Release status:** NOT APPROVED.
+
+## Browser test harness correction
+
+The first Phase 99 Chromium attempt reached the browser journey but failed on a strict Playwright locator: the text "Authenticated session" is intentionally present in both the account strip and the session-aware sidebar footer. The assertion now waits on the first matching account-strip label. This is a test-selector ambiguity, not an authentication or application runtime defect. The corrected exact-head browser run is required before marking browser verification complete.
