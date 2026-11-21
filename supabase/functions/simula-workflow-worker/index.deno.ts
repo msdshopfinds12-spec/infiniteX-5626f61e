@@ -603,3 +603,88 @@ Deno.test("shared completion helper fails closed for RPC errors, thrown errors, 
     "missing completion identity must fail closed");
   assert(messages[3] === "step_run_finish_failed", "malformed RPC envelopes must fail with a sanitized error");
 });
+
+
+Deno.test("authenticated worker atomically attaches the allowlisted notification intent", async () => {
+  const db = new StatefulDatabase();
+  db.tables.workflow_steps[0].action_type = "emit_notification_intent";
+  db.tables.workflow_steps[0].config = {
+    recipient_ref: "81000000-1000-4000-8000-000000000001",
+    template_key: "welcome-v1",
+    suffix: "-one",
+  };
+  const handler = createAuthenticatedWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    corsHeadersForRequest: cors,
+    executeSafeAction: transformAction as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST", headers: { Authorization: "Bearer valid-token" }, body: JSON.stringify({ limit: 1 }),
+  }));
+  const body = await response.json();
+  assert(response.status === 200 && body.succeeded === 1, "authenticated event-producing workflow must succeed");
+  assert(db.completionCalls[0].args.p_event_type === "notification.requested",
+    "authenticated worker must pass the allowlisted event type to atomic completion");
+  assert(db.completionCalls[0].args.p_idempotency_key ===
+    "phase90:81000000-1000-4000-8000-000000000001:81000000-3000-4000-8000-000000000005:81000000-2000-4000-8000-000000000001:1:notification.requested",
+    "authenticated worker must use a stable run/step-generation idempotency key");
+  assert(JSON.stringify(db.completionCalls[0].args.p_payload) === JSON.stringify({
+    recipient_ref: "81000000-1000-4000-8000-000000000001",
+    template_key: "welcome-v1",
+  }), "authenticated worker must pass only the allowlisted event payload");
+  assert(db.completionCalls[1].args.p_event_type === null,
+    "ordinary steps must not create outbox events");
+});
+
+Deno.test("cron worker atomically attaches the same allowlisted notification intent", async () => {
+  const db = new StatefulDatabase();
+  db.tables.workflow_steps[0].action_type = "emit_notification_intent";
+  db.tables.workflow_steps[0].config = {
+    recipient_ref: "81000000-1000-4000-8000-000000000001",
+    template_key: "cron-notice",
+    suffix: "-one",
+  };
+  const handler = createCronWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    executeSafeAction: transformAction as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST", headers: { "x-simula-worker-secret": "s".repeat(40) }, body: JSON.stringify({ limit: 1 }),
+  }));
+  const body = await response.json();
+  assert(response.status === 200 && body.succeeded === 1, "cron event-producing workflow must succeed");
+  assert(db.completionCalls[0].args.p_event_type === "notification.requested",
+    "cron worker must pass the same allowlisted event type");
+  assert(db.completionCalls[0].args.p_payload !== null,
+    "cron worker must pass event metadata through shared completion");
+  assert(db.completionCalls[1].args.p_event_type === null,
+    "cron ordinary steps must not create outbox events");
+});
+
+Deno.test("workers reject cross-owner notification recipients before the completion RPC", async () => {
+  const db = new StatefulDatabase();
+  db.tables.workflow_steps[0].action_type = "emit_notification_intent";
+  db.tables.workflow_steps[0].config = {
+    recipient_ref: "81000000-4000-4000-8000-000000000099",
+    template_key: "welcome-v1",
+    suffix: "-one",
+  };
+  const handler = createAuthenticatedWorkerHandler({
+    createClient: statefulCreateClient(db),
+    env: configuredEnv,
+    corsHeadersForRequest: cors,
+    executeSafeAction: transformAction as never,
+    now: deterministicNow,
+  });
+  const response = await handler(new Request("https://worker.test", {
+    method: "POST", headers: { Authorization: "Bearer valid-token" }, body: JSON.stringify({ limit: 1 }),
+  }));
+  const body = await response.json();
+  assert(response.status === 200 && body.failed === 1, "cross-owner recipient intent must fail the workflow step");
+  assert(db.completionCalls.length === 0, "cross-owner recipient must be rejected before the RPC");
+  assert(db.tables.workflow_runs[0].status === "failed", "rejected recipient intent must not mark the workflow successful");
+});
