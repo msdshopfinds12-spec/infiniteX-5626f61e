@@ -179,12 +179,20 @@ Deno.test({
 
       console.log("PHASE 103.2 LEASE-FENCED STEP TRANSITIONS: PASS");
     } finally {
+      const cleanupErrors: string[] = [];
       for (const workflowId of createdWorkflows.reverse()) {
-        const { error } = await admin.from("workflows").delete().eq("id", workflowId);
-        if (error) throw new Error("PHASE1032_FIXTURE_CLEANUP_FAILED: " + error.message);
+        try {
+          const { error } = await admin.from("workflows").delete().eq("id", workflowId);
+          if (error) cleanupErrors.push("workflow " + workflowId + ": " + error.message);
+        } catch (error) {
+          cleanupErrors.push("workflow " + workflowId + ": " + String(error));
+        }
       }
       // The owner is a shared, pre-seeded disposable fixture identity.
       // Never delete it; only test-created workflow rows are cleaned up.
+      if (cleanupErrors.length > 0) {
+        throw new Error("PHASE1032_FIXTURE_CLEANUP_FAILED: " + cleanupErrors.join("; "));
+      }
     }
   },
 });
