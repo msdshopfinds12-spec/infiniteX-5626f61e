@@ -14,6 +14,7 @@ export type SupervisorOptions = {
   lease: WorkflowLease;
   leaseDurationSeconds?: number;
   heartbeatIntervalMs?: number;
+  heartbeatTimeoutMs?: number;
   scheduler?: Scheduler;
   onLeaseLost?: (error: WorkflowLeaseError) => void;
 };
@@ -39,6 +40,7 @@ export class WorkflowLeaseSupervisor {
   #started = false;
   #lease: WorkflowLease;
   #intervalMs: number;
+  #heartbeatTimeoutMs: number;
   #onLeaseLost?: (error: WorkflowLeaseError) => void;
 
   constructor(options: SupervisorOptions) {
@@ -55,7 +57,12 @@ export class WorkflowLeaseSupervisor {
     if (!Number.isInteger(interval) || interval < 1_000 || interval >= duration * 1000) {
       throw new WorkflowLeaseError("LEASE_INVALID");
     }
+    const timeout = options.heartbeatTimeoutMs ?? Math.min(10_000, Math.max(1_000, Math.floor(interval / 2)));
+    if (!Number.isInteger(timeout) || timeout < 500 || timeout >= interval) {
+      throw new WorkflowLeaseError("LEASE_INVALID");
+    }
     this.#intervalMs = interval;
+    this.#heartbeatTimeoutMs = timeout;
     this.signal = this.#controller.signal;
   }
 
@@ -87,8 +94,15 @@ export class WorkflowLeaseSupervisor {
   }
 
   async #renew(): Promise<void> {
+    let timeoutHandle: unknown = null;
     try {
-      const renewed = await this.#heartbeat(this.#lease);
+      const timeout = new Promise<never>((_resolve, reject) => {
+        timeoutHandle = this.#scheduler.setTimeout(
+          () => reject(new WorkflowLeaseError("LEASE_TRANSPORT_AMBIGUOUS")),
+          this.#heartbeatTimeoutMs,
+        );
+      });
+      const renewed = await Promise.race([this.#heartbeat(this.#lease), timeout]);
       if (this.#terminal) return;
       if (renewed.runId !== this.#lease.runId ||
           renewed.ownerId !== this.#lease.ownerId ||
@@ -104,6 +118,8 @@ export class WorkflowLeaseSupervisor {
         : new WorkflowLeaseError("LEASE_TRANSPORT_AMBIGUOUS", cause);
       this.#terminate(error);
       throw error;
+    } finally {
+      if (timeoutHandle !== null) this.#scheduler.clearTimeout(timeoutHandle);
     }
   }
 
