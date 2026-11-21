@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
     return response(req, 200, { ok: true, keys: data ?? [] });
   }
 
-  if (action === "create") {
+  if (parsed.value.action === "create") {
     const { label, scopes, expiresInDays } = parsed.value;
     const expiresAt = expiresInDays === undefined
       ? null
@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
     return response(req, 201, { ok: true, key: rawKey, record: data, warning: "Copy this key now. It cannot be retrieved again." });
   }
 
-  if (action === "revoke") {
+  if (parsed.value.action === "revoke") {
     const { id } = parsed.value;
     const { data, error } = await admin.from("platform_api_keys")
       .update({ revoked_at: new Date().toISOString() })
