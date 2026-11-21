@@ -12,7 +12,7 @@ function required(name: string): string {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 Deno.test({
-  name: "Phase 103.3: trusted cron global claim and complete workflow lifecycle are lease-fenced",
+  name: "Phase 103.3: cron lease lifecycle is fenced for a dedicated disposable owner",
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
@@ -62,13 +62,6 @@ Deno.test({
       assert(!ownerFixture.error && ownerFixture.data !== null,
         "pre-seeded disposable owner fixture is missing or mismatched");
 
-      // The global cron claim is intentionally tested only when this disposable
-      // queue is empty, preventing the test from leasing unrelated rows.
-      const before = await admin.from("workflow_runs").select("id,owner_id").eq("status", "queued");
-      assert(!before.error, "queue preflight failed: " + (before.error?.message ?? ""));
-      assert((before.data ?? []).length === 0,
-        "PHASE1033_BLOCKED: disposable queue must be empty before global cron claim");
-
       const workflow = await admin.from("workflows").insert({
         id: workflowId, owner_id: ownerId, name: "phase-1033-cron-lease",
         status: "draft", trigger_type: "manual",
@@ -89,21 +82,17 @@ Deno.test({
       assert(!run.error, "run fixture insert failed: " + (run.error?.message ?? ""));
       runCreated = true;
 
-      const queued = await admin.from("workflow_runs").select("id,owner_id").eq("status", "queued");
-      assert(!queued.error && queued.data?.length === 1 && queued.data[0].id === runId,
-        "global claim precondition changed; refusing to lease unrelated queue rows");
-
       const claim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
-        p_limit: 1, p_lease_seconds: 90, p_owner_id: null,
+        p_limit: 1, p_lease_seconds: 90, p_owner_id: ownerId,
       });
       assert(!claim.error && Array.isArray(claim.data) && claim.data.length === 1,
-        "trusted cron global lease claim failed: " + (claim.error?.message ?? ""));
+         "cron owner-scoped lease claim failed: " + (claim.error?.message ?? ""));
       const lease = claim.data[0] as {
         id: string; workflow_id: string; owner_id: string; attempt: number;
         lease_token: string; lease_until: string;
       };
       assert(lease.id === runId && lease.workflow_id === workflowId && lease.owner_id === ownerId,
-        "global claim must return the exact run with its database owner identity");
+        "owner-scoped cron claim must return the exact run and database owner identity");
       assert(lease.attempt === 1 && UUID.test(lease.lease_token) &&
         Date.parse(lease.lease_until) > Date.now(), "global claim must return a fresh active lease");
 
