@@ -139,6 +139,24 @@ jobs:
           PGDATABASE: infinitex_rehearsal
         run: psql -X -v ON_ERROR_STOP=1 -f supabase/patches/phase-103-1-owner-scoped-workflow-lease-claim.sql
 
+      - name: Verify disposable lease claim function signature and grants
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -c "
+            SELECT n.nspname, p.proname, p.proargnames,
+                   pg_catalog.pg_get_function_identity_arguments(p.oid) AS identity_arguments,
+                   pg_catalog.has_function_privilege('service_role', p.oid, 'EXECUTE') AS service_role_can_execute
+            FROM pg_catalog.pg_proc AS p
+            JOIN pg_catalog.pg_namespace AS n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public'
+              AND p.proname = 'simula_claim_workflow_runs_lease_internal';
+          "
+
       - name: Apply Phase 103.2 lease-fenced step transition patch to disposable database
         env:
           PGHOST: 127.0.0.1
