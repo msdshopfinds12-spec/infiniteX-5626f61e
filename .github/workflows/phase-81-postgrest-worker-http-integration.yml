@@ -93,6 +93,9 @@ jobs:
           docker logs infinitex-phase81-postgres
           exit 1
 
+      - name: Report candidate migration SHA-256 for provenance diagnostics
+        run: sha256sum supabase/migrations/20261121000400_simula_outbox_simulation_state.sql
+
       - name: Replay reviewed migration chain in disposable database
         env:
           PGHOST: 127.0.0.1
