@@ -1,5 +1,6 @@
 import {
   claimWorkflowLeases,
+  claimCronWorkflowLeases,
   heartbeatWorkflowLease,
   finishWorkflowRunWithLease,
   completeWorkflowStepWithLease,
@@ -34,6 +35,20 @@ Deno.test("claim adapter validates and maps owner-scoped database lease rows", a
   assert(captured?.p_owner_id === leaseRow.owner_id && captured.p_limit === 2, "owner scope sent");
   assert(!Object.prototype.hasOwnProperty.call(captured, "p_run_id"),
     "absent optional UUID filter must be omitted so PostgREST uses DEFAULT NULL");
+});
+
+Deno.test("cron claim adapter uses the trusted global scope and validates every returned owner", async () => {
+  let captured: Record<string, unknown> | undefined;
+  const rpc: LeaseRpc = async (name, args) => {
+    assert(name === "simula_claim_workflow_runs_lease_internal", "cron claim RPC name");
+    captured = args;
+    return { data: [leaseRow], error: null };
+  };
+  const leases = await claimCronWorkflowLeases(rpc, { limit: 2, leaseSeconds: 60 });
+  assert(leases.length === 1 && leases[0].ownerId === leaseRow.owner_id, "database owner identity retained");
+  assert(Object.prototype.hasOwnProperty.call(captured, "p_owner_id") && captured?.p_owner_id === null,
+    "cron must explicitly request global scope only through its dedicated adapter");
+  assert(captured?.p_limit === 2 && captured?.p_lease_seconds === 60, "bounded cron options forwarded");
 });
 
 Deno.test("claim adapter rejects malformed database rows", async () => {
