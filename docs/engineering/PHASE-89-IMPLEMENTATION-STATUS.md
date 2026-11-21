@@ -57,12 +57,12 @@ The helper continues to pass null event metadata. This change hardens the comple
 | GitHub source commits | SOURCE CHANGED |
 | Read-service regression tests added | SOURCE CHANGED |
 | Worker completion regression tests added | SOURCE CHANGED |
-| Exact-head CI | NOT VERIFIED — awaiting GitHub Actions |
+| Exact-head test/build CI | NOT VERIFIED — no PR-triggered test run is available on this branch yet |
 | Local npm test execution | NOT RUN |
 | Production schema parity | NOT VERIFIED |
 | Production migration | NOT PERFORMED |
 | Outbox dispatcher delivery | NOT VERIFIED |
-| Deployment | NOT PERFORMED |
+| Deployment | NOT PERFORMED; Vercel checks report a deployment-rate-limit blocker, not a source build result |
 
 ## Remaining critical work
 
@@ -80,3 +80,10 @@ The helper continues to pass null event metadata. This change hardens the comple
 No production migration, deployment, merge, provider credential, paid usage, or destructive change is included in this phase. Each requires separate review and approval.
 
 **Definition of done:** all changed source and test files pass exact-head CI; outbox lifecycle and tenant isolation have reproducible disposable-environment evidence; frontend states are backed by persisted data; unresolved environment and release blockers are documented.
+
+## CI routing and observed external checks
+
+- Updated `.github/workflows/infinitex-ci.yml` so pull requests targeting `phase-88-frontend-backend-reconciliation` invoke the core Node 22 pipeline (`npm ci`, `npm audit`, lint, regression tests, and production build).
+- The branch has no PR-triggered core test run yet. This is **NOT VERIFIED**, not a pass or a failure of the application tests.
+- The observed Vercel commit statuses report `Deployment rate limited — retry in 24 hours` for the linked Vercel projects. This is an infrastructure/quota blocker; it does not establish whether TypeScript compilation or application tests pass.
+- Supabase Preview previously reported that this branch was not associated with a Supabase Branch. No Supabase preview database was created by this work.
