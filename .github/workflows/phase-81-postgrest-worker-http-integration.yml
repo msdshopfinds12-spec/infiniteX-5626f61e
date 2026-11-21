@@ -252,7 +252,7 @@ jobs:
           wait "$phase1026_sampler_pid" || true
           echo "=== Phase 102.6 live PostgreSQL lock/activity samples (SQL text omitted) ==="
           cat "$phase1026_diagnostic_log"
-          exit "$phase1026_test_status"
+          if (( phase1026_test_status != 0 )); then exit "$phase1026_test_status"; fi
           deno check --no-lock --node-modules-dir=auto tests/workers/phase-103-2-lease-fenced-step-transitions.deno.ts
           PHASE1032_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-103-2-lease-fenced-step-transitions.deno.ts
           deno check --no-lock --node-modules-dir=auto tests/workers/phase-103-3-cron-worker-lease.deno.ts
