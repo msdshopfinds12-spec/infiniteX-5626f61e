@@ -25,6 +25,10 @@ The authenticated worker currently:
 
 The worker therefore still has lifecycle bypasses and is not lease-migrated.
 
+## PostgREST claim RPC contract
+
+The authenticated worker calls the public facade with exactly three named parameters: `p_limit`, `p_lease_seconds`, and `p_owner_id`. The public facade delegates to the private four-argument implementation with `p_run_id = NULL`. This avoids relying on PostgREST to resolve a call that omits a middle defaulted UUID argument. The private implementation retains its optional run filter for controlled internal use. The facade remains executable only by `service_role`.
+
 ## Target flow
 
 1. Authenticate the request before creating or using the service-role client.
