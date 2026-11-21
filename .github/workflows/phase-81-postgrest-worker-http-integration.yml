@@ -284,7 +284,21 @@ jobs:
             GROUP BY state, wait_event_type, wait_event
             ORDER BY connections DESC;
           "
+          # Sample PostgreSQL while the replay RPC is in flight. The existing
+          # post-failure snapshot is too late to identify transient waits.
+          diagnostic_log="${RUNNER_TEMP:-/tmp}/phase1034-live-postgres.log"
+          : > "$diagnostic_log"
+          bash scripts/phase-1034-live-db-diagnostics.sh 24 > "$diagnostic_log" 2>&1 &
+          diagnostic_pid=$!
+          set +e
           PHASE1034_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-103-4-lease-concurrency.deno.ts
+          phase1034_test_status=$?
+          set -e
+          kill "$diagnostic_pid" 2>/dev/null || true
+          wait "$diagnostic_pid" || true
+          echo "=== Live PostgreSQL samples during Phase 103.4 replay probe (query text omitted) ==="
+          cat "$diagnostic_log"
+          exit "$phase1034_test_status"
 
       - name: Capture read-only PostgreSQL pool and lock diagnostics after failure
         if: failure()
