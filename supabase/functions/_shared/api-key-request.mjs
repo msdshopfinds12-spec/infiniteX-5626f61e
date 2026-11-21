@@ -1,6 +1,11 @@
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_SCOPES = new Set(["api:read", "api:write"]);
 
+/**
+ * @typedef {{ action: "list" } | { action: "create", label: string, scopes: Array<"api:read" | "api:write">, expiresInDays?: number } | { action: "revoke", id: string }} ApiKeyManagerRequest
+ * @typedef {{ ok: true, value: ApiKeyManagerRequest } | { ok: false, error: string }} ApiKeyRequestParse
+ */
+
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -10,6 +15,7 @@ function hasOnlyKeys(value, allowed) {
 }
 
 /** Strict allowlist parser shared by the Edge Function and regression tests. */
+/** @param {unknown} value @returns {ApiKeyRequestParse} */
 export function parseApiKeyManagerRequest(value) {
   if (!isRecord(value)) return { ok: false, error: "invalid_json_object" };
 
