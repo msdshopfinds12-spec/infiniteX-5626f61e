@@ -4,6 +4,41 @@ import { createWorkflowStepCompletedEvent } from "../../supabase/functions/_shar
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
+
+type LeaseRpcError = { code?: string; message?: string } | null | undefined;
+
+function assertLeaseSuperseded(error: LeaseRpcError, operation: string): void {
+  assert(error != null, operation + " unexpectedly succeeded; stale lease was not rejected");
+  assert(error.code === "40001",
+    operation + " must fail with SQLSTATE 40001; received " + String(error.code));
+  assert(typeof error.message === "string" &&
+    error.message.includes("workflow_run_lease_superseded"),
+    operation + " must report workflow_run_lease_superseded");
+}
+
+async function assertStaleLeaseRejected<T extends {
+  error: { code?: string; message?: string } | null;
+}>(operation: string, invoke: () => Promise<T>): Promise<void> {
+  const startedAt = performance.now();
+  let response: T;
+  try {
+    response = await invoke();
+  } catch (error) {
+    console.error("PHASE1034_STALE_LEASE_TRANSPORT_ERROR", {
+      operation,
+      durationMs: Math.round(performance.now() - startedAt),
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    throw error;
+  }
+  console.error("PHASE1034_STALE_LEASE_RESULT", {
+    operation,
+    durationMs: Math.round(performance.now() - startedAt),
+    code: response.error?.code ?? null,
+    message: response.error?.message ?? null,
+  });
+  assertLeaseSuperseded(response.error, operation);
+}
 function required(name: string): string {
   const value = Deno.env.get(name);
   if (!value) throw new Error("Missing Phase 103.4 environment value: " + name);
@@ -203,17 +238,15 @@ Deno.test({
         p_lease_token: secondLease.lease_token,
       };
 
-      const staleHeartbeat = await admin.rpc("simula_heartbeat_workflow_run", {
-        ...firstIdentity, p_extend_seconds: 90,
-      });
-      assert(Boolean(staleHeartbeat.error),
-        "previous generation heartbeat must be rejected after lease reclaim");
+      await assertStaleLeaseRejected("heartbeat", () =>
+        admin.rpc("simula_heartbeat_workflow_run", {
+          ...firstIdentity, p_extend_seconds: 90,
+        }));
 
-      const staleStart = await admin.rpc("simula_start_workflow_step_with_lease", {
-        ...firstIdentity, p_step_id: stepId, p_input: { generation: 1 },
-      });
-      assert(Boolean(staleStart.error),
-        "previous generation must not create or overwrite a step after reclaim");
+      await assertStaleLeaseRejected("start-step", () =>
+        admin.rpc("simula_start_workflow_step_with_lease", {
+          ...firstIdentity, p_step_id: stepId, p_input: { generation: 1 },
+        }));
 
       const currentHeartbeat = await admin.rpc("simula_heartbeat_workflow_run", {
         ...secondIdentity, p_extend_seconds: 90,
@@ -227,25 +260,23 @@ Deno.test({
       assert(!start.error && start.data?.length === 1,
         "current generation must start its matching step");
 
-      const staleFailure = await admin.rpc("simula_fail_workflow_step_with_lease", {
-        ...firstIdentity, p_step_id: stepId, p_error: "stale-generation-must-not-win",
-      });
-      assert(Boolean(staleFailure.error),
-        "stale generation must not fail a step owned by the current generation");
+      await assertStaleLeaseRejected("fail-step", () =>
+        admin.rpc("simula_fail_workflow_step_with_lease", {
+          ...firstIdentity, p_step_id: stepId, p_error: "stale-generation-must-not-win",
+        }));
 
       const event = createWorkflowStepCompletedEvent({ runId, stepId, attempt: secondLease.attempt });
 
       // A superseded generation must not complete the step or create an outbox row.
-      const staleComplete = await admin.rpc("simula_complete_step_with_outbox_lease", {
-        ...firstIdentity,
-        p_step_id: stepId,
-        p_output: { result: "stale-generation-must-not-win" },
-        p_event_type: event.eventType,
-        p_idempotency_key: event.idempotencyKey,
-        p_payload: event.payload,
-      });
-      assert(Boolean(staleComplete.error),
-        "stale generation completion must be rejected before any outbox write");
+      await assertStaleLeaseRejected("complete-step", () =>
+        admin.rpc("simula_complete_step_with_outbox_lease", {
+          ...firstIdentity,
+          p_step_id: stepId,
+          p_output: { result: "stale-generation-must-not-win" },
+          p_event_type: event.eventType,
+          p_idempotency_key: event.idempotencyKey,
+          p_payload: event.payload,
+        }));
 
       const complete = await admin.rpc("simula_complete_step_with_outbox_lease", {
         ...secondIdentity,
@@ -361,28 +392,42 @@ Deno.test({
         $phase1034$;
       `;
       const directPgStartedAt = performance.now();
-      const directPg = await new Deno.Command("psql", {
+      const directPgProcess = new Deno.Command("psql", {
         args: [
           "-X", "-v", "ON_ERROR_STOP=1",
           "-v", "phase1034_args=" + JSON.stringify(conflictingOutputArgs),
-          "-c", directSql,
+          "-f", "-",
         ],
+        stdin: "piped",
         stdout: "piped",
         stderr: "piped",
         env: { PGOPTIONS: "-c statement_timeout=5000", PGCONNECT_TIMEOUT: "5" },
-      }).output();
-      const directPgOutput = new TextDecoder().decode(directPg.stdout) +
-        new TextDecoder().decode(directPg.stderr);
+      }).spawn();
+      // psql performs :'variable' interpolation while reading a script from
+      // stdin; -c sends SQL directly and does not apply psql variable expansion.
+      const directPgStdoutPromise = new Response(directPgProcess.stdout).text();
+      const directPgStderrPromise = new Response(directPgProcess.stderr).text();
+      const directPgWriter = directPgProcess.stdin.getWriter();
+      await directPgWriter.write(new TextEncoder().encode(directSql));
+      await directPgWriter.close();
+      const [directPgStatus, directPgStdout, directPgStderr] = await Promise.all([
+        directPgProcess.status,
+        directPgStdoutPromise,
+        directPgStderrPromise,
+      ]);
+      const directPgOutput = directPgStdout + directPgStderr;
       const directPgResultLine = directPgOutput.split("\n").find((line) =>
         line.includes("PHASE1034_DIRECT_PG_REPLAY_RESULT")
       ) ?? null;
       console.error("PHASE1034_DIRECT_PG_REPLAY_DIAGNOSTIC", {
         durationMs: Math.round(performance.now() - directPgStartedAt),
-        exitCode: directPg.code,
+        exitCode: directPgStatus.code,
         resultLine: directPgResultLine,
       });
-      assert(directPg.success && directPgResultLine !== null,
+      assert(directPgStatus.success && directPgResultLine !== null,
         "direct PostgreSQL diagnostic must complete and report its caught outcome");
+      assert(directPgResultLine.includes("outbox_replay_step_state_mismatch"),
+        "direct PostgreSQL diagnostic must report the expected altered-output mismatch");
 
       // First issue the exact RPC through raw HTTP. This separates the
       // PostgREST/HTTP result from any Supabase-js response handling.
@@ -451,11 +496,11 @@ Deno.test({
         "same event key with altered step output must raise outbox_replay_step_state_mismatch",
       );
 
-      const staleFinish = await admin.rpc("simula_finish_workflow_run_lease", {
-        ...firstIdentity, p_terminal_status: "failed", p_error: "stale-generation-must-not-finish",
-      });
-      assert(Boolean(staleFinish.error),
-        "stale generation must not terminalize the reclaimed run");
+      await assertStaleLeaseRejected("finish-run", () =>
+        admin.rpc("simula_finish_workflow_run_lease", {
+          ...firstIdentity, p_terminal_status: "failed",
+          p_error: "stale-generation-must-not-finish",
+        }));
 
       const finish = await admin.rpc("simula_finish_workflow_run_lease", {
         ...secondIdentity, p_terminal_status: "succeeded",
