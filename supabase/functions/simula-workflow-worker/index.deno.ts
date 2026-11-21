@@ -556,7 +556,7 @@ Deno.test("shared completion helper validates input before calling the database"
   try {
     await completeWorkflowStepWithOutbox(async () => {
       calls++;
-      return { data: [{ step_run_id: "step-81000000-3000-4000-8000-000000000005" }], error: null };
+      return { data: [{ step_run_id: "81000000-4000-4000-8000-000000000001" }], error: null };
     }, { ownerId: "81000000-1000-4000-8000-000000000001", runId: "81000000-3000-4000-8000-000000000005", stepId: "81000000-2000-4000-8000-000000000001", attempt: 0, output: {} });
   } catch (error) {
     rejected = error instanceof Error && error.message === "step_run_finish_invalid_input";
@@ -571,11 +571,11 @@ Deno.test("shared completion helper normalizes a valid transactional RPC respons
   const result = await completeWorkflowStepWithOutbox(async (name, args) => {
     calledName = name;
     calledArgs = args;
-    return { data: [{ step_run_id: "step-81000000-3000-4000-8000-000000000005", outbox_id: null, replayed: false }], error: null };
+    return { data: [{ step_run_id: "81000000-4000-4000-8000-000000000001", outbox_id: null, replayed: false }], error: null };
   }, { ownerId: "81000000-1000-4000-8000-000000000001", runId: "81000000-3000-4000-8000-000000000005", stepId: "81000000-2000-4000-8000-000000000001", attempt: 2, output: { ok: true } });
   assert(calledName === "simula_complete_step_with_outbox", "helper must call the fixed transactional RPC");
   assert(calledArgs.p_owner_id === "81000000-1000-4000-8000-000000000001" && calledArgs.p_attempt === 2, "helper must bind owner and attempt");
-  assert(result.stepRunId === "step-81000000-3000-4000-8000-000000000005" && result.outboxId === null && !result.replayed,
+  assert(result.stepRunId === "81000000-4000-4000-8000-000000000001" && result.outboxId === null && !result.replayed,
     "helper must normalize the completion result");
 });
 
@@ -599,7 +599,7 @@ Deno.test("shared completion helper fails closed for RPC errors, thrown errors, 
   assert(messages.length === 4, "all invalid completion paths must reject");
   assert(messages[0] === "step_run_finish_failed" && messages[1] === "step_run_finish_failed",
     "database and transport errors must be sanitized");
-  assert(messages[2] === "workflow_step_attempt_superseded",
-    "missing completion identity must fail as superseded");
+  assert(messages[2] === "step_run_finish_invalid_response",
+    "missing completion identity must fail closed");
   assert(messages[3] === "step_run_finish_failed", "malformed RPC envelopes must fail with a sanitized error");
 });
