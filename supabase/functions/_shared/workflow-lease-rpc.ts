@@ -1,3 +1,4 @@
+import { validateWorkflowOutboxEvent, type WorkflowOutboxEvent } from "./workflow-outbox-contract.ts";
 import {
   classifyLeaseRpcError,
   isCanonicalUuid,
@@ -133,9 +134,15 @@ export async function completeWorkflowStepWithLease(
   lease: LeaseIdentity,
   stepId: string,
   output: Record<string, unknown>,
-  outbox?: { eventType: string; idempotencyKey: string; payload: Record<string, unknown> },
+  outbox?: WorkflowOutboxEvent,
 ): Promise<{ stepRunId: string; outboxId: string | null; replayed: boolean }> {
-  if (!isCanonicalUuid(stepId) || !output || typeof output !== "object" || Array.isArray(output)) {
+  if (!isCanonicalUuid(stepId) || !output || typeof output !== "object" || Array.isArray(output) ||
+      (outbox !== undefined && (
+        !validateWorkflowOutboxEvent(outbox) ||
+        outbox.payload.run_id !== lease.runId ||
+        outbox.payload.step_id !== stepId ||
+        outbox.payload.attempt !== lease.attempt
+      ))) {
     throw new WorkflowLeaseError("LEASE_INVALID");
   }
   const data = await invoke(rpc, LEASE_RPC.completeStep, {
