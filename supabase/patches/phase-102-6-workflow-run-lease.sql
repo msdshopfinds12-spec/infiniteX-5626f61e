@@ -259,7 +259,7 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION private.simula_claim_workflow_runs_lease_internal(integer, integer)
+REVOKE ALL ON FUNCTION private.simula_claim_workflow_runs_lease_internal(integer, integer, uuid)
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION private.simula_heartbeat_workflow_run(uuid, uuid, integer, uuid, integer)
   FROM PUBLIC, anon, authenticated;
