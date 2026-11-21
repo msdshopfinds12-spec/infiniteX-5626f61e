@@ -82,7 +82,7 @@ Deno.test("dispatcher sends malformed payloads to bounded retry without simulati
         rpc: async (name) => {
           calls.push(name);
           if (name === "simula_claim_workflow_outbox") return { data: [malformed], error: null };
-          if (name === "simula_finish_workflow_outbox") return { data: [{ status: "pending" }], error: null };
+          if (name === "simula_finish_workflow_outbox") return { data: [{ status: "pending", replayed: false }], error: null };
           throw new Error("unexpected_rpc");
         },
       },
