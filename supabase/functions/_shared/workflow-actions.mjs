@@ -19,6 +19,9 @@ function requiredString(value, label) {
  * references and a template key; arbitrary URLs, headers, credentials and code
  * are never accepted.
  */
+/**
+ * @returns {{eventType: "notification.requested", payload: {recipient_ref: string, template_key: string}} | null}
+ */
 export function resolveWorkflowOutboxEvent(actionType, config) {
   if (actionType !== "emit_notification_intent") return null;
   const safeConfig = record(config);
