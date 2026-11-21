@@ -124,12 +124,19 @@ Deno.test({
       console.log("Phase 101.6 verified: same-run replay, event/payload conflicts, cross-run race and rollback");
     } finally {
       // UUID-scoped cleanup only; both operations are attempted independently.
-      const stepCleanup = await admin.from("workflow_step_runs").delete().in("run_id", runIds);
-      const runCleanup = await admin.from("workflow_runs").delete().in("id", runIds);
-      const cleanupFailures = [
-        stepCleanup.error ? "step cleanup: " + stepCleanup.error.message : null,
-        runCleanup.error ? "run cleanup: " + runCleanup.error.message : null,
-      ].filter((failure): failure is string => failure !== null);
+      // allSettled also handles rejected network promises: one failed request
+      // must never prevent the other scoped cleanup request from being attempted.
+      const cleanupResults = await Promise.allSettled([
+        admin.from("workflow_step_runs").delete().in("run_id", runIds),
+        admin.from("workflow_runs").delete().in("id", runIds),
+      ]);
+      const cleanupFailures = cleanupResults.flatMap((result, index) => {
+        const label = index === 0 ? "step cleanup" : "run cleanup";
+        if (result.status === "rejected") {
+          return [label + " rejected: " + String(result.reason)];
+        }
+        return result.value.error ? [label + ": " + result.value.error.message] : [];
+      });
       if (cleanupFailures.length > 0) {
         throw new Error("PHASE1016_FIXTURE_CLEANUP_FAILED: " + cleanupFailures.join("; "));
       }
