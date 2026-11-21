@@ -1922,3 +1922,176 @@ input:disabled {
     justify-content: center;
   }
 }
+
+
+/* ---------- Phase 99: truthful runtime and activity surfaces ---------- */
+.runtime-registry,
+.activity-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.runtime-registry-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(500px 180px at 0% 0%, var(--primary-soft), transparent),
+    var(--bg-2);
+}
+
+.runtime-registry-mark,
+.activity-empty-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.runtime-registry-intro h3,
+.activity-empty-state h3 {
+  color: var(--text-0);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.runtime-registry-intro p,
+.activity-empty-state > p {
+  max-width: 720px;
+  margin-top: 6px;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.runtime-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.runtime-status-card {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 3px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+}
+
+.runtime-status-icon {
+  display: grid;
+  grid-row: span 3;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--neutral-soft);
+  color: var(--text-2);
+}
+
+.runtime-status-label {
+  color: var(--text-2);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.runtime-status-card strong {
+  overflow-wrap: anywhere;
+  color: var(--text-0);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.runtime-status-detail {
+  overflow-wrap: anywhere;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.runtime-registry-note {
+  padding: 12px 14px;
+  border-left: 3px solid var(--warning);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--warning-soft);
+  color: var(--text-1);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.activity-empty-state {
+  align-items: flex-start;
+  padding: 22px 4px;
+}
+
+.activity-empty-icon {
+  width: 50px;
+  height: 50px;
+}
+
+.activity-next-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  max-width: 720px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  color: var(--primary);
+}
+
+.activity-next-step > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.activity-next-step div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.activity-next-step strong {
+  color: var(--text-0);
+  font-size: 13px;
+}
+
+.activity-next-step span {
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .runtime-status-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .runtime-registry-intro {
+    padding: 14px;
+  }
+
+  .activity-empty-state {
+    padding: 14px 0;
+  }
+}
