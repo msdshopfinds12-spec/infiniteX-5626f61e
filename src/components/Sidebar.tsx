@@ -14,9 +14,11 @@ const nav: { key: ViewKey; label: string; icon: LucideIcon }[] = [
 export default function Sidebar({
   view,
   onChange,
+  workspaceLabel = "Preview mode",
 }: {
   view: ViewKey;
   onChange: (v: ViewKey) => void;
+  workspaceLabel?: string;
 }) {
   return (
     <aside className="sidebar">
