@@ -88,3 +88,18 @@ The dispatcher has no provider client, no `fetch` call, no destination URL, and 
 ### Safety boundary
 
 This is an operational dry-run only. It does not send notifications, activate providers, apply migrations to connected Supabase, deploy Edge Functions, change secrets, or merge the branch. The migration remains a candidate until separately reviewed and approved.
+
+
+## Phase 92 — Dispatcher result integrity and strict simulation contract
+
+Phase 92 hardens the dry-run boundary against false-positive operational reporting.
+
+- The simulation RPC now accepts exactly six fields: `mode`, `delivery_attempted`, `event_type`, `adapter`, `outcome`, and `idempotency_key`.
+- The database rejects extra keys, provider-delivery claims, unsupported adapters/event types, incorrect outcome labels, and invalid idempotency-key bounds.
+- The Edge Function counts a simulation only when the RPC returns exactly one structurally valid state row with status `simulated` and a boolean replay indicator.
+- Invalid-event retry outcomes are counted as rejected only after the finish RPC confirms exactly one `pending` or `dead` state row.
+- Empty, malformed, or transient RPC responses are reported as deferred, never as successful simulation or confirmed rejection.
+- Claim result cardinality is checked against the requested bounded limit.
+- Disposable PostgreSQL tests reject extra metadata and any `delivery_attempted: true` claim, and exercise concurrent identical simulation replay.
+
+These controls reduce false-positive telemetry and keep the dry-run state distinct from provider delivery. Exact-head CI must pass after this update. Production migration and provider activation remain unauthorized.
