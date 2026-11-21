@@ -9,6 +9,7 @@ const authBoundary = read("../../supabase/functions/_shared/worker-auth-boundary
 const sharedActions = read("../../supabase/functions/_shared/workflow-actions.mjs");
 const sharedCompletion = read("../../supabase/functions/_shared/workflow-completion.ts");
 const leaseRpc = read("../../supabase/functions/_shared/workflow-lease-rpc.ts");
+const leaseContract = read("../../supabase/functions/_shared/workflow-lease-contract.ts");
 const leaseSupervisor = read("../../supabase/functions/_shared/workflow-lease-supervisor.ts");
 
 function assertOrdered(source, first, second, message) {
@@ -62,11 +63,11 @@ test("authenticated worker uses only fenced lifecycle RPCs and has no direct lif
 
 test("lease adapter and supervisor fail closed on ambiguous transport and enforce heartbeat bounds", () => {
   assert.ok(leaseRpc.includes("LEASE_TRANSPORT_AMBIGUOUS"));
-  assert.ok(leaseRpc.includes("simula_claim_workflow_runs_lease_internal"));
-  assert.ok(leaseRpc.includes("simula_start_workflow_step_with_lease"));
-  assert.ok(leaseRpc.includes("simula_fail_workflow_step_with_lease"));
-  assert.ok(leaseRpc.includes("simula_complete_step_with_outbox_lease"));
-  assert.ok(leaseRpc.includes("simula_finish_workflow_run_lease"));
+  assert.ok(leaseContract.includes('claim: "simula_claim_workflow_runs_lease_internal"'));
+  assert.ok(leaseContract.includes('startStep: "simula_start_workflow_step_with_lease"'));
+  assert.ok(leaseContract.includes('failStep: "simula_fail_workflow_step_with_lease"'));
+  assert.ok(leaseContract.includes('completeStep: "simula_complete_step_with_outbox_lease"'));
+  assert.ok(leaseContract.includes('finishRun: "simula_finish_workflow_run_lease"'));
   assert.ok(leaseSupervisor.includes("heartbeatTimeoutMs"));
   assert.ok(leaseSupervisor.includes("Promise.race"));
   assert.ok(leaseSupervisor.includes("this.#controller.abort(error)"));
