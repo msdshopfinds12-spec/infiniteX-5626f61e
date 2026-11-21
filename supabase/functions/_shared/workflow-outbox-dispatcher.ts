@@ -110,6 +110,24 @@ function boundedLimit(value: unknown): number {
   return Math.max(1, Math.min(25, Math.floor(value)));
 }
 
+function hasRpcStatus(
+  data: unknown,
+  statuses: readonly string[],
+): boolean {
+  if (!Array.isArray(data) || data.length !== 1) return false;
+  const row = data[0];
+  return Boolean(
+    row &&
+    typeof row === "object" &&
+    statuses.includes((row as { status?: unknown }).status as string) &&
+    (row as { replayed?: unknown }).replayed === false ||
+    row &&
+    typeof row === "object" &&
+    statuses.includes((row as { status?: unknown }).status as string) &&
+    (row as { replayed?: unknown }).replayed === true
+  );
+}
+
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -164,7 +182,7 @@ export function createOutboxDryRunDispatcherHandler(
       "simula_claim_workflow_outbox",
       { p_limit: limit },
     );
-    if (error || !Array.isArray(data)) {
+    if (error || !Array.isArray(data) || data.length > limit) {
       return jsonResponse(500, { ok: false, error: "outbox_claim_failed" });
     }
 
@@ -206,8 +224,11 @@ export function createOutboxDryRunDispatcherHandler(
               p_error: safeCode,
             },
           );
-          if (finish.error) summary.deferred++;
-          else summary.rejected++;
+          if (finish.error || !hasRpcStatus(finish.data, ["pending", "dead"])) {
+            summary.deferred++;
+          } else {
+            summary.rejected++;
+          }
         } catch {
           summary.deferred++;
         }
@@ -232,8 +253,11 @@ export function createOutboxDryRunDispatcherHandler(
             },
           },
         );
-        if (result.error) summary.deferred++;
-        else summary.simulated++;
+        if (result.error || !hasRpcStatus(result.data, ["simulated"])) {
+          summary.deferred++;
+        } else {
+          summary.simulated++;
+        }
       } catch {
         summary.deferred++;
       }
