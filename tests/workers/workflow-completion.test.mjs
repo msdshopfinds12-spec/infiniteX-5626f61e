@@ -140,7 +140,7 @@ test("allowlisted event metadata is passed atomically with a stable idempotency 
   assert.equal(result.outboxId, "81000000-4000-4000-8000-000000000006");
   assert.equal(captured.p_event_type, "notification.requested");
   assert.equal(captured.p_idempotency_key,
-    "phase90:81000000-4000-4000-8000-000000000001:81000000-3000-4000-8000-000000000001:81000000-2000-4000-8000-000000000001:1:notification.requested");
+    "phase90:81000000-1000-4000-8000-000000000001:81000000-3000-4000-8000-000000000005:81000000-2000-4000-8000-000000000001:1:notification.requested");
   assert.deepEqual(captured.p_payload, input.event.payload);
 });
 
