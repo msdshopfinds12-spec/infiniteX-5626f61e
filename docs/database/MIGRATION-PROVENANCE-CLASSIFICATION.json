@@ -42,6 +42,16 @@
       "sha256": "8bab1def33302b3a0627e2b356d197e86adae5804d7af7640c61be2ca1791c56",
       "reason": "Phase 87.4 forward-only correction for the PL/pgSQL OUT-parameter ambiguity in simula_claim_workflow_outbox(). Intended for disposable PostgreSQL CI rehearsal only; no live migration evidence or production approval.",
       "productionApproval": "NOT_GRANTED"
+    },
+    {
+      "version": "20261121000400",
+      "name": "simula_outbox_simulation_state",
+      "path": "supabase/migrations/20261121000400_simula_outbox_simulation_state.sql",
+      "classification": "PROPOSED_NOT_APPLIED",
+      "sourceStatus": "NOT_VERIFIED_LIVE",
+      "sha256": "5d5789b8fa16f7995f6ce9250524c08a22ac3cf26bc135a9cf03112b4b7dd6f7",
+      "reason": "Phase 91 candidate only. Non-delivery simulation state for the isolated dry-run dispatcher; rehearsal limited to disposable PostgreSQL CI and no live migration evidence or production approval.",
+      "productionApproval": "NOT_GRANTED"
     }
   ]
 }
