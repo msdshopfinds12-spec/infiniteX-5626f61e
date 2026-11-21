@@ -318,6 +318,72 @@ Deno.test({
         p_payload: event.payload,
       };
 
+      // Compare the exact failing arguments against PostgreSQL directly before
+      // the HTTP probes. This is diagnostic-only: the function's expected
+      // exception is caught inside a DO block, so the probe cannot leave a
+      // partial transaction behind. Hard-pin execution to the disposable
+      // loopback rehearsal database and the same service_role execution role.
+      const pgHost = Deno.env.get("PGHOST");
+      const pgPort = Deno.env.get("PGPORT");
+      const pgDatabase = Deno.env.get("PGDATABASE");
+      assert(pgHost === "127.0.0.1" && pgPort === "5432" &&
+        pgDatabase === "infinitex_rehearsal",
+        "PHASE1034_BLOCKED: direct SQL probe requires the disposable loopback rehearsal database");
+      const directSql = `
+        SET statement_timeout = '5s';
+        SET ROLE service_role;
+        SELECT set_config('phase1034.args', :'phase1034_args', false);
+        DO $phase1034$
+        DECLARE
+          v_args jsonb := current_setting('phase1034.args')::jsonb;
+          v_state text;
+          v_message text;
+        BEGIN
+          PERFORM * FROM public.simula_complete_step_with_outbox_lease(
+            (v_args->>'p_owner_id')::uuid,
+            (v_args->>'p_run_id')::uuid,
+            (v_args->>'p_step_id')::uuid,
+            (v_args->>'p_attempt')::integer,
+            (v_args->>'p_lease_token')::uuid,
+            v_args->'p_output',
+            v_args->>'p_event_type',
+            v_args->>'p_idempotency_key',
+            v_args->'p_payload'
+          );
+          RAISE NOTICE 'PHASE1034_DIRECT_PG_REPLAY_RESULT outcome=returned';
+        EXCEPTION WHEN OTHERS THEN
+          GET STACKED DIAGNOSTICS
+            v_state = RETURNED_SQLSTATE,
+            v_message = MESSAGE_TEXT;
+          RAISE NOTICE 'PHASE1034_DIRECT_PG_REPLAY_RESULT outcome=exception sqlstate=% message=%',
+            v_state, v_message;
+        END
+        $phase1034$;
+      `;
+      const directPgStartedAt = performance.now();
+      const directPg = await new Deno.Command("psql", {
+        args: [
+          "-X", "-v", "ON_ERROR_STOP=1",
+          "-v", "phase1034_args=" + JSON.stringify(conflictingOutputArgs),
+          "-c", directSql,
+        ],
+        stdout: "piped",
+        stderr: "piped",
+        env: { PGOPTIONS: "-c statement_timeout=5000", PGCONNECT_TIMEOUT: "5" },
+      }).output();
+      const directPgOutput = new TextDecoder().decode(directPg.stdout) +
+        new TextDecoder().decode(directPg.stderr);
+      const directPgResultLine = directPgOutput.split("\\n").find((line) =>
+        line.includes("PHASE1034_DIRECT_PG_REPLAY_RESULT")
+      ) ?? null;
+      console.error("PHASE1034_DIRECT_PG_REPLAY_DIAGNOSTIC", {
+        durationMs: Math.round(performance.now() - directPgStartedAt),
+        exitCode: directPg.code,
+        resultLine: directPgResultLine,
+      });
+      assert(directPg.success && directPgResultLine !== null,
+        "direct PostgreSQL diagnostic must complete and report its caught outcome");
+
       // First issue the exact RPC through raw HTTP. This separates the
       // PostgREST/HTTP result from any Supabase-js response handling.
       const rawHttpStartedAt = performance.now();
