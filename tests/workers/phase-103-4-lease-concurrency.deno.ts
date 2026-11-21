@@ -33,15 +33,58 @@ Deno.test({
     const ownerId = required("PHASE1032_OWNER_ID");
     assert(UUID.test(ownerId), "pre-seeded disposable owner ID must be a UUID");
 
-    const localFetch: typeof fetch = (input, init) => {
+    const localFetch: typeof fetch = async (input, init) => {
       const source = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
       const target = new URL(source);
       if (target.pathname === "/rest/v1") target.pathname = "/";
       else if (target.pathname.startsWith("/rest/v1/")) target.pathname = target.pathname.slice("/rest/v1".length);
+
+      // Preserve both Request.signal and init.signal while retaining the hard
+      // 20-second diagnostic deadline. Never log request bodies or auth headers.
       const timeout = AbortSignal.timeout(20_000);
-      const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
-      if (input instanceof Request) return fetch(new Request(target, input), { signal });
-      return fetch(target, { ...init, signal });
+      const inheritedSignal = input instanceof Request ? input.signal : undefined;
+      const signals = [inheritedSignal, init?.signal, timeout]
+        .filter((value): value is AbortSignal => value != null);
+      const signal = AbortSignal.any(signals);
+      const isReplayRpc = target.pathname.endsWith(
+        "/rpc/simula_complete_step_with_outbox_lease",
+      );
+      const requestId = crypto.randomUUID();
+      const startedAt = performance.now();
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+
+      try {
+        const response = input instanceof Request
+          ? await fetch(new Request(target, input), { ...init, signal })
+          : await fetch(target, { ...init, signal });
+
+        if (isReplayRpc) {
+          console.error("PHASE1034_HTTP_RESPONSE", {
+            requestId,
+            method,
+            pathname: target.pathname,
+            durationMs: Math.round(performance.now() - startedAt),
+            status: response.status,
+            contentType: response.headers.get("content-type"),
+            server: response.headers.get("server"),
+          });
+        }
+        return response;
+      } catch (error) {
+        if (isReplayRpc) {
+          console.error("PHASE1034_HTTP_TRANSPORT_ERROR", {
+            requestId,
+            method,
+            pathname: target.pathname,
+            durationMs: Math.round(performance.now() - startedAt),
+            errorName: error instanceof Error ? error.name : "UnknownError",
+            timeoutAborted: timeout.aborted,
+            requestSignalAborted: inheritedSignal?.aborted ?? false,
+            initSignalAborted: init?.signal?.aborted ?? false,
+          });
+        }
+        throw error;
+      }
     };
     const admin = createClient(url, serviceJwt, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -248,14 +291,159 @@ Deno.test({
         "same idempotency key with altered payload must raise outbox_idempotency_conflict",
       );
 
+      // Refresh the disposable test lease immediately before the conflict probe.
+      // This isolates outbox replay semantics from lease-expiry timing.
+      const conflictLeaseHeartbeatAt = performance.now();
+      const conflictLeaseHeartbeat = await admin.rpc("simula_heartbeat_workflow_run", {
+        ...secondIdentity,
+        p_extend_seconds: 90,
+      });
+      assert(
+        !conflictLeaseHeartbeat.error && conflictLeaseHeartbeat.data?.length === 1,
+        "current lease must be valid immediately before the altered-output replay probe",
+      );
+
       // Matching event identity with a different step output must not be treated as replay.
-      const conflictingOutput = await admin.rpc("simula_complete_step_with_outbox_lease", {
+      // Correlate this exact request with the concurrent read-only PostgreSQL sampler.
+      console.error("PHASE1034_OUTPUT_REPLAY_BEGIN", {
+        elapsedSinceLeaseHeartbeatMs: Math.round(performance.now() - conflictLeaseHeartbeatAt),
+        startedAt: new Date().toISOString(),
+      });
+      const conflictingOutputArgs = {
         ...secondIdentity,
         p_step_id: stepId,
         p_output: { result: "different-output-must-not-replay" },
         p_event_type: event.eventType,
         p_idempotency_key: event.idempotencyKey,
         p_payload: event.payload,
+      };
+
+      // Compare the exact failing arguments against PostgreSQL directly before
+      // the HTTP probes. This is diagnostic-only: the function's expected
+      // exception is caught inside a DO block, so the probe cannot leave a
+      // partial transaction behind. Hard-pin execution to the disposable
+      // loopback rehearsal database and the same service_role execution role.
+      const pgHost = Deno.env.get("PGHOST");
+      const pgPort = Deno.env.get("PGPORT");
+      const pgDatabase = Deno.env.get("PGDATABASE");
+      assert(pgHost === "127.0.0.1" && pgPort === "5432" &&
+        pgDatabase === "infinitex_rehearsal",
+        "PHASE1034_BLOCKED: direct SQL probe requires the disposable loopback rehearsal database");
+      const directSql = `
+        SET statement_timeout = '5s';
+        SET ROLE service_role;
+        SELECT set_config('phase1034.args', :'phase1034_args', false);
+        DO $phase1034$
+        DECLARE
+          v_args jsonb := current_setting('phase1034.args')::jsonb;
+          v_state text;
+          v_message text;
+        BEGIN
+          PERFORM * FROM public.simula_complete_step_with_outbox_lease(
+            (v_args->>'p_owner_id')::uuid,
+            (v_args->>'p_run_id')::uuid,
+            (v_args->>'p_step_id')::uuid,
+            (v_args->>'p_attempt')::integer,
+            (v_args->>'p_lease_token')::uuid,
+            v_args->'p_output',
+            v_args->>'p_event_type',
+            v_args->>'p_idempotency_key',
+            v_args->'p_payload'
+          );
+          RAISE NOTICE 'PHASE1034_DIRECT_PG_REPLAY_RESULT outcome=returned';
+        EXCEPTION WHEN OTHERS THEN
+          GET STACKED DIAGNOSTICS
+            v_state = RETURNED_SQLSTATE,
+            v_message = MESSAGE_TEXT;
+          RAISE NOTICE 'PHASE1034_DIRECT_PG_REPLAY_RESULT outcome=exception sqlstate=% message=%',
+            v_state, v_message;
+        END
+        $phase1034$;
+      `;
+      const directPgStartedAt = performance.now();
+      const directPg = await new Deno.Command("psql", {
+        args: [
+          "-X", "-v", "ON_ERROR_STOP=1",
+          "-v", "phase1034_args=" + JSON.stringify(conflictingOutputArgs),
+          "-c", directSql,
+        ],
+        stdout: "piped",
+        stderr: "piped",
+        env: { PGOPTIONS: "-c statement_timeout=5000", PGCONNECT_TIMEOUT: "5" },
+      }).output();
+      const directPgOutput = new TextDecoder().decode(directPg.stdout) +
+        new TextDecoder().decode(directPg.stderr);
+      const directPgResultLine = directPgOutput.split("\n").find((line) =>
+        line.includes("PHASE1034_DIRECT_PG_REPLAY_RESULT")
+      ) ?? null;
+      console.error("PHASE1034_DIRECT_PG_REPLAY_DIAGNOSTIC", {
+        durationMs: Math.round(performance.now() - directPgStartedAt),
+        exitCode: directPg.code,
+        resultLine: directPgResultLine,
+      });
+      assert(directPg.success && directPgResultLine !== null,
+        "direct PostgreSQL diagnostic must complete and report its caught outcome");
+
+      // First issue the exact RPC through raw HTTP. This separates the
+      // PostgREST/HTTP result from any Supabase-js response handling.
+      const rawHttpStartedAt = performance.now();
+      const rawHttpResponse = await localFetch(
+        new URL("/rest/v1/rpc/simula_complete_step_with_outbox_lease", url),
+        {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + serviceJwt,
+            apikey: serviceJwt,
+            "Content-Type": "application/json",
+            "Accept-Profile": "public",
+            "Content-Profile": "public",
+          },
+          body: JSON.stringify(conflictingOutputArgs),
+        },
+      );
+      const rawHttpBody = await rawHttpResponse.json().catch(() => null) as
+        | { code?: unknown; message?: unknown }
+        | null;
+      const rawHttpErrorCode = typeof rawHttpBody?.code === "string"
+        ? rawHttpBody.code
+        : null;
+      const rawHttpErrorMessage = typeof rawHttpBody?.message === "string"
+        ? rawHttpBody.message
+        : "";
+      console.error("PHASE1034_RAW_HTTP_REPLAY_RESULT", {
+        durationMs: Math.round(performance.now() - rawHttpStartedAt),
+        status: rawHttpResponse.status,
+        errorCode: rawHttpErrorCode,
+        expectedMessageObserved: rawHttpErrorMessage.includes(
+          "outbox_replay_step_state_mismatch",
+        ),
+      });
+      assert(
+        !rawHttpResponse.ok &&
+          rawHttpErrorMessage.includes("outbox_replay_step_state_mismatch"),
+        "raw PostgREST HTTP replay must return the expected altered-output mismatch",
+      );
+
+      const conflictRpcStartedAt = performance.now();
+      const conflictingOutput = await admin.rpc(
+        "simula_complete_step_with_outbox_lease",
+        conflictingOutputArgs,
+      );
+      console.error("PHASE1034_OUTPUT_REPLAY_DIAGNOSTIC", {
+        elapsedSinceLeaseHeartbeatMs: Math.round(
+          performance.now() - conflictLeaseHeartbeatAt,
+        ),
+        conflictRpcDurationMs: Math.round(
+          performance.now() - conflictRpcStartedAt,
+        ),
+        code: conflictingOutput.error?.code ?? null,
+        message: conflictingOutput.error?.message ?? null,
+        details: conflictingOutput.error?.details ?? null,
+        hint: conflictingOutput.error?.hint ?? null,
+        returnedRowCount: Array.isArray(conflictingOutput.data)
+          ? conflictingOutput.data.length
+          : null,
+        replayed: conflictingOutput.data?.[0]?.replayed ?? null,
       });
       assert(
         conflictingOutput.error !== null &&
