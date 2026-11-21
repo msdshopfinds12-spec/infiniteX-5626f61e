@@ -247,16 +247,21 @@ Deno.test({
     );
     assert(Boolean(simulationDeliveryClaimError), "simulation RPC must reject any claim of provider delivery");
 
-    const { data: simulationReplay, error: simulationReplayError } = await admin.rpc(
-      "simula_record_workflow_outbox_simulation",
-      {
+    const simulationReplayCalls = await Promise.all([
+      admin.rpc("simula_record_workflow_outbox_simulation", {
         p_id: simulationOutboxId,
         p_lock_token: simulationLease.lock_token,
         p_result: simulationResult,
-      },
-    );
-    assert(!simulationReplayError && simulationReplay?.[0]?.status === "simulated" && simulationReplay[0].replayed === true,
-      "identical simulation replay must be idempotent");
+      }),
+      admin.rpc("simula_record_workflow_outbox_simulation", {
+        p_id: simulationOutboxId,
+        p_lock_token: simulationLease.lock_token,
+        p_result: simulationResult,
+      }),
+    ]);
+    assert(simulationReplayCalls.every((result) =>
+      !result.error && result.data?.[0]?.status === "simulated" && result.data[0].replayed === true),
+      "concurrent identical simulation replay must be idempotent");
     const { error: simulationConflictError } = await admin.rpc(
       "simula_record_workflow_outbox_simulation",
       {
