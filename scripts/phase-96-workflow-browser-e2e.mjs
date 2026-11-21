@@ -190,6 +190,17 @@ try {
   await page.getByText("queued", { exact: true }).waitFor();
   await page.getByText("succeeded", { exact: true }).waitFor({ timeout: 12_000 });
 
+  await page.getByRole("button", { name: "AI Runtime" }).click();
+  await page.getByText("AI runtime is not active").waitFor();
+  await page.getByText("No live agent registrations available").waitFor();
+  for (const fabricatedAgent of ["Atlas", "Forge", "Sentinel", "Vault", "Pulse", "Quill"]) {
+    assert.equal(await page.getByText(fabricatedAgent, { exact: true }).count(), 0, `sample agent ${fabricatedAgent} must not appear`);
+  }
+
+  await page.getByRole("button", { name: "Activity" }).click();
+  await page.getByText("Global event stream is not connected").waitFor();
+  assert.equal(await page.getByText("06:41:02", { exact: true }).count(), 0, "fabricated log timestamps must not appear");
+
   assert.equal(functionRequests.length, 1, "one explicit user action must produce one enqueue call");
   assert.equal(functionRequests[0].method, "POST");
   assert.equal(functionRequests[0].body.workflow_id, workflowId);
