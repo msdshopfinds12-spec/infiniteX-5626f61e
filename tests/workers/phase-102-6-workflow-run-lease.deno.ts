@@ -67,6 +67,14 @@ Deno.test({
       });
       assert(!runError, "synthetic run seed failed: " + (runError?.message ?? ""));
 
+      // A different authenticated owner scope must never claim this run.
+      const wrongOwnerClaim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
+        p_limit: 1, p_lease_seconds: 30, p_run_id: runId, p_owner_id: crypto.randomUUID(),
+      });
+      assert(!wrongOwnerClaim.error && Array.isArray(wrongOwnerClaim.data) &&
+        wrongOwnerClaim.data.length === 0,
+        "owner-scoped claim must not disclose or claim another owner's run");
+
       // Concurrent claims against one queue row must produce exactly one owner.
       const claimArgs = { p_limit: 1, p_lease_seconds: 30, p_run_id: runId, p_owner_id: ownerId };
       const claims = await Promise.all([
