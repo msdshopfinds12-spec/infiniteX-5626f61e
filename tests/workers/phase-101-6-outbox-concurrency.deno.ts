@@ -130,14 +130,23 @@ Deno.test({
       assert(Boolean(expiredFinish.error),
         "an expired outbox lease must not be completed even when its token matches");
 
-      const reclaimedBatch = await admin.rpc("simula_claim_workflow_outbox", { p_limit: 25 });
-      assert(!reclaimedBatch.error && Array.isArray(reclaimedBatch.data),
-        "expired outbox event must be eligible for recovery");
-      const reclaimedEvent = reclaimedBatch.data.find((row: { idempotency_key: string }) =>
-        row.idempotency_key === sameArgs.p_idempotency_key);
+      // Other integration phases may leave older expired synthetic events in
+      // the same disposable queue. Claim successive bounded batches until this
+      // exact idempotency key is recovered; do not assume it is in batch one.
+      let reclaimedEvent: {
+        id: string; lock_token: string; idempotency_key: string;
+      } | undefined;
+      let reclaimedBatchCount = 0;
+      for (; reclaimedBatchCount < 10 && !reclaimedEvent; reclaimedBatchCount++) {
+        const reclaimedBatch = await admin.rpc("simula_claim_workflow_outbox", { p_limit: 25 });
+        assert(!reclaimedBatch.error && Array.isArray(reclaimedBatch.data),
+          "expired outbox event must be eligible for recovery");
+        reclaimedEvent = reclaimedBatch.data.find((row: { idempotency_key: string }) =>
+          row.idempotency_key === sameArgs.p_idempotency_key);
+      }
       assert(reclaimedEvent && typeof reclaimedEvent.lock_token === "string" &&
         reclaimedEvent.lock_token !== leasedEvent.lock_token,
-        "recovery must issue a fresh lease token");
+        "recovery must issue a fresh lease token within the bounded batch scan");
       const recoveredFinish = await admin.rpc("simula_finish_workflow_outbox", {
         p_id: reclaimedEvent.id,
         p_lock_token: reclaimedEvent.lock_token,
