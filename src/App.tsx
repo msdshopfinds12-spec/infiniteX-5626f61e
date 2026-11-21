@@ -1,12 +1,10 @@
-import { useMemo, useState } from "react";
-import { Activity, Bot, BriefcaseBusiness, Cpu, GitBranch, LogOut, Play, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
+import { useState } from "react";
+import { Bot, BriefcaseBusiness, GitBranch, LogOut, Settings, ShieldAlert, Terminal, Zap } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import { useTheme } from "./hooks/useTheme";
-import MetricCard from "./components/MetricCard";
 import AgentList from "./components/AgentList";
-import PipelineBoard from "./components/PipelineBoard";
 import LogStream from "./components/LogStream";
 import AuthScreen from "./features/auth/auth-screen";
 import PasswordRecoveryScreen from "./features/auth/password-recovery-screen";
@@ -20,6 +18,7 @@ import ProfileSummary from "./features/profile/profile-summary";
 import type { ProfileReadService } from "./features/profile/profile-read-service";
 import ProjectList from "./features/projects/project-list";
 import type { ProjectReadService } from "./features/projects/project-read-service";
+import OverviewSummary from "./features/overview/overview-summary";
 
 type AppProps = Readonly<{
   authState?: AuthState;
@@ -45,17 +44,6 @@ export default function App({
   const query = searchTerm.trim().toLocaleLowerCase();
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
-
-  // Illustrative placeholders only; these values are not live backend telemetry.
-  const metrics = useMemo(
-    () => [
-      { id: "agents", label: "Sample agents", value: "6", delta: "Demo data", trend: "flat" as const, icon: Bot, accent: "primary" as const },
-      { id: "runs", label: "Pipeline runs", value: "—", delta: "Not connected", trend: "flat" as const, icon: GitBranch, accent: "neutral" as const },
-      { id: "tokens", label: "Tokens used", value: "—", delta: "Not connected", trend: "flat" as const, icon: Zap, accent: "warning" as const },
-      { id: "uptime", label: "System uptime", value: "—", delta: "Not measured", trend: "flat" as const, icon: Activity, accent: "neutral" as const },
-    ],
-    []
-  );
 
   if (authState?.status === "loading") {
     return (
@@ -136,33 +124,31 @@ export default function App({
             </div>
             {view === "overview" && (
               <>
-                <section className="metrics" aria-label="Sample metrics">
-                  {metrics.map((metric) => <MetricCard key={metric.id} {...metric} />)}
-                </section>
-                <section className="grid-2">
-                  <div className="panel">
-                    <div className="panel-head">
-                      <h2><Cpu size={18} /> Sample Agent Activity</h2>
-                      <span className="badge badge-neutral">demo</span>
-                    </div>
-                    <AgentList compact searchTerm={query} />
+                {authState.status === "authenticated" ? (
+                  <OverviewSummary
+                    userId={authState.userId}
+                    identityEpoch={authState.identityEpoch}
+                    workflowService={workflowReadService}
+                    projectService={projectReadService}
+                  />
+                ) : (
+                  <div className="panel" role="status">
+                    Sign in to load your account overview.
                   </div>
-                  <div className="panel">
-                    <div className="panel-head">
-                      <h2><Terminal size={18} /> Sample Log Entries</h2>
-                      <span className="badge badge-neutral">static</span>
-                    </div>
-                    <LogStream compact searchTerm={query} />
-                  </div>
-                </section>
-                <section className="panel">
-                  <div className="panel-head">
-                    <h2><GitBranch size={18} /> Sample Pipeline Board</h2>
-                    <button className="btn btn-ghost" type="button" disabled title="Pipeline execution is not connected">
-                      <Play size={14} /> Run all unavailable
-                    </button>
-                  </div>
-                  <PipelineBoard searchTerm={query} />
+                )}
+                <section className="overview-capabilities" aria-label="Platform capability status">
+                  <article className="capability-card">
+                    <Bot size={18} aria-hidden="true" />
+                    <div><strong>AI agent runtime</strong><span>Not connected</span></div>
+                  </article>
+                  <article className="capability-card">
+                    <Terminal size={18} aria-hidden="true" />
+                    <div><strong>Execution telemetry</strong><span>Not measured</span></div>
+                  </article>
+                  <article className="capability-card">
+                    <ShieldAlert size={18} aria-hidden="true" />
+                    <div><strong>Security posture</strong><span>Not assessed in this UI</span></div>
+                  </article>
                 </section>
               </>
             )}
