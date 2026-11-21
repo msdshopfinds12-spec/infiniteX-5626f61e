@@ -74,7 +74,7 @@ Deno.test({
       assert(leases.length === 3, "all three synthetic runs must receive distinct leases");
       const byRun = new Map(leases.map((row: {
         id: string; owner_id: string; attempt: number; lease_token: string; lease_until: string;
-      }) => [row.id, row]));
+      }) => [row.id, row] as const));
       for (const id of runIds) {
         const lease = byRun.get(id) as {
           id: string; owner_id: string; attempt: number; lease_token: string; lease_until: string;
