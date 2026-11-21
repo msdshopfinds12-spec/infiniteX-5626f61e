@@ -15,7 +15,7 @@
 
 ## Transition contract
 
-Every transition uses the tuple `(run_id, owner_id, attempt, lease_token)`. The RPC locks the workflow run first, validates owner/status/generation/token, then evaluates expiry using `clock_timestamp()` **after lock acquisition**. It retains the row lock through the step/outbox mutation and transaction commit.
+Every transition uses the tuple `(run_id, owner_id, attempt, lease_token)`. The RPC locks the workflow run first, validates owner/status/generation/token, then evaluates expiry using `clock_timestamp()` **after lock acquisition**. Completion then pre-locks the matching step-run row before delegating to the existing atomic completion/outbox RPC. This is required because the legacy RPC's idempotent replay branch otherwise locks an existing outbox row before reading/locking the succeeded step row. The wrapper therefore normalizes both first-completion and replay paths to the same `workflow_runs → workflow_step_runs → outbox` order and retains those locks through transaction commit.
 
 | RPC | Contract |
 |---|---|
