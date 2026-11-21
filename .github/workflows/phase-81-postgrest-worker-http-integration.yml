@@ -40,8 +40,6 @@ permissions:
   contents: read
 
 concurrency:
-  # Each commit gets an isolated runner/database; do not let an older
-  # cancelled run's diagnostic cleanup block verification of the new head.
   group: infinitex-phase-81-postgrest-worker-http-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
@@ -161,7 +159,7 @@ jobs:
               AND p.proname = 'simula_claim_workflow_runs_lease_internal';
           "
           psql -X -v ON_ERROR_STOP=1 -c "
-            DO \$verify\$ 
+            DO \$verify\$
             DECLARE v_oid oid; v_names text[];
             BEGIN
               SELECT p.oid, p.proargnames INTO v_oid, v_names
@@ -222,7 +220,6 @@ jobs:
           exit 1
 
       - name: Execute real Deno worker HTTP to PostgREST/PostgreSQL journey
-        # Includes the authenticated lease-fenced worker and downstream lease/outbox regression suites.
         env:
           PHASE81_POSTGREST_URL: http://127.0.0.1:3000
           PHASE87_ALLOW_DISPOSABLE_DB_WRITES: "true"
@@ -242,7 +239,7 @@ jobs:
           export PGPASSWORD=postgres PGDATABASE=infinitex_rehearsal
           phase1026_diagnostic_log="${RUNNER_TEMP:-/tmp}/phase1026-live-locks.log"
           : > "$phase1026_diagnostic_log"
-          bash scripts/phase-1026-live-lock-diagnostics.sh 45 > "$phase1026_diagnostic_log" 2>&1 &
+          bash scripts/phase-102-6-live-lock-diagnostics.sh 45 > "$phase1026_diagnostic_log" 2>&1 &
           phase1026_sampler_pid=$!
           set +e
           PHASE1026_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-102-6-workflow-run-lease.deno.ts
