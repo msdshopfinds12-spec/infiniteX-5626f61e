@@ -248,7 +248,20 @@ Deno.test({
         "same idempotency key with altered payload must raise outbox_idempotency_conflict",
       );
 
+      // Refresh the disposable test lease immediately before the conflict probe.
+      // This isolates outbox replay semantics from lease-expiry timing.
+      const conflictLeaseHeartbeatAt = performance.now();
+      const conflictLeaseHeartbeat = await admin.rpc("simula_heartbeat_workflow_run", {
+        ...secondIdentity,
+        p_extend_seconds: 90,
+      });
+      assert(
+        !conflictLeaseHeartbeat.error && conflictLeaseHeartbeat.data?.length === 1,
+        "current lease must be valid immediately before the altered-output replay probe",
+      );
+
       // Matching event identity with a different step output must not be treated as replay.
+      const conflictRpcStartedAt = performance.now();
       const conflictingOutput = await admin.rpc("simula_complete_step_with_outbox_lease", {
         ...secondIdentity,
         p_step_id: stepId,
@@ -256,6 +269,22 @@ Deno.test({
         p_event_type: event.eventType,
         p_idempotency_key: event.idempotencyKey,
         p_payload: event.payload,
+      });
+      console.error("PHASE1034_OUTPUT_REPLAY_DIAGNOSTIC", {
+        elapsedSinceLeaseHeartbeatMs: Math.round(
+          performance.now() - conflictLeaseHeartbeatAt,
+        ),
+        conflictRpcDurationMs: Math.round(
+          performance.now() - conflictRpcStartedAt,
+        ),
+        code: conflictingOutput.error?.code ?? null,
+        message: conflictingOutput.error?.message ?? null,
+        details: conflictingOutput.error?.details ?? null,
+        hint: conflictingOutput.error?.hint ?? null,
+        returnedRowCount: Array.isArray(conflictingOutput.data)
+          ? conflictingOutput.data.length
+          : null,
+        replayed: conflictingOutput.data?.[0]?.replayed ?? null,
       });
       assert(
         conflictingOutput.error !== null &&
