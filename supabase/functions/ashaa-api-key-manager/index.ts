@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeadersForRequest } from "../_shared/cors.ts";
 import { readJsonBodyLimited } from "../_shared/worker-security.mjs";
+import { parseApiKeyManagerRequest } from "../_shared/api-key-request.mjs";
 
 function response(req: Request, status: number, payload: Record<string, unknown>) {
   return new Response(JSON.stringify(payload), { status, headers: corsHeadersForRequest(req).headers });
@@ -44,14 +45,13 @@ Deno.serve(async (req: Request) => {
     const status = bodyResult.reason === "payload_too_large" ? 413 : 400;
     return response(req, status, { ok: false, error: bodyResult.reason });
   }
-  const parsed = bodyResult.value;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return response(req, 400, { ok: false, error: "invalid_json" });
+  const parsed = parseApiKeyManagerRequest(bodyResult.value);
+  if (!parsed.ok) {
+    return response(req, 400, { ok: false, error: parsed.error });
   }
-  const body = parsed as Record<string, unknown>;
 
   const ownerId = authData.user.id;
-  const action = body.action;
+  const action = parsed.value.action;
 
   if (action === "list") {
     const { data, error } = await admin.from("platform_api_keys")
@@ -62,23 +62,10 @@ Deno.serve(async (req: Request) => {
   }
 
   if (action === "create") {
-    const label = typeof body.label === "string" ? body.label.trim() : "";
-    if (label.length < 1 || label.length > 100) return response(req, 400, { ok: false, error: "label_length_invalid" });
-
-    const scopes = Array.isArray(body.scopes) ? body.scopes : ["api:read"];
-    const allowed = new Set(["api:read", "api:write"]);
-    if (!scopes.length || scopes.length > 2 || scopes.some((s) => typeof s !== "string" || !allowed.has(s))) {
-      return response(req, 400, { ok: false, error: "invalid_scopes" });
-    }
-
-    let expiresAt: string | null = null;
-    if (body.expires_in_days !== undefined) {
-      const days = body.expires_in_days;
-      if (typeof days !== "number" || !Number.isInteger(days) || days < 1 || days > 365) {
-        return response(req, 400, { ok: false, error: "expires_in_days_must_be_1_to_365" });
-      }
-      expiresAt = new Date(Date.now() + days * 86400000).toISOString();
-    }
+    const { label, scopes, expiresInDays } = parsed.value;
+    const expiresAt = expiresInDays === undefined
+      ? null
+      : new Date(Date.now() + expiresInDays * 86400000).toISOString();
 
     const random = crypto.getRandomValues(new Uint8Array(32));
     const rawKey = "ashaa_live_" + b64url(random);
@@ -94,10 +81,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (action === "revoke") {
-    const id = typeof body.id === "string" ? body.id : "";
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
-      return response(req, 400, { ok: false, error: "invalid_key_id" });
-    }
+    const { id } = parsed.value;
     const { data, error } = await admin.from("platform_api_keys")
       .update({ revoked_at: new Date().toISOString() })
       .eq("id", id).eq("owner_id", ownerId).is("revoked_at", null)
