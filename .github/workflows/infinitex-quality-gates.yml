@@ -60,6 +60,9 @@ jobs:
       - name: Edge Function and worker security tests
         run: npm run test:edge-function-security
 
+      - name: Type-check API key manager Edge Function
+        run: deno check --no-lock --node-modules-dir=auto supabase/functions/ashaa-api-key-manager/index.ts
+
       - name: Type-check authenticated worker
         run: deno check --no-lock --node-modules-dir=auto supabase/functions/simula-workflow-worker/index.ts
 
