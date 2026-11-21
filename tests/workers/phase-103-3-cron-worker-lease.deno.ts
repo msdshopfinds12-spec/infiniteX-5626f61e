@@ -62,6 +62,38 @@ Deno.test({
       assert(!ownerFixture.error && ownerFixture.data !== null,
         "pre-seeded disposable owner fixture is missing or mismatched");
 
+      // The SQL global claim can lease queued runs and expired running leases,
+      // and can terminalize expired runs at the retry ceiling. Prove the
+      // disposable queue has no eligible rows before invoking that global path.
+      // This is intentionally fail-closed: never consume another fixture's work.
+      const queueBefore = await admin.from("workflow_runs")
+        .select("id,owner_id,status,attempt,lease_token,lease_until");
+      assert(!queueBefore.error && Array.isArray(queueBefore.data),
+        "cannot establish disposable global-queue isolation");
+      const now = Date.now();
+      const globallyEligible = queueBefore.data.filter((row) => {
+        const attempt = Number(row.attempt);
+        const leaseExpired = typeof row.lease_until === "string" &&
+          Number.isFinite(Date.parse(row.lease_until)) &&
+          Date.parse(row.lease_until) <= now;
+        const queued = row.status === "queued" && attempt < 5;
+        const expiredLease = row.status === "running" && attempt < 5 &&
+          row.lease_token !== null && leaseExpired;
+        const expiredFinalAttempt = row.status === "running" &&
+          attempt >= 5 && leaseExpired;
+        return queued || expiredLease || expiredFinalAttempt;
+      });
+      assert(globallyEligible.length === 0,
+        "PHASE1033_BLOCKED: disposable queue contains globally claimable or terminalizable rows");
+
+      const unrelatedBefore = queueBefore.data
+        .map((row) => ({
+          id: row.id, owner_id: row.owner_id, status: row.status,
+          attempt: row.attempt, lease_token: row.lease_token,
+          lease_until: row.lease_until,
+        }))
+        .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+
       const workflow = await admin.from("workflows").insert({
         id: workflowId, owner_id: ownerId, name: "phase-1033-cron-lease",
         status: "draft", trigger_type: "manual",
@@ -83,16 +115,16 @@ Deno.test({
       runCreated = true;
 
       const claim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
-        p_limit: 1, p_lease_seconds: 90, p_owner_id: ownerId,
+        p_limit: 1, p_lease_seconds: 90, p_owner_id: null,
       });
       assert(!claim.error && Array.isArray(claim.data) && claim.data.length === 1,
-         "cron owner-scoped lease claim failed: " + (claim.error?.message ?? ""));
+        "trusted cron global lease claim failed: " + (claim.error?.message ?? ""));
       const lease = claim.data[0] as {
         id: string; workflow_id: string; owner_id: string; attempt: number;
         lease_token: string; lease_until: string;
       };
       assert(lease.id === runId && lease.workflow_id === workflowId && lease.owner_id === ownerId,
-        "owner-scoped cron claim must return the exact run and database owner identity");
+        "global cron claim must return the exact isolated run and database owner identity");
       assert(lease.attempt === 1 && UUID.test(lease.lease_token) &&
         Date.parse(lease.lease_until) > Date.now(), "global claim must return a fresh active lease");
 
@@ -144,7 +176,23 @@ Deno.test({
         finalRun.data.attempt === 1 && finalRun.data.lease_token === null &&
         finalRun.data.lease_until === null, "terminal run must clear active lease fields");
 
-      console.log("Phase 103.3 trusted cron lease lifecycle verified in disposable PostgreSQL.");
+      // The global claim must not alter any pre-existing workflow run.
+      const unrelatedAfter = await admin.from("workflow_runs")
+        .select("id,owner_id,status,attempt,lease_token,lease_until")
+        .neq("id", runId);
+      assert(!unrelatedAfter.error && Array.isArray(unrelatedAfter.data),
+        "cannot verify unrelated queue rows after global claim");
+      const unrelatedSnapshotAfter = unrelatedAfter.data
+        .map((row) => ({
+          id: row.id, owner_id: row.owner_id, status: row.status,
+          attempt: row.attempt, lease_token: row.lease_token,
+          lease_until: row.lease_until,
+        }))
+        .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+      assert(JSON.stringify(unrelatedSnapshotAfter) === JSON.stringify(unrelatedBefore),
+        "global cron claim changed an unrelated workflow run");
+
+      console.log("Phase 103.3 trusted global cron lease lifecycle verified in isolated disposable PostgreSQL.");
     } finally {
       const cleanupErrors: string[] = [];
       if (runCreated) {
