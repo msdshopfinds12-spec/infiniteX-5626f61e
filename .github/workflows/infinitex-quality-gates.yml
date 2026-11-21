@@ -72,6 +72,14 @@ jobs:
       - name: Test outbox dispatcher handler security
         run: deno test --no-check supabase/functions/_shared/workflow-outbox-dispatcher.deno.ts
 
+      - name: Type-check AI runtime Edge Function and contract tests
+        run: |
+          deno check --no-lock --node-modules-dir=auto supabase/functions/simula-ai-runtime/index.ts
+          deno check --no-lock --node-modules-dir=auto supabase/functions/_shared/ai-runtime.deno.ts
+
+      - name: Test AI runtime authentication and provider boundary
+        run: deno test --no-check supabase/functions/_shared/ai-runtime.deno.ts
+
       - name: Execute authenticated worker handler tests
         run: deno test --no-check --allow-env supabase/functions/simula-workflow-worker/index.deno.ts
 
