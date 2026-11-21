@@ -40,7 +40,7 @@ Deno.test({
       throw new Error("PHASE1016_BLOCKED: writes require loopback HTTP PostgREST on port 3000");
     }
     const serviceJwt = required("PHASE81_SERVICE_JWT");
-    const ownerId = required("PHASE81_USER_ID");
+    const ownerId = "81000000-0000-4000-8000-000000000003";
     assert(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ownerId),
       "PHASE1016_BLOCKED: owner ID must be a canonical UUID");
 
@@ -48,8 +48,8 @@ Deno.test({
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { Authorization: "Bearer " + serviceJwt }, fetch: postgrestFetch },
     });
-    const workflowId = "81000000-1000-4000-8000-000000000001";
-    const stepId = "81000000-2000-4000-8000-000000000001";
+    const workflowId = "81000000-1000-4000-8000-000000000003";
+    const stepId = "81000000-2000-4000-8000-000000000003";
     const runSame = crypto.randomUUID();
     const runRaceA = crypto.randomUUID();
     const runRaceB = crypto.randomUUID();
