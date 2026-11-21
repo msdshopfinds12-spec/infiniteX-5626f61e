@@ -179,11 +179,44 @@ export function createOutboxDryRunDispatcherHandler(
     };
 
     for (const candidate of data) {
+      let plan: OutboxDryRunPlan;
       try {
-        const plan = createOutboxDryRunPlan(
+        plan = createOutboxDryRunPlan(
           candidate as ClaimedWorkflowOutboxEvent,
           now().getTime(),
         );
+      } catch (error) {
+        const safeCode = error instanceof Error &&
+          error.message === "outbox_dry_run_invalid_payload"
+          ? "outbox_dry_run_invalid_payload"
+          : "outbox_dry_run_invalid_claim";
+        const candidateRecord = candidate as Partial<ClaimedWorkflowOutboxEvent>;
+        if (typeof candidateRecord.id !== "string" ||
+            typeof candidateRecord.lock_token !== "string") {
+          summary.rejected++;
+          continue;
+        }
+        try {
+          const finish = await authentication.admin.rpc(
+            "simula_finish_workflow_outbox",
+            {
+              p_id: candidateRecord.id,
+              p_lock_token: candidateRecord.lock_token,
+              p_succeeded: false,
+              p_error: safeCode,
+            },
+          );
+          if (finish.error) summary.deferred++;
+          else summary.rejected++;
+        } catch {
+          summary.deferred++;
+        }
+        continue;
+      }
+
+      // Infrastructure/RPC errors are deferred, never reclassified as bad
+      // event data. The lease will expire and can be safely reclaimed.
+      try {
         const result = await authentication.admin.rpc(
           "simula_record_workflow_outbox_simulation",
           {
@@ -199,36 +232,12 @@ export function createOutboxDryRunDispatcherHandler(
             },
           },
         );
-        if (result.error) {
-          summary.deferred++;
-          continue;
-        }
-        summary.simulated++;
-      } catch (error) {
-        const safeCode = error instanceof Error &&
-          error.message === "outbox_dry_run_invalid_payload"
-          ? "outbox_dry_run_invalid_payload"
-          : "outbox_dry_run_invalid_claim";
-        const candidateRecord = candidate as Partial<ClaimedWorkflowOutboxEvent>;
-        if (typeof candidateRecord.id !== "string" ||
-            typeof candidateRecord.lock_token !== "string") {
-          summary.rejected++;
-          continue;
-        }
-        const finish = await authentication.admin.rpc(
-          "simula_finish_workflow_outbox",
-          {
-            p_id: candidateRecord.id,
-            p_lock_token: candidateRecord.lock_token,
-            p_succeeded: false,
-            p_error: safeCode,
-          },
-        );
-        if (finish.error) summary.deferred++;
-        else summary.rejected++;
+        if (result.error) summary.deferred++;
+        else summary.simulated++;
+      } catch {
+        summary.deferred++;
       }
     }
-
     return jsonResponse(200, summary);
   };
 }
