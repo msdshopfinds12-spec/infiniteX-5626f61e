@@ -14,6 +14,7 @@ on:
       - "tests/workers/**"
       - "scripts/rehearse-migration-chain.mjs"
       - "scripts/phase-81-generate-jwt.mjs"
+      - "docs/database/MIGRATION-PROVENANCE-CLASSIFICATION.json"
       - "package.json"
       - "package-lock.json"
   pull_request:
