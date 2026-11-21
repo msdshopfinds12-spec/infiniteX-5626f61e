@@ -1,0 +1,89 @@
+name: InfiniteX Phase 96 Browser Workflow E2E
+
+on:
+  push:
+    branches:
+      - phase-96-browser-workflow-e2e
+    paths:
+      - ".github/workflows/phase-96-workflow-browser-e2e.yml"
+      - "src/**"
+      - "scripts/phase-96-workflow-browser-e2e.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "vite.config.*"
+  pull_request:
+    branches:
+      - main
+      - eng/infinitex-unified-ui-backend-2026-11-20
+    paths:
+      - ".github/workflows/phase-96-workflow-browser-e2e.yml"
+      - "src/**"
+      - "scripts/phase-96-workflow-browser-e2e.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "vite.config.*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-phase-96-browser-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workflow-browser-e2e:
+    name: Chromium / Authenticated workflow lifecycle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configure Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install reproducibly from lockfile
+        run: npm ci
+
+      - name: Dependency security audit
+        run: npm audit --audit-level=low
+
+      - name: TypeScript and project lint
+        run: npm run lint
+
+      - name: Unit and regression suites
+        run: npm test
+
+      - name: Install ephemeral Playwright runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      - name: Build with synthetic browser-only configuration
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_phase96_synthetic_test_key
+          VITE_WORKFLOW_RUN_ENQUEUE_ENABLED: "true"
+        run: npm run build
+
+      - name: Start isolated production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4176 --strictPort > /tmp/infinitex-phase96-preview.log 2>&1 &
+          echo $! > /tmp/infinitex-phase96-preview.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4176/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/infinitex-phase96-preview.log
+          exit 1
+
+      - name: Chromium mobile workflow lifecycle E2E
+        env:
+          INFINITEX_WORKFLOW_E2E_BASE_URL: http://127.0.0.1:4176
+        run: node scripts/phase-96-workflow-browser-e2e.mjs
