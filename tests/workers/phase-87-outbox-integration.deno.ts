@@ -26,9 +26,25 @@ Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
+    // This integration suite performs real database writes. It is restricted
+    // to an explicitly named, local disposable database; hosted/shared targets
+    // fail closed before a client is created.
+    if (Deno.env.get("PHASE87_ALLOW_DISPOSABLE_DB_WRITES") !== "true") {
+      throw new Error("PHASE87_BLOCKED: explicit disposable-database opt-in is required");
+    }
+    const databaseName = required("PHASE87_DATABASE_NAME");
+    if (databaseName !== "infinitex_rehearsal" && !databaseName.startsWith("infinitex_test_")) {
+      throw new Error("PHASE87_BLOCKED: database name is not an approved test database");
+    }
     const url = required("PHASE81_POSTGREST_URL");
+    const endpoint = new URL(url);
+    if (!["localhost", "127.0.0.1", "[::1]", "::1"].includes(endpoint.hostname)) {
+      throw new Error("PHASE87_BLOCKED: integration writes are restricted to loopback PostgREST");
+    }
     const serviceJwt = required("PHASE81_SERVICE_JWT");
     const userId = required("PHASE81_USER_ID");
+    assert(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(userId),
+      "PHASE87_BLOCKED: owner ID must be a canonical UUID");
     const admin = createClient(url, serviceJwt, {
       auth: { persistSession: false, autoRefreshToken: false },
       global: {
@@ -37,9 +53,10 @@ Deno.test({
       },
     });
 
-    const runId = "81000000-3000-4000-8000-000000000005";
+    const runId = crypto.randomUUID();
     const stepId = "81000000-2000-4000-8000-000000000001";
     const workflowId = "81000000-1000-4000-8000-000000000001";
+    try {
     console.log("Phase 87: inserting synthetic outbox workflow run");
     const { error: runInsertError } = await admin.from("workflow_runs").insert({
       id: runId,
@@ -68,7 +85,7 @@ Deno.test({
       p_attempt: 1,
       p_output: { transformed: true },
       p_event_type: "notification.requested",
-      p_idempotency_key: "phase87-disposable-notification-0001",
+      p_idempotency_key: "phase87-disposable-notification:" + runId,
       p_payload: { recipient_ref: "synthetic-user-a", template: "test-only" },
     };
 
@@ -163,5 +180,13 @@ Deno.test({
       && finalReplay[0].outbox_id === outboxId,
       "completion replay after delivery must return the same outbox event");
     console.log("Phase 87: transactional outbox integration verified");
+    } finally {
+      // Remove only records owned by this invocation. A failed cleanup fails
+      // the test so fixture residue cannot be silently ignored.
+      const stepCleanup = await admin.from("workflow_step_runs").delete().eq("run_id", runId);
+      assert(!stepCleanup.error, "phase87 step fixture cleanup failed: " + (stepCleanup.error?.message ?? ""));
+      const runCleanup = await admin.from("workflow_runs").delete().eq("id", runId);
+      assert(!runCleanup.error, "phase87 run fixture cleanup failed: " + (runCleanup.error?.message ?? ""));
+    }
   },
 });
