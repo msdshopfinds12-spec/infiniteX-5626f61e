@@ -1,6 +1,6 @@
 # Phase 103.2 — Database Lease Fencing
 
-**Status:** Draft rehearsal patch committed for review; not executed or validated against PostgreSQL in this change.
+**Status:** Draft rehearsal patch and disposable integration test committed for review; execution is pending the candidate CI result.
 **Scope:** Additive database RPC contract for step start, failure, and completion/outbox creation.
 **Target branch:** `phase-103-2-database-lease-fencing`
 **Base commit:** `b23791957a8c364c3f476657c140498303e1c544`
@@ -38,7 +38,7 @@ All future lifecycle RPCs must follow this order. Avoid any reverse path that lo
 3. Older attempt cannot overwrite a newer step generation.
 4. Same attempt in a terminal step state cannot restart.
 5. Wrong owner, token, attempt, status, or run ID is rejected.
-6. Expired lease is rejected after lock acquisition (include a lock-wait test where expiry occurs while waiting).
+6. Expired lease is rejected after lock acquisition (the current integration test covers expiry; a dedicated lock-wait expiry race remains an additional test).
 7. Failure updates only the matching running step.
 8. Completion and outbox intent commit atomically.
 9. Duplicate completion with the same idempotency identity is deterministic.
@@ -47,6 +47,12 @@ All future lifecycle RPCs must follow this order. Avoid any reverse path that lo
 12. Authenticated/anon roles cannot execute service-role RPCs.
 13. SQLSTATE and error identifiers are stable and mapped safely by TypeScript.
 14. Migration replay plus both existing worker regression suites remain green.
+
+The disposable integration test is `tests/workers/phase-103-2-lease-fenced-step-transitions.deno.ts`; the Phase 81 PostgREST workflow now applies this patch after Phase 103.1 and executes the test using loopback-only PostgREST and the synthetic test owner.
+
+## Review finding addressed
+
+The failure RPC now validates that the supplied step belongs to the workflow associated with the locked run before updating the step-run row. This prevents a privileged caller from crossing workflow boundaries through a malformed or legacy step-run relationship.
 
 ## Known compatibility limitation
 
