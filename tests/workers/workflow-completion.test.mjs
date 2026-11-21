@@ -56,7 +56,7 @@ test("completion helper accepts a valid RPC envelope and returns normalized iden
       assert.equal(name, "simula_complete_step_with_outbox");
       assert.equal(args.p_owner_id, "81000000-1000-4000-8000-000000000001");
       assert.equal(args.p_attempt, 1);
-      return { data: [{ step_run_id: "step-81000000-3000-4000-8000-000000000005", outbox_id: null, replayed: false }], error: null };
+      return { data: [{ step_run_id: "81000000-4000-4000-8000-000000000005", outbox_id: null, replayed: false }], error: null };
     },
     validInput,
   );
