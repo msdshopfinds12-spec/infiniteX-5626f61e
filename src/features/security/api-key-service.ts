@@ -119,7 +119,8 @@ export function createApiKeyService(client: ApiKeyClient) {
       }
       const scopes = input.scopes ?? ["api:read"];
       if (scopes.length < 1 || scopes.length > 2
-        || scopes.some((scope) => !ALLOWED_SCOPES.has(scope))) {
+        || scopes.some((scope) => !ALLOWED_SCOPES.has(scope))
+        || new Set(scopes).size !== scopes.length) {
         return { status: "error", code: "invalid_scopes" };
       }
       if (input.expiresInDays !== undefined
