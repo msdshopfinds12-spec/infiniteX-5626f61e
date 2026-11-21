@@ -205,7 +205,7 @@ BEGIN
      OR p_attempt IS NULL OR p_attempt < 1 THEN
     RAISE EXCEPTION 'workflow_run_lease_identity_required' USING ERRCODE = '22023';
   END IF;
-  IF p_terminal_status NOT IN ('succeeded', 'failed', 'cancelled') THEN
+  IF p_terminal_status IS NULL OR p_terminal_status NOT IN ('succeeded', 'failed', 'cancelled') THEN
     RAISE EXCEPTION 'workflow_run_terminal_status_invalid' USING ERRCODE = '22023';
   END IF;
   IF p_output IS NOT NULL AND
