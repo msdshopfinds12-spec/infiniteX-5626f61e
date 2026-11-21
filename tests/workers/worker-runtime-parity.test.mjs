@@ -14,12 +14,13 @@ test("authenticated worker uses bounded input and exact-origin policy", async ()
   assert.doesNotMatch(source, /\.upsert\(/);
 });
 
-test("cron worker authenticates the shared secret and bounds streamed JSON", async () => {
+test("cron worker authenticates the shared secret before bounded global lease claims", async () => {
   const source = await read("../../supabase/functions/simula-workflow-cron-worker/index.ts");
-  assert.match(source, /authenticateCronRequest/);
-  assert.match(source, /readJsonBodyLimited\(req,\s*2048\)/);
-  assert.match(source, /simula_claim_workflow_runs_internal/);
-  assert.doesNotMatch(source, /\.upsert\(/);
+  assert.ok(source.includes("authenticateCronRequest"));
+  assert.ok(source.includes("readJsonBodyLimited(req, 2048)"));
+  assert.ok(source.includes("claimCronWorkflowLeases("));
+  assert.ok(!source.includes("simula_claim_workflow_runs_internal"));
+  assert.ok(!source.includes(".upsert("));
 });
 
 test("authenticated worker delegates every lifecycle transition to fenced lease RPCs", async () => {
@@ -48,23 +49,29 @@ test("authenticated worker delegates every lifecycle transition to fenced lease 
   assert.match(supervisor, /Promise\.race/);
 });
 
-test("cron worker retains generation compare-and-set until Phase 103.5 migration", async () => {
+test("cron worker delegates every lifecycle transition to fenced lease RPCs", async () => {
   const source = await read("../../supabase/functions/simula-workflow-cron-worker/index.ts");
-  const helper = await read(completionPath);
-  const updates = (source.match(/\.update\(/g) ?? []).length;
-  const olderGenerationGuards = (source.match(/\.lt\(["']attempt["'],\s*stepAttempt\)/g) ?? []).length;
-  const stepGenerationGuards = (source.match(/\.eq\(["']attempt["'],\s*stepAttempt\)/g) ?? []).length;
-  const runGenerationGuards = (source.match(/\.eq\(["']attempt["'],\s*run\.attempt\)/g) ?? []).length;
-  assert.ok(updates >= 5, "cron legacy transitions remain explicit pending Phase 103.5");
-  assert.equal(olderGenerationGuards, 2);
-  assert.ok(stepGenerationGuards >= 1);
-  assert.match(source, /completeWorkflowStepWithOutbox/);
-  assert.match(helper, /simula_complete_step_with_outbox/);
-  assert.match(helper, /p_attempt:\s*input\.attempt/);
-  assert.ok(runGenerationGuards >= 2);
-  assert.match(source, /workflow_run_attempt_superseded/);
-  assert.match(source, /status:\s*"superseded"/);
-  assert.doesNotMatch(source, /\.upsert\(/);
+  const rpc = await read("../../supabase/functions/_shared/workflow-lease-rpc.ts");
+  const supervisor = await read("../../supabase/functions/_shared/workflow-lease-supervisor.ts");
+  for (const token of [
+    "claimCronWorkflowLeases(", "heartbeatWorkflowLease(", "startWorkflowStepWithLease(",
+    "failWorkflowStepWithLease(", "completeWorkflowStepWithLease(", "finishWorkflowRunWithLease(",
+  ]) assert.ok(source.includes(token), "missing cron fenced transition: " + token);
+  for (const table of ["workflow_step_runs", "workflow_runs"]) {
+    for (const method of ["insert", "update", "upsert"]) {
+      assert.ok(!source.includes('.from("' + table + '").' + method + '('),
+        "direct state mutation remains for " + table + "." + method);
+    }
+  }
+  assert.ok(!source.includes("simula_claim_workflow_runs_internal"));
+  assert.ok(!source.includes("completeWorkflowStepWithOutbox("));
+  assert.ok(source.includes("const ownerId = lease.ownerId"));
+  assert.ok(source.includes("supervisor.signal.aborted"));
+  assert.ok(source.includes("abortableSleep"));
+  assert.ok(source.includes("createWorkflowStepCompletedEvent"));
+  assert.ok(rpc.includes("claimCronWorkflowLeases"));
+  assert.ok(supervisor.includes("heartbeatTimeoutMs"));
+  assert.ok(supervisor.includes("Promise.race"));
 });
 
 test("API-key manager rejects wildcard CORS and uses streamed JSON size limits", async () => {

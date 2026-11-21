@@ -1,237 +1,284 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { executeSafeAction } from "../_shared/workflow-actions.mjs";
-import { completeWorkflowStepWithOutbox } from "../_shared/workflow-completion.ts";
 import { authenticateCronRequest } from "../_shared/worker-auth-boundary.mjs";
 import {
   clampBatchLimit,
   executeWithinStepBudget,
   executeWithRetry,
-  isClaimedRunValid,
   isWorkflowOwnedBy,
-  isAttemptGenerationNewer,
   readJsonBodyLimited,
   validateStepTimeoutSeconds,
   validateRetryLimit,
 } from "../_shared/worker-security.mjs";
+import {
+  claimCronWorkflowLeases,
+  heartbeatWorkflowLease,
+  startWorkflowStepWithLease,
+  failWorkflowStepWithLease,
+  completeWorkflowStepWithLease,
+  finishWorkflowRunWithLease,
+  type LeaseRpc,
+} from "../_shared/workflow-lease-rpc.ts";
+import { WorkflowLeaseError } from "../_shared/workflow-lease-contract.ts";
+import { WorkflowLeaseSupervisor } from "../_shared/workflow-lease-supervisor.ts";
+import { createWorkflowStepCompletedEvent } from "../_shared/workflow-outbox-contract.ts";
 
 type JsonRecord = Record<string, unknown>;
 type Step = {
-  id: string; step_order: number; name: string; action_type: string;
-  config: JsonRecord; retry_limit: number; timeout_seconds: number;
-};
-type ClaimedRun = {
-  id: string; workflow_id: string; owner_id: string; input: unknown; attempt: number;
+  id: string;
+  step_order: number;
+  name: string;
+  action_type: string;
+  config: JsonRecord;
+  retry_limit: number;
+  timeout_seconds: number;
 };
 
-const headers = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" };
-function respond(status: number, body: JsonRecord) {
-  return new Response(JSON.stringify(body), { status, headers });
-}
 function record(value: unknown): JsonRecord {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? { ...(value as JsonRecord) } : { value };
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    return { ...(value as JsonRecord) };
+  }
+  return { value };
 }
-async function logEvent(
-  admin: SupabaseClient<any, "public", any, any, any>, ownerId: string, workflowId: string, runId: string,
-  level: "info" | "warning" | "error", event: string, details: JsonRecord = {},
-) {
-  const { error } = await admin.from("workflow_logs").insert({
-    owner_id: ownerId, workflow_id: workflowId, run_id: runId, level, event, details,
+
+function safeError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "workflow_run_failed";
+  return message.slice(0, 500);
+}
+
+function safeLeaseDiagnostic(error: unknown): JsonRecord {
+  if (!(error instanceof WorkflowLeaseError) || !error.causeValue ||
+      typeof error.causeValue !== "object") return {};
+  const cause = error.causeValue as { code?: unknown; message?: unknown };
+  return {
+    database_code: typeof cause.code === "string" ? cause.code.slice(0, 32) : "unknown",
+    database_message: typeof cause.message === "string" ? cause.message.slice(0, 180) : "unknown",
+  };
+}
+
+function assertLeaseActive(supervisor: WorkflowLeaseSupervisor): void {
+  if (supervisor.signal.aborted || supervisor.isTerminal) {
+    const reason = supervisor.signal.reason;
+    if (reason instanceof WorkflowLeaseError) throw reason;
+    throw new WorkflowLeaseError("LEASE_LOST", reason);
+  }
+}
+
+function abortableSleep(milliseconds: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(new WorkflowLeaseError("LEASE_LOST", signal.reason));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, milliseconds);
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      reject(new WorkflowLeaseError("LEASE_LOST", signal.reason));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
   });
-  if (error) console.error("workflow_log_insert_failed", error.message);
+}
+
+async function logEvent(
+  admin: SupabaseClient<any, "public", any, any, any>,
+  ownerId: string,
+  workflowId: string,
+  runId: string,
+  level: "info" | "warning" | "error",
+  event: string,
+  details: JsonRecord = {},
+): Promise<void> {
+  try {
+    const { error } = await admin.from("workflow_logs").insert({
+      owner_id: ownerId, workflow_id: workflowId, run_id: runId, level, event, details,
+    });
+    if (error) console.error("workflow_log_insert_failed", error.message);
+  } catch (error) {
+    // Observability is deliberately non-authoritative; it cannot trigger a
+    // second workflow transition after a successful fenced completion.
+    console.error("workflow_log_insert_failed", safeError(error));
+  }
 }
 
 export type CronWorkerDependencies = {
   createClient: typeof createClient;
   env: { get(name: string): string | undefined };
   executeSafeAction: typeof executeSafeAction;
-  now?: () => Date;
+};
+
+const headers = {
+  "Content-Type": "application/json; charset=utf-8",
+  "Cache-Control": "no-store",
 };
 
 export function createCronWorkerHandler(deps: CronWorkerDependencies) {
   const { createClient, env, executeSafeAction } = deps;
-  const now = deps.now ?? (() => new Date());
   const respond = (status: number, body: JsonRecord) =>
     new Response(JSON.stringify(body), { status, headers });
+
   return async (req: Request) => {
-  if (req.method !== "POST") return respond(405, { ok: false, error: "method_not_allowed" });
+    if (req.method !== "POST") return respond(405, { ok: false, error: "method_not_allowed" });
 
-  const authentication = await authenticateCronRequest({
-    request: req,
-    env,
-    createClient,
-  });
-  if (!authentication.ok) {
-    if (authentication.status === 500) console.error("worker_environment_incomplete");
-    const authStatus = typeof authentication.status === "number" ? authentication.status : 401;
-    return respond(authStatus, { ok: false, error: authentication.error });
-  }
-  const { admin } = authentication;
-
-  const bodyResult = await readJsonBodyLimited(req, 2048);
-  if (!bodyResult.ok) {
-    const status = bodyResult.reason === "payload_too_large" ? 413 : 400;
-    return respond(status, { ok: false, error: bodyResult.reason });
-  }
-  const body = bodyResult.value;
-  const limit = clampBatchLimit(body && typeof body === "object" ? body.limit : undefined);
-
-  const { data: claimedRuns, error: claimError } = await admin.rpc(
-    "simula_claim_workflow_runs_internal", { p_limit: limit },
-  );
-  if (claimError) {
-    console.error("queue_claim_failed", claimError.message);
-    return respond(500, { ok: false, error: "queue_claim_failed" });
-  }
-
-  const summary = { ok: true, claimed: (claimedRuns ?? []).length, succeeded: 0, failed: 0, superseded: 0, runs: [] as JsonRecord[] };
-
-  for (const run of (claimedRuns ?? []) as ClaimedRun[]) {
-    if (!isClaimedRunValid(run)) {
-      summary.failed++;
-      summary.runs.push({ status: "rejected", error: "claimed_run_invalid" });
-      continue;
+    // A trusted global queue claim is allowed only after the cron secret has
+    // been verified by the shared authentication boundary.
+    const authentication = await authenticateCronRequest({ request: req, env, createClient });
+    if (!authentication.ok) {
+      if (authentication.status === 500) console.error("worker_environment_incomplete");
+      return respond(authentication.status ?? 401, { ok: false, error: authentication.error });
     }
-    const ownerId = run.owner_id;
-    let payload: unknown = record(run.input);
-    let failure = "";
+    const { admin } = authentication;
+    const bodyResult = await readJsonBodyLimited(req, 2048);
+    if (!bodyResult.ok) {
+      const status = bodyResult.reason === "payload_too_large" ? 413 : 400;
+      return respond(status, { ok: false, error: bodyResult.reason });
+    }
+    const body = bodyResult.value;
+    const limit = clampBatchLimit(body && typeof body === "object" ? body.limit : undefined);
+
+    const rpc: LeaseRpc = async (name, args) => {
+      const result = await admin.rpc(name, args as never);
+      return { data: result.data, error: result.error };
+    };
+
+    let leases;
     try {
-      const { data: workflow, error: workflowError } = await admin
-        .from("workflows").select("id,owner_id,status")
-        .eq("id", run.workflow_id).eq("owner_id", ownerId).maybeSingle();
-      if (workflowError || !workflow || !isWorkflowOwnedBy(workflow, run.workflow_id, ownerId)) throw new Error("workflow_owner_validation_failed");
-      if (workflow.status === "archived") throw new Error("workflow_archived");
-
-      const { data: steps, error: stepsError } = await admin
-        .from("workflow_steps")
-        .select("id,step_order,name,action_type,config,retry_limit,timeout_seconds")
-        .eq("workflow_id", run.workflow_id)
-        .order("step_order", { ascending: true });
-      if (stepsError) throw new Error("workflow_steps_read_failed");
-      if (!steps || steps.length === 0) throw new Error("workflow_has_no_steps");
-
-      for (const step of steps as Step[]) {
-        const config = record(step.config);
-        const { data: previous, error: previousError } = await admin
-          .from("workflow_step_runs").select("id,attempt")
-          .eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId).maybeSingle();
-        if (previousError) throw new Error("step_run_lookup_failed");
-
-        // Step attempts track the workflow-run generation so stale workers
-        // cannot replace state written by a newer claim.
-        const stepAttempt = run.attempt;
-        const stepRunPayload = {
-          run_id: run.id, step_id: step.id, owner_id: ownerId, status: "running",
-          input: record(payload), output: null, error_message: null,
-          attempt: stepAttempt, started_at: now().toISOString(), finished_at: null,
-        };
-        if (previous) {
-          if (!isAttemptGenerationNewer(previous.attempt, stepAttempt)) {
-            throw new Error("workflow_step_attempt_superseded");
-          }
-          const { data: startedStep, error: startError } = await admin
-            .from("workflow_step_runs").update(stepRunPayload)
-            .eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
-            .lt("attempt", stepAttempt).select("id").maybeSingle();
-          if (startError) throw new Error("step_run_start_failed");
-          if (!startedStep) throw new Error("workflow_step_attempt_superseded");
-        } else {
-          const { data: insertedStep, error: insertError } = await admin
-            .from("workflow_step_runs").insert(stepRunPayload).select("id").maybeSingle();
-          if (insertError?.code === "23505") {
-            const { data: startedStep, error: startError } = await admin
-              .from("workflow_step_runs").update(stepRunPayload)
-              .eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
-              .lt("attempt", stepAttempt).select("id").maybeSingle();
-            if (startError) throw new Error("step_run_start_failed");
-            if (!startedStep) throw new Error("workflow_step_attempt_superseded");
-          } else {
-            if (insertError || !insertedStep) throw new Error("step_run_start_failed");
-          }
-        }
-
-        let output: JsonRecord | null = null;
-        let actionError = "";
-        try {
-          const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
-          const retryLimit = validateRetryLimit(step.retry_limit);
-          output = await executeWithRetry(
-            () => executeWithinStepBudget(
-              () => executeSafeAction(step.action_type, payload, config),
-              { input: payload, config },
-              timeoutSeconds,
-              64 * 1024,
-            ),
-            retryLimit,
-            { maxElapsedMs: timeoutSeconds * 1000 },
-          );
-        } catch (error) {
-          actionError = error instanceof Error ? error.message : "action_failed";
-        }
-        if (actionError || !output) {
-          const { data: failedStep, error: stepFailureError } = await admin.from("workflow_step_runs").update({
-            status: "failed", error_message: (actionError || "action_failed").slice(0, 500),
-            finished_at: now().toISOString(),
-          }).eq("run_id", run.id).eq("step_id", step.id).eq("owner_id", ownerId)
-            .eq("attempt", stepAttempt).select("id").maybeSingle();
-          if (stepFailureError) throw new Error("step_run_failure_update_failed");
-          if (!failedStep) throw new Error("workflow_step_attempt_superseded");
-          throw new Error("step_failed:" + step.name + ":" + (actionError || "action_failed"));
-        }
-
-        payload = output;
-        // Keep cron and authenticated workers on the same atomic completion path.
-        // Never fall back to a direct success update if the RPC fails.
-        await completeWorkflowStepWithOutbox(
-          async (name, args) => await admin.rpc(name, args as never),
-          { ownerId, runId: run.id, stepId: step.id, attempt: stepAttempt, output },
-        );
-        await logEvent(admin, ownerId, run.workflow_id, run.id, "info", "workflow_step_succeeded", {
-          step_id: step.id, step_order: step.step_order, action_type: step.action_type,
-        });
-      }
-
-      const { data: finishedRun, error: finishRunError } = await admin.from("workflow_runs").update({
-        status: "succeeded", output: record(payload), error_message: null, finished_at: now().toISOString(),
-      }).eq("id", run.id).eq("owner_id", ownerId).eq("status", "running")
-        .eq("attempt", run.attempt).select("id").maybeSingle();
-      if (finishRunError) throw new Error("workflow_run_finish_failed");
-      if (!finishedRun) throw new Error("workflow_run_attempt_superseded");
-      await logEvent(admin, ownerId, run.workflow_id, run.id, "info", "workflow_run_succeeded", {
-        attempt: run.attempt, step_count: steps.length,
-      });
-      summary.succeeded++;
-      summary.runs.push({ id: run.id, status: "succeeded" });
+      leases = await claimCronWorkflowLeases(rpc, { limit, leaseSeconds: 90 });
     } catch (error) {
-      failure = (error instanceof Error ? error.message : "workflow_run_failed").slice(0, 500);
+      console.error("queue_lease_claim_failed", safeError(error), safeLeaseDiagnostic(error));
+      return respond(500, { ok: false, error: "queue_claim_failed" });
     }
 
-    if (failure) {
-      if (failure.includes("attempt_superseded")) {
-        summary.superseded++;
-        summary.runs.push({ id: run.id, status: "superseded", reason: "attempt_generation_changed" });
-        continue;
-      }
-      const { data: failedRun, error: updateError } = await admin.from("workflow_runs").update({
-        status: "failed", error_message: failure, finished_at: now().toISOString(),
-      }).eq("id", run.id).eq("owner_id", ownerId).eq("status", "running")
-        .eq("attempt", run.attempt).select("id").maybeSingle();
-      if (updateError) console.error("workflow_run_failure_update_failed", updateError.message);
-      if (!failedRun) {
-        summary.superseded++;
-        summary.runs.push({ id: run.id, status: "superseded", reason: "attempt_generation_changed" });
-        continue;
-      }
-      await logEvent(admin, ownerId, run.workflow_id, run.id, "error", "workflow_run_failed", {
-        attempt: run.attempt, error: failure,
+    const summary = {
+      ok: true, claimed: leases.length, succeeded: 0, failed: 0,
+      superseded: 0, lease_lost: 0, runs: [] as JsonRecord[],
+    };
+
+    for (const lease of leases) {
+      // The claim adapter validates owner_id as a canonical UUID. Retain that
+      // database-returned owner on every subsequent RPC and row predicate.
+      const ownerId = lease.ownerId;
+      const supervisor = new WorkflowLeaseSupervisor({
+        lease,
+        leaseDurationSeconds: 90,
+        heartbeatIntervalMs: 30_000,
+        heartbeatTimeoutMs: 10_000,
+        heartbeat: (identity) => heartbeatWorkflowLease(rpc, identity, 90),
       });
-      summary.failed++;
-      summary.runs.push({ id: run.id, status: "failed", error: failure });
-    }
-  }
+      supervisor.start();
 
-  return respond(200, summary);
+      let payload: unknown = record(lease.input);
+      let workflowId = lease.workflowId;
+      let stepCount = 0;
+      try {
+        assertLeaseActive(supervisor);
+        const { data: workflow, error: workflowError } = await admin
+          .from("workflows").select("id,owner_id,status")
+          .eq("id", workflowId).eq("owner_id", ownerId).maybeSingle();
+        assertLeaseActive(supervisor);
+        if (workflowError || !workflow || !isWorkflowOwnedBy(workflow, workflowId, ownerId)) {
+          throw new Error("workflow_owner_validation_failed");
+        }
+        if (workflow.status === "archived") throw new Error("workflow_archived");
+
+        const { data: steps, error: stepsError } = await admin
+          .from("workflow_steps")
+          .select("id,step_order,name,action_type,config,retry_limit,timeout_seconds")
+          .eq("workflow_id", workflowId)
+          .order("step_order", { ascending: true });
+        assertLeaseActive(supervisor);
+        if (stepsError) throw new Error("workflow_steps_read_failed");
+        if (!steps || steps.length === 0) throw new Error("workflow_has_no_steps");
+
+        for (const step of steps as Step[]) {
+          assertLeaseActive(supervisor);
+          const config = record(step.config);
+          await startWorkflowStepWithLease(rpc, supervisor.lease, step.id, record(payload));
+          assertLeaseActive(supervisor);
+
+          let actionOutput: JsonRecord;
+          try {
+            const timeoutSeconds = validateStepTimeoutSeconds(step.timeout_seconds);
+            const retryLimit = validateRetryLimit(step.retry_limit);
+            actionOutput = await executeWithRetry(
+              () => {
+                assertLeaseActive(supervisor);
+                const output = executeWithinStepBudget(
+                  () => executeSafeAction(step.action_type, payload, config),
+                  { input: payload, config },
+                  timeoutSeconds,
+                  64 * 1024,
+                );
+                assertLeaseActive(supervisor);
+                return output;
+              },
+              retryLimit,
+              {
+                maxElapsedMs: timeoutSeconds * 1000,
+                sleep: (ms: number) => abortableSleep(ms, supervisor.signal),
+              },
+            );
+          } catch (actionError) {
+            assertLeaseActive(supervisor);
+            const message = safeError(actionError);
+            await failWorkflowStepWithLease(rpc, supervisor.lease, step.id, message);
+            throw new Error("step_failed:" + step.name + ":" + message);
+          }
+
+          assertLeaseActive(supervisor);
+          const event = createWorkflowStepCompletedEvent({
+            runId: lease.runId, stepId: step.id, attempt: lease.attempt,
+          });
+          await completeWorkflowStepWithLease(rpc, supervisor.lease, step.id, actionOutput, event);
+          assertLeaseActive(supervisor);
+          payload = actionOutput;
+          stepCount++;
+          await logEvent(admin, ownerId, workflowId, lease.runId, "info", "workflow_step_succeeded", {
+            step_id: step.id, step_order: step.step_order, action_type: step.action_type,
+          });
+        }
+
+        assertLeaseActive(supervisor);
+        await finishWorkflowRunWithLease(rpc, supervisor.lease, "succeeded", record(payload));
+        await logEvent(admin, ownerId, workflowId, lease.runId, "info", "workflow_run_succeeded", {
+          attempt: lease.attempt, step_count: stepCount,
+        });
+        summary.succeeded++;
+        summary.runs.push({ id: lease.runId, status: "succeeded" });
+      } catch (error) {
+        const leaseFailure = error instanceof WorkflowLeaseError || supervisor.isTerminal;
+        if (leaseFailure) {
+          summary.lease_lost++;
+          summary.runs.push({
+            id: lease.runId, status: "lease_lost",
+            reason: error instanceof WorkflowLeaseError ? error.code : "LEASE_LOST",
+          });
+        } else {
+          const message = safeError(error);
+          try {
+            await finishWorkflowRunWithLease(rpc, supervisor.lease, "failed", undefined, message);
+            await logEvent(admin, ownerId, workflowId, lease.runId, "error", "workflow_run_failed", {
+              attempt: lease.attempt, error: message,
+            });
+            summary.failed++;
+            summary.runs.push({ id: lease.runId, status: "failed", error: message });
+          } catch (finishError) {
+            summary.superseded++;
+            summary.runs.push({
+              id: lease.runId, status: "superseded",
+              reason: finishError instanceof WorkflowLeaseError ? finishError.code : "terminal_transition_unconfirmed",
+            });
+          }
+        }
+      } finally {
+        // Local shutdown only. The database lease is terminalized exclusively
+        // through the fenced finish RPC or expires naturally after lease loss.
+        await supervisor.release();
+      }
+    }
+
+    return respond(200, summary);
   };
 }
 

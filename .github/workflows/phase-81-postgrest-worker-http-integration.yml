@@ -10,6 +10,7 @@ on:
       - "supabase/migrations/**"
       - "supabase/patches/**"
       - "supabase/functions/simula-workflow-worker/**"
+      - "supabase/functions/simula-workflow-cron-worker/**"
       - "supabase/functions/_shared/**"
       - "tests/database/phase-81-postgrest-worker-fixtures.sql"
       - "tests/workers/**"
@@ -23,6 +24,7 @@ on:
       - "supabase/migrations/**"
       - "supabase/patches/**"
       - "supabase/functions/simula-workflow-worker/**"
+      - "supabase/functions/simula-workflow-cron-worker/**"
       - "supabase/functions/_shared/**"
       - "tests/database/phase-81-postgrest-worker-fixtures.sql"
       - "tests/workers/**"
@@ -235,6 +237,8 @@ jobs:
           PHASE1026_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-102-6-workflow-run-lease.deno.ts
           deno check --no-lock --node-modules-dir=auto tests/workers/phase-103-2-lease-fenced-step-transitions.deno.ts
           PHASE1032_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-103-2-lease-fenced-step-transitions.deno.ts
+          deno check --no-lock --node-modules-dir=auto tests/workers/phase-103-3-cron-worker-lease.deno.ts
+          PHASE1033_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-103-3-cron-worker-lease.deno.ts
 
       - name: Collect disposable service logs
         if: always()
