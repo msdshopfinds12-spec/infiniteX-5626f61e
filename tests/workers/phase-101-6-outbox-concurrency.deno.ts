@@ -21,7 +21,7 @@ const postgrestFetch: typeof fetch = (input, init) => {
 };
 
 Deno.test({
-  name: "Phase 101.6: isolated concurrent completion, idempotency conflicts and rollback invariants",
+  name: "Phase 101.6: concurrency, idempotency, rollback and expired-lease invariants",
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
@@ -104,6 +104,48 @@ Deno.test({
       });
       assert(Boolean(payloadConflict.error), "same key with a different payload must be rejected");
 
+      // A completion token must not authorize finishing an event after its lease
+      // expires. This intentionally waits for the database-issued 60s lease:
+      // changing the private row directly would bypass the public RPC contract.
+      const firstClaim = await admin.rpc("simula_claim_workflow_outbox", { p_limit: 25 });
+      assert(!firstClaim.error && Array.isArray(firstClaim.data),
+        "outbox claim must return a bounded claim batch");
+      const leasedEvent = firstClaim.data.find((row: { idempotency_key: string }) =>
+        row.idempotency_key === sameArgs.p_idempotency_key);
+      assert(leasedEvent && typeof leasedEvent.lock_token === "string" &&
+        typeof leasedEvent.lease_until === "string",
+        "the fixture event must receive a database-issued lease");
+      const leaseDeadline = Date.parse(leasedEvent.lease_until);
+      assert(Number.isFinite(leaseDeadline), "outbox lease deadline must be a valid timestamp");
+      const waitMs = leaseDeadline - Date.now() + 150;
+      assert(waitMs >= 0 && waitMs <= 65_000,
+        "outbox lease must be within the expected bounded 60-second window");
+      if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs));
+
+      const expiredFinish = await admin.rpc("simula_finish_workflow_outbox", {
+        p_id: leasedEvent.id,
+        p_lock_token: leasedEvent.lock_token,
+        p_succeeded: true,
+      });
+      assert(Boolean(expiredFinish.error),
+        "an expired outbox lease must not be completed even when its token matches");
+
+      const reclaimedBatch = await admin.rpc("simula_claim_workflow_outbox", { p_limit: 25 });
+      assert(!reclaimedBatch.error && Array.isArray(reclaimedBatch.data),
+        "expired outbox event must be eligible for recovery");
+      const reclaimedEvent = reclaimedBatch.data.find((row: { idempotency_key: string }) =>
+        row.idempotency_key === sameArgs.p_idempotency_key);
+      assert(reclaimedEvent && typeof reclaimedEvent.lock_token === "string" &&
+        reclaimedEvent.lock_token !== leasedEvent.lock_token,
+        "recovery must issue a fresh lease token");
+      const recoveredFinish = await admin.rpc("simula_finish_workflow_outbox", {
+        p_id: reclaimedEvent.id,
+        p_lock_token: reclaimedEvent.lock_token,
+        p_succeeded: true,
+      });
+      assert(!recoveredFinish.error && recoveredFinish.data?.[0]?.status === "succeeded",
+        "the current unexpired lease token must be allowed to finish the event");
+
       // Independent runs contend for one owner-scoped idempotency key.
       const crossKey = "workflow.step.completed:" + runRaceA + ":" + stepId + ":1";
       const crossResults = await Promise.all([
@@ -121,7 +163,7 @@ Deno.test({
         states.filter((r: { status: string }) => r.status === "running").length === 1,
         "losing cross-run transaction must roll back its step completion");
 
-      console.log("Phase 101.6 verified: same-run replay, event/payload conflicts, cross-run race and rollback");
+      console.log("Phase 101.6 verified: replay, idempotency conflicts, rollback, lease expiry and recovery");
     } finally {
       // UUID-scoped cleanup only; both operations are attempted independently.
       // allSettled also handles rejected network promises: one failed request
