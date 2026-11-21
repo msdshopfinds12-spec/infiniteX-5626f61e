@@ -158,7 +158,7 @@ export default function App({
                   <h2><Bot size={18} /> AI Runtime &amp; Agent Registry</h2>
                   <span className="badge badge-neutral">PROVIDER DISABLED</span>
                 </div>
-                <AgentList searchTerm={query} />
+                <AgentList />
               </div>
             )}
             {view === "projects" && (
@@ -204,7 +204,7 @@ export default function App({
                   <h2><Terminal size={18} /> Workflow Activity</h2>
                   <span className="badge badge-neutral">PER-RUN EVENTS</span>
                 </div>
-                <LogStream searchTerm={query} />
+                <LogStream />
               </div>
             )}
             {view === "security" && (
