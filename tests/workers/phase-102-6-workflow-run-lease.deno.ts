@@ -121,13 +121,59 @@ Deno.test({
       });
       assert(Boolean(expiredHeartbeat.error), "expired lease must not be resurrected");
 
+      const { data: expiredFixture, error: expiredFixtureError } = await admin
+        .from("workflow_runs")
+        .select("id,status,owner_id,attempt,lease_token,lease_until")
+        .eq("id", runId)
+        .eq("owner_id", ownerId)
+        .maybeSingle();
+      assert(!expiredFixtureError, "failed to inspect expired fixture: " +
+        (expiredFixtureError?.message ?? ""));
+      assert(expiredFixture?.status === "running" &&
+        expiredFixture.attempt === first.attempt &&
+        expiredFixture.lease_token === first.lease_token &&
+        Date.parse(expiredFixture.lease_until) <= Date.now(),
+        "fixture must be expired and still owned by the first lease before reclaim: " +
+          JSON.stringify(expiredFixture));
+
       const reclaim = await admin.rpc("simula_claim_workflow_runs_lease_internal", claimArgs);
-      assert(!reclaim.error && Array.isArray(reclaim.data), "expired run reclaim RPC failed");
+      assert(!reclaim.error && Array.isArray(reclaim.data),
+        "expired run reclaim RPC failed: " + (reclaim.error?.message ?? ""));
       const second = reclaim.data.find((row: { id: string }) => row.id === runId) as
         | { attempt: number; lease_token: string; lease_until: string } | undefined;
-      assert(second && second.attempt === 2 && UUID.test(second.lease_token) &&
+      if (!second) {
+        const { data: currentFixture, error: currentFixtureError } = await admin
+          .from("workflow_runs")
+          .select("id,status,owner_id,attempt,lease_token,lease_until")
+          .eq("id", runId)
+          .maybeSingle();
+        throw new Error("RECLAIM_DIAGNOSTICS: " + JSON.stringify({
+          runId,
+          ownerId,
+          firstLease: {
+            attempt: first.attempt,
+            lease_token: first.lease_token,
+            lease_until: first.lease_until,
+          },
+          expiredFixture,
+          reclaimRows: reclaim.data.map((row: {
+            id: string; owner_id: string; attempt: number;
+            lease_token: string; lease_until: string;
+          }) => ({
+            id: row.id,
+            owner_id: row.owner_id,
+            attempt: row.attempt,
+            lease_token: row.lease_token,
+            lease_until: row.lease_until,
+          })),
+          currentFixture,
+          currentFixtureError: currentFixtureError?.message ?? null,
+        }));
+      }
+      assert(second.attempt === 2 && UUID.test(second.lease_token) &&
         second.lease_token !== first.lease_token && Date.parse(second.lease_until) > Date.now(),
-        "reclaim must advance generation and issue a fresh, unexpired token");
+        "reclaim must advance generation and issue a fresh, unexpired token: " +
+          JSON.stringify({ first, second }));
 
       const staleFinish = await admin.rpc("simula_finish_workflow_run_lease", {
         p_run_id: runId, p_owner_id: ownerId, p_attempt: first.attempt,
