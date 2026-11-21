@@ -37,6 +37,8 @@ test("Phase 99 navigation reflects the session and retains accessible names", as
   assert.match(sidebar, /workspaceLabel = "Preview mode"/);
   assert.match(sidebar, /aria-label=\{item.label\}/);
   assert.match(sidebar, /aria-current=\{active \? "page" : undefined\}/);
+  const app = await read("src/App.tsx");
+  assert.match(app, /workspaceLabel=\{authState.status === "authenticated" \? "Authenticated session" : "Preview mode"\}/);
 });
 
 test("Phase 99 capability and activity cards adapt to narrow mobile screens", async () => {
