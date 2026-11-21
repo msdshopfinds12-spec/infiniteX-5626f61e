@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/phase-82-postgrest-rls-tenant-isolation.yml"
       - "supabase/migrations/**"
+      - "supabase/patches/**"
       - "supabase/functions/simula-workflow-worker/**"
       - "supabase/functions/_shared/**"
       - "tests/database/phase-81-postgrest-worker-fixtures.sql"
@@ -19,6 +20,7 @@ on:
     paths:
       - ".github/workflows/phase-82-postgrest-rls-tenant-isolation.yml"
       - "supabase/migrations/**"
+      - "supabase/patches/**"
       - "supabase/functions/simula-workflow-worker/**"
       - "supabase/functions/_shared/**"
       - "tests/database/phase-81-postgrest-worker-fixtures.sql"
@@ -106,6 +108,42 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: infinitex_rehearsal
         run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-81-postgrest-worker-fixtures.sql
+
+      - name: Apply Phase 102.4 lease-expiry patch to disposable database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: psql -X -v ON_ERROR_STOP=1 -f supabase/patches/phase-102-4-outbox-expiry-guard.sql
+
+      - name: Apply Phase 102.6 run-lease patch to disposable database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: psql -X -v ON_ERROR_STOP=1 -f supabase/patches/phase-102-6-workflow-run-lease.sql
+
+      - name: Apply Phase 103.1 owner-scoped lease claim patch to disposable database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: psql -X -v ON_ERROR_STOP=1 -f supabase/patches/phase-103-1-owner-scoped-workflow-lease-claim.sql
+
+      - name: Apply Phase 103.2 lease-fenced step transition patch to disposable database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: psql -X -v ON_ERROR_STOP=1 -f supabase/patches/phase-103-2-lease-fenced-step-transitions.sql
 
       - name: Generate short-lived local-only JWTs
         env:
