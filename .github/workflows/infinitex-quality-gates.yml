@@ -9,6 +9,7 @@ on:
       - phase-89-frontend-backend-reconciliation
       - phase-90-transactional-outbox-integration
       - phase-93-infiniteX-ui-backend-readiness
+      - phase-94-workflow-enqueue-to-worker-e2e
       - eng/infinitex-p0-p1-auth-2026-11-20
 
 permissions:
