@@ -61,6 +61,12 @@ jobs:
       - name: Type-check isolated outbox dispatcher core
         run: deno check --no-lock supabase/functions/_shared/workflow-outbox-dispatcher.ts
 
+      - name: Type-check outbox dispatcher Edge Function
+        run: deno check --no-lock --node-modules-dir=auto supabase/functions/simula-workflow-outbox-dispatcher/index.ts
+
+      - name: Test outbox dispatcher handler security
+        run: deno test --no-check supabase/functions/_shared/workflow-outbox-dispatcher.deno.ts
+
       - name: Execute authenticated worker handler tests
         run: deno test --no-check --allow-env supabase/functions/simula-workflow-worker/index.deno.ts
 
