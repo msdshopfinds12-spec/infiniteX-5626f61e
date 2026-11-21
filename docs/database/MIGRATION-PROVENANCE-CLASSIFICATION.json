@@ -49,7 +49,7 @@
       "path": "supabase/migrations/20261121000400_simula_outbox_simulation_state.sql",
       "classification": "PROPOSED_NOT_APPLIED",
       "sourceStatus": "NOT_VERIFIED_LIVE",
-      "sha256": "5d5789b8fa16f7995f6ce9250524c08a22ac3cf26bc135a9cf03112b4b7dd6f7",
+      "sha256": "30189914ed6cb3ddc9b9d46a28aed99a10ae6d9a41e29bf6363df4f3cd85f55d",
       "reason": "Phase 91 candidate only. Non-delivery simulation state for the isolated dry-run dispatcher; rehearsal limited to disposable PostgreSQL CI and no live migration evidence or production approval.",
       "productionApproval": "NOT_GRANTED"
     }
