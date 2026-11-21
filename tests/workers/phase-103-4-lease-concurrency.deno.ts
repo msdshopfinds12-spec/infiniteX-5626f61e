@@ -242,9 +242,11 @@ Deno.test({
         p_idempotency_key: event.idempotencyKey,
         p_payload: { ...event.payload, conflict_probe: true },
       });
-      assert(Boolean(conflictingPayload.error) &&
-        String(conflictingPayload.error.message).includes("outbox_idempotency_conflict"),
-        "same idempotency key with altered payload must raise outbox_idempotency_conflict");
+      assert(
+        conflictingPayload.error !== null &&
+          conflictingPayload.error.message.includes("outbox_idempotency_conflict"),
+        "same idempotency key with altered payload must raise outbox_idempotency_conflict",
+      );
 
       // Matching event identity with a different step output must not be treated as replay.
       const conflictingOutput = await admin.rpc("simula_complete_step_with_outbox_lease", {
@@ -255,9 +257,11 @@ Deno.test({
         p_idempotency_key: event.idempotencyKey,
         p_payload: event.payload,
       });
-      assert(Boolean(conflictingOutput.error) &&
-        String(conflictingOutput.error.message).includes("outbox_replay_step_state_mismatch"),
-        "same event key with altered step output must raise outbox_replay_step_state_mismatch");
+      assert(
+        conflictingOutput.error !== null &&
+          conflictingOutput.error.message.includes("outbox_replay_step_state_mismatch"),
+        "same event key with altered step output must raise outbox_replay_step_state_mismatch",
+      );
 
       const staleFinish = await admin.rpc("simula_finish_workflow_run_lease", {
         ...firstIdentity, p_terminal_status: "failed", p_error: "stale-generation-must-not-finish",
