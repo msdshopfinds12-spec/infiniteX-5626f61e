@@ -127,7 +127,7 @@ test("allowlisted event metadata is passed atomically with a stable idempotency 
     event: {
       eventType: "notification.requested",
       payload: {
-        recipient_ref: "81000000-4000-4000-8000-000000000001",
+        recipient_ref: "81000000-1000-4000-8000-000000000001",
         template_key: "welcome-v1",
       },
     },
@@ -154,7 +154,7 @@ test("completion helper rejects unregistered event types and malformed event pay
   await assert.rejects(() => completeWorkflowStepWithOutbox(rpc, {
     ...validInput,
     event: { eventType: "notification.requested", payload: {
-      recipient_ref: "https://example.com",
+      recipient_ref: "81000000-4000-4000-8000-000000000001",
       template_key: "welcome",
     } },
   }), /step_run_finish_invalid_event/);
