@@ -60,7 +60,8 @@ INSERT INTO auth.users(id, raw_user_meta_data)
 VALUES
   ('81000000-0000-4000-8000-000000000001', '{"full_name":"Phase 81 synthetic owner A"}'::jsonb),
   ('81000000-0000-4000-8000-000000000002', '{"full_name":"Phase 81 synthetic owner B"}'::jsonb),
-  ('81000000-0000-4000-8000-000000000003', '{"full_name":"Phase 103 isolated lease test owner"}'::jsonb)
+  ('81000000-0000-4000-8000-000000000003', '{"full_name":"Phase 103 isolated lease test owner"}'::jsonb),
+  ('81000000-0000-4000-8000-000000000004', '{"full_name":"Phase 103 negative-scope test owner"}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.user_projects(id, user_id, title, project_type, content)
