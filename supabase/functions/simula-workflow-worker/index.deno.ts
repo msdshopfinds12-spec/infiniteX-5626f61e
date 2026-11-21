@@ -188,27 +188,52 @@ Deno.test("ambiguous step-start transport outcome never triggers unfenced failur
     "no retry, fail-step, or finish mutation follows ambiguous start");
 });
 
-Deno.test("cron handler verifies secret before requesting a global lease claim", async () => {
+Deno.test("cron handler verifies secret then executes every transition through global lease fencing", async () => {
   const calls: RpcCall[] = [];
+  const admin = fakeAdmin({
+    calls,
+    rpc: async (name, args) => {
+      if (name === "simula_verify_worker_secret") return { data: true, error: null };
+      if (name === "simula_claim_workflow_runs_lease_internal") {
+        return { data: [{
+          id: runId, workflow_id: workflowId, owner_id: ownerId, input: { seed: true },
+          attempt: 1, lease_token: leaseToken, lease_until: new Date(Date.now() + 90_000).toISOString(),
+        }], error: null };
+      }
+      if (name === "simula_start_workflow_step_with_lease") {
+        return { data: [{ step_run_id: stepRunId, replayed: false }], error: null };
+      }
+      if (name === "simula_complete_step_with_outbox_lease") {
+        return { data: [{ step_run_id: stepRunId, outbox_id: outboxId, replayed: false }], error: null };
+      }
+      if (name === "simula_finish_workflow_run_lease") {
+        return { data: [{ id: runId, status: args.p_terminal_status, attempt: 1 }], error: null };
+      }
+      return { data: null, error: new Error("unexpected_cron_rpc:" + name) };
+    },
+  });
   const handler = createCronWorkerHandler({
-    createClient: (() => ({
-      rpc: async (name: string, args: Record<string, unknown>) => {
-        calls.push({ name, args });
-        if (name === "simula_verify_worker_secret") return { data: true, error: null };
-        if (name === "simula_claim_workflow_runs_lease_internal") return { data: [], error: null };
-        return { data: null, error: new Error("unexpected_rpc:" + name) };
-      },
-    })) as never,
+    createClient: (() => admin) as never,
     env: configuredEnv,
-    executeSafeAction: (() => ({})) as never,
+    executeSafeAction: ((type: string, input: unknown) => type === "pass_through" ? input : {}) as never,
   });
   const response = await handler(new Request("https://worker.test", {
-    method: "POST", headers: { "x-simula-worker-secret": "s".repeat(40) }, body: "{}",
+    method: "POST", headers: { "x-simula-worker-secret": "s".repeat(40) },
+    body: JSON.stringify({ limit: 1 }),
   }));
-  assert(response.status === 200, "valid cron secret allows an empty synthetic claim");
+  const body = await response.json();
+  assert(response.status === 200 && body.succeeded === 1, "authenticated cron lease should complete the synthetic run");
   assert(calls.map(call => call.name).join(",") === [
-    "simula_verify_worker_secret", "simula_claim_workflow_runs_lease_internal",
-  ].join(","), "cron secret verification precedes lease claim");
-  assert(calls[1].args.p_owner_id === null,
-    "cron claim uses the dedicated global scope after authentication");
+    "simula_verify_worker_secret",
+    "simula_claim_workflow_runs_lease_internal",
+    "simula_start_workflow_step_with_lease",
+    "simula_complete_step_with_outbox_lease",
+    "simula_finish_workflow_run_lease",
+  ].join(","), "cron secret check precedes the complete fenced lifecycle");
+  assert(calls[1].args.p_owner_id === null, "cron claim must use global scope only after secret verification");
+  for (const call of calls.slice(2)) {
+    assert(call.args.p_owner_id === ownerId && call.args.p_run_id === runId &&
+      call.args.p_attempt === 1 && call.args.p_lease_token === leaseToken,
+    "every cron transition must carry the exact returned owner/run/attempt/token identity");
+  }
 });
