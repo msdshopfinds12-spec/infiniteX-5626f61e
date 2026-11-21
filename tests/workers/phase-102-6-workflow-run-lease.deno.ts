@@ -68,7 +68,7 @@ Deno.test({
       assert(!runError, "synthetic run seed failed: " + (runError?.message ?? ""));
 
       // Concurrent claims against one queue row must produce exactly one owner.
-      const claimArgs = { p_limit: 1, p_lease_seconds: 30, p_run_id: runId };
+      const claimArgs = { p_limit: 1, p_lease_seconds: 30, p_run_id: runId, p_owner_id: ownerId };
       const claims = await Promise.all([
         admin.rpc("simula_claim_workflow_runs_lease_internal", claimArgs),
         admin.rpc("simula_claim_workflow_runs_lease_internal", claimArgs),
