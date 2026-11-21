@@ -17,6 +17,7 @@ on:
       - "tests/browser-secret-boundary.test.mjs"
       - "package.json"
       - "package-lock.json"
+      - "vercel.json"
       - "tsconfig*.json"
   workflow_dispatch:
 
