@@ -88,9 +88,9 @@ Deno.test("late heartbeat response cannot revive a released supervisor", async (
   const gate = deferred<WorkflowLease>();
   const supervisor = new WorkflowLeaseSupervisor({ lease, heartbeat: () => gate.promise });
   const pending = supervisor.heartbeatNow();
-  const release = supervisor.release();
+  await supervisor.release(); // must not wait for an unresponsive network request
   gate.resolve({ ...lease, leaseUntil: "2030-01-01T00:04:00.000Z" });
-  await Promise.all([pending, release]);
+  await pending;
   assert(supervisor.isTerminal, "release stays terminal");
   assert(supervisor.lease.leaseUntil === lease.leaseUntil, "late response cannot update expiry");
 });
