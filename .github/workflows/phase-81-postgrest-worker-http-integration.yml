@@ -218,6 +218,7 @@ jobs:
           exit 1
 
       - name: Execute real Deno worker HTTP to PostgREST/PostgreSQL journey
+        # Includes the authenticated lease-fenced worker and downstream lease/outbox regression suites.
         env:
           PHASE81_POSTGREST_URL: http://127.0.0.1:3000
           PHASE87_ALLOW_DISPOSABLE_DB_WRITES: "true"
