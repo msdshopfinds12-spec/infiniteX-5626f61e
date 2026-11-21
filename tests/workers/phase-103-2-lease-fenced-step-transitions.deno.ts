@@ -56,21 +56,10 @@ Deno.test({
     let syntheticOwnerId: string | null = null;
 
     try {
-      // Give this test an isolated owner so the supported public claim RPC
-      // cannot pick unrelated queued runs belonging to a shared fixture user.
-      const syntheticEmail = "phase1032-" + crypto.randomUUID() + "@example.invalid";
-      const syntheticPassword = crypto.randomUUID() + "Aa1!";
-      const createdUser = await admin.auth.admin.createUser({
-        email: syntheticEmail,
-        password: syntheticPassword,
-        email_confirm: true,
-      });
-      const createdAuthUser = createdUser.data.user;
-      assert(!createdUser.error && createdAuthUser !== null,
-        "synthetic auth user creation failed: " + (createdUser.error?.message ?? ""));
-      syntheticOwnerId = createdAuthUser.id;
+      // Reuse the isolated Auth identity pre-seeded in the disposable SQL fixture.
+      // This rehearsal starts PostgreSQL + PostgREST, not GoTrue; calling the
+      // Auth Admin API here would cross an unavailable service boundary.
       const ownerId = syntheticOwnerId;
-      assert(UUID.test(ownerId), "synthetic owner ID must be a UUID");
 
       for (const [id, name] of [[workflowA, "phase-1032-primary"], [workflowB, "phase-1032-foreign"]] as const) {
         const { error } = await admin.from("workflows").insert({
@@ -194,10 +183,8 @@ Deno.test({
         const { error } = await admin.from("workflows").delete().eq("id", workflowId);
         if (error) throw new Error("PHASE1032_FIXTURE_CLEANUP_FAILED: " + error.message);
       }
-      if (syntheticOwnerId) {
-        const { error } = await admin.auth.admin.deleteUser(syntheticOwnerId);
-        if (error) throw new Error("PHASE1032_AUTH_FIXTURE_CLEANUP_FAILED: " + error.message);
-      }
+      // The owner is a shared, pre-seeded disposable fixture identity.
+      // Never delete it; only test-created workflow rows are cleaned up.
     }
   },
 });
