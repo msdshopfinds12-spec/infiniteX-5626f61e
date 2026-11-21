@@ -112,3 +112,22 @@ Deno.test("invalid heartbeat identity cannot be accepted", async () => {
   try { await supervisor.heartbeatNow(); } catch { rejected = true; }
   assert(rejected && supervisor.isTerminal, "identity mutation rejected");
 });
+
+Deno.test("stalled heartbeat transport times out and aborts the work signal", async () => {
+  const fake = fakeScheduler();
+  const supervisor = new WorkflowLeaseSupervisor({
+    lease,
+    heartbeatIntervalMs: 10_000,
+    heartbeatTimeoutMs: 1_000,
+    scheduler: fake.scheduler,
+    heartbeat: () => new Promise<WorkflowLease>(() => undefined),
+  });
+  const pending = supervisor.heartbeatNow();
+  fake.fire();
+  let code = "";
+  try { await pending; } catch (error) {
+    if (error instanceof WorkflowLeaseError) code = error.code;
+  }
+  assert(code === "LEASE_TRANSPORT_AMBIGUOUS", "timeout classified as ambiguous");
+  assert(supervisor.signal.aborted && supervisor.isTerminal, "hung heartbeat aborts work");
+});
