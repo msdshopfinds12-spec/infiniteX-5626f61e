@@ -188,15 +188,15 @@ Deno.test("ambiguous step-start transport outcome never triggers unfenced failur
     "no retry, fail-step, or finish mutation follows ambiguous start");
 });
 
-Deno.test("cron handler still verifies secret before internal claim during Phase 103.4", async () => {
-  const calls: string[] = [];
+Deno.test("cron handler verifies secret before requesting a global lease claim", async () => {
+  const calls: RpcCall[] = [];
   const handler = createCronWorkerHandler({
     createClient: (() => ({
-      rpc: async (name: string) => {
-        calls.push(name);
-        return name === "simula_verify_worker_secret"
-          ? { data: true, error: null }
-          : { data: [], error: null };
+      rpc: async (name: string, args: Record<string, unknown>) => {
+        calls.push({ name, args });
+        if (name === "simula_verify_worker_secret") return { data: true, error: null };
+        if (name === "simula_claim_workflow_runs_lease_internal") return { data: [], error: null };
+        return { data: null, error: new Error("unexpected_rpc:" + name) };
       },
     })) as never,
     env: configuredEnv,
@@ -206,6 +206,9 @@ Deno.test("cron handler still verifies secret before internal claim during Phase
     method: "POST", headers: { "x-simula-worker-secret": "s".repeat(40) }, body: "{}",
   }));
   assert(response.status === 200, "valid cron secret allows an empty synthetic claim");
-  assert(calls.join(",") === "simula_verify_worker_secret,simula_claim_workflow_runs_internal",
-    "cron secret verification precedes claim");
+  assert(calls.map(call => call.name).join(",") === [
+    "simula_verify_worker_secret", "simula_claim_workflow_runs_lease_internal",
+  ].join(","), "cron secret verification precedes lease claim");
+  assert(calls[1].args.p_owner_id === null,
+    "cron claim uses the dedicated global scope after authentication");
 });
