@@ -241,6 +241,48 @@ jobs:
           deno check --no-lock --node-modules-dir=auto tests/workers/phase-103-3-cron-worker-lease.deno.ts
           PHASE1033_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-103-3-cron-worker-lease.deno.ts
           deno check --no-lock --node-modules-dir=auto tests/workers/phase-103-4-lease-concurrency.deno.ts
+
+          # Diagnostic isolation probe: earlier suites share this PostgREST
+          # process. Snapshot the disposable DB pool, restart only the local
+          # PostgREST container (not PostgreSQL), then snapshot again. This
+          # tests whether stale pooled sessions from earlier suites explain
+          # Phase 103.4 PGRST003; it is not a production configuration change.
+          export PGHOST=127.0.0.1 PGPORT=5432 PGUSER=supabase_admin
+          export PGPASSWORD=postgres PGDATABASE=infinitex_rehearsal
+          echo "=== PostgreSQL sessions before Phase 103.4 gateway reset ==="
+          psql -X -v ON_ERROR_STOP=1 -c "
+            SELECT state, wait_event_type, wait_event, count(*) AS connections
+            FROM pg_stat_activity
+            WHERE datname = current_database()
+            GROUP BY state, wait_event_type, wait_event
+            ORDER BY connections DESC;
+          "
+          docker rm -f infinitex-phase81-postgrest >/dev/null
+          docker run -d --name infinitex-phase81-postgrest \\
+            --network container:infinitex-phase81-postgres \\
+            -e PGRST_DB_URI=postgres://authenticator:phase81-local-only@127.0.0.1:5432/infinitex_rehearsal \\
+            -e PGRST_DB_SCHEMAS=public \\
+            -e PGRST_DB_ANON_ROLE=anon \\
+            -e PGRST_JWT_SECRET=phase81-disposable-local-signing-secret-not-production \\
+            -e PGRST_DB_EXTRA_SEARCH_PATH=public,extensions,private \\
+            -e PGRST_SERVER_PORT=3000 \\
+            postgrest/postgrest:v12.2.12
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:3000/ >/dev/null || {
+            docker logs infinitex-phase81-postgrest
+            exit 1
+          }
+          echo "=== PostgreSQL sessions after fresh Phase 103.4 gateway ==="
+          psql -X -v ON_ERROR_STOP=1 -c "
+            SELECT state, wait_event_type, wait_event, count(*) AS connections
+            FROM pg_stat_activity
+            WHERE datname = current_database()
+            GROUP BY state, wait_event_type, wait_event
+            ORDER BY connections DESC;
+          "
           PHASE1034_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-103-4-lease-concurrency.deno.ts
 
       - name: Capture read-only PostgreSQL pool and lock diagnostics after failure
