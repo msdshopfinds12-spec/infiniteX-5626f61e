@@ -16,11 +16,11 @@ test("authenticated worker uses bounded input and exact-origin policy", async ()
 
 test("cron worker authenticates the shared secret before bounded global lease claims", async () => {
   const source = await read("../../supabase/functions/simula-workflow-cron-worker/index.ts");
-  assert.match(source, /authenticateCronRequest/);
-  assert.match(source, /readJsonBodyLimited\\(req,\\s*2048\\)/);
-  assert.match(source, /claimCronWorkflowLeases\\(/);
-  assert.doesNotMatch(source, /simula_claim_workflow_runs_internal/);
-  assert.doesNotMatch(source, /\\.upsert\\(/);
+  assert.ok(source.includes("authenticateCronRequest"));
+  assert.ok(source.includes("readJsonBodyLimited(req, 2048)"));
+  assert.ok(source.includes("claimCronWorkflowLeases("));
+  assert.ok(!source.includes("simula_claim_workflow_runs_internal"));
+  assert.ok(!source.includes(".upsert("));
 });
 
 test("authenticated worker delegates every lifecycle transition to fenced lease RPCs", async () => {
@@ -57,17 +57,20 @@ test("cron worker delegates every lifecycle transition to fenced lease RPCs", as
     "claimCronWorkflowLeases(", "heartbeatWorkflowLease(", "startWorkflowStepWithLease(",
     "failWorkflowStepWithLease(", "completeWorkflowStepWithLease(", "finishWorkflowRunWithLease(",
   ]) assert.ok(source.includes(token), "missing cron fenced transition: " + token);
-  assert.doesNotMatch(source, /\\.from\\(["']workflow_step_runs["']\\)\\.(insert|update|upsert)\\(/);
-  assert.doesNotMatch(source, /\\.from\\(["']workflow_runs["']\\)\\.(update|upsert)\\(/);
-  assert.doesNotMatch(source, /simula_claim_workflow_runs_internal/);
-  assert.doesNotMatch(source, /completeWorkflowStepWithOutbox\\(/);
-  assert.match(source, /const ownerId = lease\\.ownerId/);
-  assert.match(source, /supervisor\\.signal\\.aborted/);
-  assert.match(source, /abortableSleep/);
-  assert.match(source, /createWorkflowStepCompletedEvent/);
-  assert.match(rpc, /claimCronWorkflowLeases/);
-  assert.match(supervisor, /heartbeatTimeoutMs/);
-  assert.match(supervisor, /Promise\\.race/);
+  for (const table of ["workflow_step_runs", "workflow_runs"]) {
+    assert.ok(!source.includes('.from("' + table + '").update('), "direct update remains for " + table);
+    assert.ok(!source.includes('.from("' + table + '").insert('), "direct insert remains for " + table);
+    assert.ok(!source.includes('.from("' + table + '").upsert('), "direct upsert remains for " + table);
+  }
+  assert.ok(!source.includes("simula_claim_workflow_runs_internal"));
+  assert.ok(!source.includes("completeWorkflowStepWithOutbox("));
+  assert.ok(source.includes("const ownerId = lease.ownerId"));
+  assert.ok(source.includes("supervisor.signal.aborted"));
+  assert.ok(source.includes("abortableSleep"));
+  assert.ok(source.includes("createWorkflowStepCompletedEvent"));
+  assert.ok(rpc.includes("claimCronWorkflowLeases"));
+  assert.ok(supervisor.includes("heartbeatTimeoutMs"));
+  assert.ok(supervisor.includes("Promise.race"));
 });
 
 test("API-key manager rejects wildcard CORS and uses streamed JSON size limits", async () => {
