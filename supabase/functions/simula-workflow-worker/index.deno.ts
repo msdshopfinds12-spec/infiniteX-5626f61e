@@ -559,7 +559,7 @@ Deno.test("shared completion helper validates input before calling the database"
   try {
     await completeWorkflowStepWithOutbox(async () => {
       calls++;
-      return { data: [{ step_run_id: "22222222-2222-4222-8222-2222222222221111111-1111-4111-8111-111111111111" }], error: null };
+      return { data: [{ step_run_id: "44444444-4444-4444-8444-444444444444" }], error: null };
     }, { ownerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", runId: "11111111-1111-4111-8111-111111111111", stepId: "22222222-2222-4222-8222-222222222222", attempt: 0, output: {} });
   } catch (error) {
     rejected = error instanceof Error && error.message === "step_run_finish_invalid_input";
@@ -574,11 +574,11 @@ Deno.test("shared completion helper normalizes a valid transactional RPC respons
   const result = await completeWorkflowStepWithOutbox(async (name, args) => {
     calledName = name;
     calledArgs = args;
-    return { data: [{ step_run_id: "22222222-2222-4222-8222-2222222222221111111-1111-4111-8111-111111111111", outbox_id: null, replayed: false }], error: null };
+    return { data: [{ step_run_id: "44444444-4444-4444-8444-444444444444", outbox_id: null, replayed: false }], error: null };
   }, { ownerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", runId: "11111111-1111-4111-8111-111111111111", stepId: "22222222-2222-4222-8222-222222222222", attempt: 2, output: { ok: true } });
   assert(calledName === "simula_complete_step_with_outbox", "helper must call the fixed transactional RPC");
   assert(calledArgs.p_owner_id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" && calledArgs.p_attempt === 2, "helper must bind owner and attempt");
-  assert(result.stepRunId === "22222222-2222-4222-8222-2222222222221111111-1111-4111-8111-111111111111" && result.outboxId === null && !result.replayed,
+  assert(result.stepRunId === "44444444-4444-4444-8444-444444444444" && result.outboxId === null && !result.replayed,
     "helper must normalize the completion result");
 });
 
