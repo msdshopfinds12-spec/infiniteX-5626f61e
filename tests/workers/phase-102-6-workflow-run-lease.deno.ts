@@ -92,8 +92,8 @@ Deno.test({
         lease_token: string; lease_until: string;
       };
       assert(first.owner_id === ownerId && first.attempt === 1 &&
-        UUID.test(first.lease_token) && Date.parse(first.lease_until) > Date.now(),
-        "claim must return owner, generation, fresh token and future database expiry");
+        UUID.test(first.lease_token),
+        "claim must return owner, generation and a fresh lease token");
 
       const heartbeat = await admin.rpc("simula_heartbeat_workflow_run", {
         p_run_id: runId, p_owner_id: ownerId, p_attempt: first.attempt,
@@ -101,6 +101,9 @@ Deno.test({
       });
       assert(!heartbeat.error && Array.isArray(heartbeat.data) && heartbeat.data.length === 1,
         "current unexpired lease must heartbeat successfully");
+      assert(Date.parse(heartbeat.data[0].lease_until) >
+        Date.parse(heartbeat.data[0].heartbeat_at),
+        "database-generated lease expiry must be later than its database heartbeat timestamp");
 
       const staleToken = await admin.rpc("simula_heartbeat_workflow_run", {
         p_run_id: runId, p_owner_id: ownerId, p_attempt: first.attempt,
