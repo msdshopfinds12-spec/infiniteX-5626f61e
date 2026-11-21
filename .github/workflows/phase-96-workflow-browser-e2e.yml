@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - phase-96-browser-workflow-e2e
+      - phase-99-command-center-ui
     paths:
       - ".github/workflows/phase-96-workflow-browser-e2e.yml"
       - "src/**"
