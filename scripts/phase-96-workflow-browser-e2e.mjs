@@ -178,7 +178,7 @@ try {
   await page.getByLabel("Email address").fill("workflow@example.test");
   await page.getByLabel("Password", { exact: true }).fill("synthetic-password-123");
   await page.getByRole("button", { name: "Sign in securely" }).click();
-  await page.getByText("Authenticated session").first().waitFor();
+  await page.locator(".account-strip .account-indicator").waitFor();
   await page.getByText("WORKFLOW QUEUE ENABLED").waitFor();
 
   await page.getByRole("button", { name: "Pipelines" }).click();
