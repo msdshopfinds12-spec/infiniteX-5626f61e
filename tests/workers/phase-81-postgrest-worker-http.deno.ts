@@ -39,7 +39,6 @@ Deno.test({
   name: "Phase 81: real worker HTTP request persists through PostgREST into disposable PostgreSQL",
   sanitizeOps: false,
   sanitizeResources: false,
-  timeout: 90_000,
   fn: async () => {
     const url = required("PHASE81_POSTGREST_URL");
     const userJwt = required("PHASE81_USER_JWT");
