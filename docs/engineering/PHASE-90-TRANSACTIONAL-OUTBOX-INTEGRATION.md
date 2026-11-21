@@ -35,7 +35,9 @@ The outbox remains at-least-once. The event represents a notification intent, no
 
 ## Dispatcher safety decision
 
-Do not mark an outbox row `succeeded` merely because a dry-run adapter inspected it. That status must continue to mean the configured delivery contract completed. A dry-run dispatcher needs a separate non-delivery outcome/observability contract before it can safely claim and finish rows. Phase 90 therefore keeps provider dispatch disabled rather than corrupting delivery semantics.
+Phase 90 adds a pure, isolated dry-run dispatcher core in `workflow-outbox-dispatcher.ts`. It validates the lease envelope, fixed event type, owner-bound recipient, exact payload schema, bounded attempts, and unexpired lease, then returns a `validated_not_delivered` plan. It has no database client, network client, secret resolver, or provider adapter.
+
+Do not mark an outbox row `succeeded` merely because a dry-run adapter inspected it. That status must continue to mean the configured delivery contract completed. The current dry-run core deliberately does not claim or finish database rows. A separately reviewed non-delivery state and audit contract is required before an operational dispatcher can claim and release leases. Provider dispatch remains disabled.
 
 ## Required verification
 
