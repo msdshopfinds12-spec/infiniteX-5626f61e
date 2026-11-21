@@ -1,34 +1,16 @@
-export type ApiKeyManagerRequest =
-  | Readonly<{ action: "list" }>
-  | Readonly<{ action: "create"; label: string; scopes: readonly ("api:read" | "api:write")[]; expiresInDays?: number }>
-  | Readonly<{ action: "revoke"; id: string }>;
-
-export type ApiKeyRequestError =
-  | "invalid_json_object"
-  | "unsupported_request_field"
-  | "unsupported_action"
-  | "label_length_invalid"
-  | "invalid_scopes"
-  | "expires_in_days_must_be_1_to_365"
-  | "invalid_key_id";
-
-export type ApiKeyRequestParse =
-  | Readonly<{ ok: true; value: ApiKeyManagerRequest }>
-  | Readonly<{ ok: false; error: ApiKeyRequestError }>;
-
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_SCOPES = new Set(["api:read", "api:write"]);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+function hasOnlyKeys(value, allowed) {
   return Object.keys(value).every((key) => allowed.includes(key));
 }
 
 /** Strict allowlist parser shared by the Edge Function and regression tests. */
-export function parseApiKeyManagerRequest(value: unknown): ApiKeyRequestParse {
+export function parseApiKeyManagerRequest(value) {
   if (!isRecord(value)) return { ok: false, error: "invalid_json_object" };
 
   if (value.action === "list") {
@@ -53,7 +35,7 @@ export function parseApiKeyManagerRequest(value: unknown): ApiKeyRequestParse {
       return { ok: false, error: "invalid_scopes" };
     }
 
-    let expiresInDays: number | undefined;
+    let expiresInDays;
     if (value.expires_in_days !== undefined) {
       if (typeof value.expires_in_days !== "number"
         || !Number.isInteger(value.expires_in_days)
@@ -68,7 +50,7 @@ export function parseApiKeyManagerRequest(value: unknown): ApiKeyRequestParse {
       value: {
         action: "create",
         label,
-        scopes: scopes as ("api:read" | "api:write")[],
+        scopes,
         ...(expiresInDays === undefined ? {} : { expiresInDays }),
       },
     };
