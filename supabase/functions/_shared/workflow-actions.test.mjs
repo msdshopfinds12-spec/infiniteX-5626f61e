@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { executeSafeAction } from "./workflow-actions.mjs";
+import { executeSafeAction, resolveWorkflowOutboxEvent } from "./workflow-actions.mjs";
 
 test("pass_through returns a shallow copy of object input", () => {
   const input = { value: 1 };
@@ -35,4 +35,32 @@ test("rejects malformed action config and unsupported action types", () => {
   assert.throws(() => executeSafeAction("append_text", { text: "a" }, { text: "" }), /config.text_must_be_non_empty_string/);
   assert.throws(() => executeSafeAction("uppercase_text", { text: 1 }, {}), /input_text_field_required:text/);
   assert.throws(() => executeSafeAction("delete_everything", {}, {}), /unsupported_action_type/);
+});
+
+
+test("notification intent action emits only a closed, bounded event descriptor", () => {
+  const config = {
+    recipient_ref: "81000000-4000-4000-8000-000000000001",
+    template_key: "welcome-v1",
+  };
+  assert.deepEqual(executeSafeAction("emit_notification_intent", { source: "test" }, config), { source: "test" });
+  assert.deepEqual(resolveWorkflowOutboxEvent("emit_notification_intent", config), {
+    eventType: "notification.requested",
+    payload: {
+      recipient_ref: "81000000-4000-4000-8000-000000000001",
+      template_key: "welcome-v1",
+    },
+  });
+  assert.equal(resolveWorkflowOutboxEvent("pass_through", config), null);
+});
+
+test("notification intent rejects arbitrary destinations and malformed references", () => {
+  assert.throws(() => executeSafeAction("emit_notification_intent", {}, {
+    recipient_ref: "https://attacker.example",
+    template_key: "welcome",
+  }), /config.recipient_ref_must_be_uuid/);
+  assert.throws(() => resolveWorkflowOutboxEvent("emit_notification_intent", {
+    recipient_ref: "81000000-4000-4000-8000-000000000001",
+    template_key: "../arbitrary",
+  }), /config.template_key_invalid/);
 });
