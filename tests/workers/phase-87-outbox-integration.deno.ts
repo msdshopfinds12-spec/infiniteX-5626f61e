@@ -235,3 +235,94 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Phase 87.3: concurrent identical requests for the same run replay one event",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  fn: async () => {
+    const url = required("PHASE81_POSTGREST_URL");
+    const serviceJwt = required("PHASE81_SERVICE_JWT");
+    const userId = required("PHASE81_USER_ID");
+    const admin = createClient(url, serviceJwt, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: {
+        headers: { Authorization: "Bearer " + serviceJwt },
+        fetch: postgrestFetch,
+      },
+    });
+
+    const workflowId = "81000000-1000-4000-8000-000000000001";
+    const stepId = "81000000-2000-4000-8000-000000000001";
+    const runId = "81000000-3000-4000-8000-000000000008";
+    const idempotencyKey = "phase87-concurrent-same-run-key-0003";
+    const output = { result: "same-run-concurrent-replay" };
+    const payload = { recipient_ref: "synthetic-same-run-recipient", template: "test-only" };
+
+    const { error: runSeedError } = await admin.from("workflow_runs").insert({
+      id: runId,
+      workflow_id: workflowId,
+      owner_id: userId,
+      status: "running",
+      input: { test: "same-run-replay" },
+      attempt: 1,
+    });
+    assert(!runSeedError, "same-run synthetic workflow must be seeded: " + (runSeedError?.message ?? ""));
+
+    const { error: stepSeedError } = await admin.from("workflow_step_runs").insert({
+      run_id: runId,
+      step_id: stepId,
+      owner_id: userId,
+      status: "running",
+      input: { test: "same-run-replay" },
+      attempt: 1,
+    });
+    assert(!stepSeedError, "same-run synthetic step must be seeded: " + (stepSeedError?.message ?? ""));
+
+    const completionArgs = {
+      p_owner_id: userId,
+      p_run_id: runId,
+      p_step_id: stepId,
+      p_attempt: 1,
+      p_output: output,
+      p_event_type: "notification.requested",
+      p_idempotency_key: idempotencyKey,
+      p_payload: payload,
+    };
+
+    // Both calls target one run row. The database row lock serializes the
+    // transaction boundary: the first commits, and the second must replay it.
+    const results = await Promise.all([
+      admin.rpc("simula_complete_step_with_outbox", completionArgs),
+      admin.rpc("simula_complete_step_with_outbox", completionArgs),
+    ]);
+    assert(results.every((result) => !result.error && result.data?.length === 1),
+      "both identical concurrent calls must return one successful RPC row: "
+        + results.map((result) => result.error?.message ?? "ok").join("; "));
+
+    const rows = results.map((result) => result.data![0]);
+    const created = rows.filter((row: { replayed: boolean }) => row.replayed === false);
+    const replayed = rows.filter((row: { replayed: boolean }) => row.replayed === true);
+    assert(created.length === 1 && replayed.length === 1,
+      "exactly one call must create the event and the other must return the replay result");
+    assert(typeof rows[0].outbox_id === "string" && rows[0].outbox_id === rows[1].outbox_id,
+      "both calls must return the same durable outbox ID");
+    assert(rows[0].step_run_id === rows[1].step_run_id,
+      "both calls must return the same completed step-run ID");
+
+    const { error: eventTypeConflict } = await admin.rpc("simula_complete_step_with_outbox", {
+      ...completionArgs,
+      p_event_type: "workflow.completed",
+    });
+    assert(Boolean(eventTypeConflict),
+      "same idempotency key with a different event type must be rejected");
+
+    const { error: payloadConflict } = await admin.rpc("simula_complete_step_with_outbox", {
+      ...completionArgs,
+      p_payload: { recipient_ref: "different-synthetic-recipient", template: "test-only" },
+    });
+    assert(Boolean(payloadConflict),
+      "same idempotency key with a different payload must be rejected");
+
+    console.log("Phase 87.3: same-run concurrent replay and conflict checks verified");
+  },
+});
