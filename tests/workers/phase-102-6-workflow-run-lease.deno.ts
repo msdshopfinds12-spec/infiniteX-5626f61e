@@ -111,7 +111,7 @@ Deno.test({
       // Simulate worker loss by expiring only this synthetic fixture row.
       // This direct mutation is permitted solely in the opt-in disposable DB.
       const { data: expiredRows, error: expireError } = await admin.from("workflow_runs")
-        .update({ lease_until: new Date(Date.now() - 5_000).toISOString() })
+        .update({ lease_until: "2000-01-01T00:00:00.000Z" })
         .eq("id", runId).eq("lease_token", first.lease_token).eq("status", "running")
         .select("id,owner_id,status,attempt,lease_until");
       assert(!expireError, "synthetic lease expiry setup failed: " + (expireError?.message ?? ""));
@@ -143,7 +143,7 @@ Deno.test({
         beforeReclaim.status === "running" &&
         beforeReclaim.attempt === first.attempt &&
         beforeReclaim.lease_token === first.lease_token &&
-        Date.parse(beforeReclaim.lease_until) <= Date.now(),
+        Date.parse(beforeReclaim.lease_until) <= Date.parse("2000-01-01T00:00:00.000Z"),
         "reclaim precondition mismatch: " + JSON.stringify({
           found: Boolean(beforeReclaim),
           ownerMatches: beforeReclaim?.owner_id === ownerId,
@@ -152,7 +152,6 @@ Deno.test({
           attemptExpected: first.attempt,
           tokenMatches: beforeReclaim?.lease_token === first.lease_token,
           leaseUntil: beforeReclaim?.lease_until,
-          clientNow: new Date().toISOString(),
         }));
 
       console.error("PHASE1026_RECLAIM_PRE_RPC", {
@@ -162,8 +161,7 @@ Deno.test({
         attempt: beforeReclaim.attempt,
         tokenMatches: beforeReclaim.lease_token === first.lease_token,
         leaseUntil: beforeReclaim.lease_until,
-        leaseExpiredByClientClock: Date.parse(beforeReclaim.lease_until) <= Date.now(),
-        clientNow: new Date().toISOString(),
+        fixtureExpiryIsDeterministic: Date.parse(beforeReclaim.lease_until) <= Date.parse("2000-01-01T00:00:00.000Z"),
         requestedLimit: claimArgs.p_limit,
         requestedOwnerMatches: claimArgs.p_owner_id === ownerId,
       });
@@ -216,8 +214,31 @@ Deno.test({
         "reclaim generation mismatch: expected 2, received " + second.attempt);
       assert(UUID.test(second.lease_token), "reclaim returned an invalid lease token");
       assert(second.lease_token !== first.lease_token, "reclaim reused the previous lease token");
-      assert(Date.parse(second.lease_until) > Date.now(),
-        "reclaim returned a non-future lease expiry: " + second.lease_until);
+      const { data: afterReclaim, error: afterReclaimError } = await admin
+        .from("workflow_runs")
+        .select("id,owner_id,status,attempt,lease_token,lease_until,heartbeat_at")
+        .eq("id", runId)
+        .maybeSingle();
+      assert(!afterReclaimError, "post-reclaim state inspection failed: " +
+        (afterReclaimError?.message ?? ""));
+      console.error("PHASE1026_RECLAIM_POST_STATE", {
+        found: Boolean(afterReclaim),
+        ownerMatches: afterReclaim?.owner_id === ownerId,
+        status: afterReclaim?.status ?? null,
+        attempt: afterReclaim?.attempt ?? null,
+        tokenRotated: afterReclaim?.lease_token !== first.lease_token,
+        returnedTokenMatchesPersisted: afterReclaim?.lease_token === second.lease_token,
+        leaseUntil: afterReclaim?.lease_until ?? null,
+        heartbeatAt: afterReclaim?.heartbeat_at ?? null,
+      });
+      assert(afterReclaim?.id === runId && afterReclaim.owner_id === ownerId &&
+        afterReclaim.status === "running" && afterReclaim.attempt === 2 &&
+        afterReclaim.lease_token === second.lease_token &&
+        afterReclaim.lease_token !== first.lease_token &&
+        afterReclaim.lease_until === second.lease_until &&
+        afterReclaim.heartbeat_at !== null &&
+        Date.parse(afterReclaim.lease_until) > Date.parse(afterReclaim.heartbeat_at),
+        "reclaim result must match persisted running generation, rotated token and DB-generated lease timestamps");
 
       const staleFinish = await admin.rpc("simula_finish_workflow_run_lease", {
         p_run_id: runId, p_owner_id: ownerId, p_attempt: first.attempt,
