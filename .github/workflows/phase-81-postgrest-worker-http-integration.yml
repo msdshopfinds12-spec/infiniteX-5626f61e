@@ -20,6 +20,7 @@ on:
       - "tests/workers/**"
       - "scripts/rehearse-migration-chain.mjs"
       - "scripts/phase-81-generate-jwt.mjs"
+      - "scripts/ci/**"
       - "package.json"
       - "package-lock.json"
   pull_request:
@@ -34,6 +35,7 @@ on:
       - "tests/workers/**"
       - "scripts/rehearse-migration-chain.mjs"
       - "scripts/phase-81-generate-jwt.mjs"
+      - "scripts/ci/**"
       - "package.json"
       - "package-lock.json"
   workflow_dispatch:
@@ -64,6 +66,9 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.2.12
+
+      - name: Validate CI recovery shell syntax
+        run: bash -n scripts/ci/npm-ci-retry.sh
 
       - name: Install locked dependencies with transient-only recovery
         run: bash scripts/ci/npm-ci-retry.sh
