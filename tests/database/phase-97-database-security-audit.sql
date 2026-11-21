@@ -11,6 +11,14 @@ $guard$;
 
 BEGIN;
 
+SELECT pg_catalog.jsonb_pretty(pg_catalog.coalesce(
+  (SELECT pg_catalog.jsonb_agg(pg_catalog.to_jsonb(p))
+   FROM pg_catalog.pg_policies p
+   WHERE p.schemaname = 'public'
+     AND p.tablename IN ('workflows','workflow_steps','workflow_runs','workflow_step_runs','workflow_logs')),
+  '[]'::jsonb
+)) AS phase97_policy_catalog;
+
 DO $audit$
 DECLARE
   v_missing text;
