@@ -38,6 +38,11 @@ jobs:
       - name: Dependency security audit
         run: npm audit --audit-level=low
 
+      - name: Configure Deno 2
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.2.12
+
       - name: TypeScript lint
         run: npm run lint
 
@@ -46,6 +51,15 @@ jobs:
 
       - name: Edge Function and worker security tests
         run: npm run test:edge-function-security
+
+      - name: Type-check authenticated worker
+        run: deno check --no-lock --node-modules-dir=auto supabase/functions/simula-workflow-worker/index.ts
+
+      - name: Type-check cron worker
+        run: deno check --no-lock --node-modules-dir=auto supabase/functions/simula-workflow-cron-worker/index.ts
+
+      - name: Execute authenticated worker handler tests
+        run: deno test --no-check --allow-env supabase/functions/simula-workflow-worker/index.deno.ts
 
       - name: Production build
         run: npm run build
