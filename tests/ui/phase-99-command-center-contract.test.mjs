@@ -47,3 +47,17 @@ test("Phase 99 capability and activity cards adapt to narrow mobile screens", as
   assert.match(css, /@media \(max-width: 600px\)\s*\{[\s\S]*?\.runtime-status-grid\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/);
   assert.match(css, /overflow-wrap: anywhere/);
 });
+
+test("Phase 99 browser authentication uses stable, unique locators", async () => {
+  const auth = await read("src/features/auth/auth-screen.tsx");
+  const app = await read("src/App.tsx");
+  const browser = await read("scripts/phase-96-workflow-browser-e2e.mjs");
+  assert.match(auth, /data-testid="auth-form"/);
+  assert.match(app, /data-testid="authenticated-session-indicator"/);
+  assert.match(browser, /getByTestId\("auth-form"\)/);
+  assert.match(browser, /getByTestId\("authenticated-session-indicator"\)/);
+  assert.match(browser, /getByRole\("textbox", \{ name: "Email address", exact: true \}\)/);
+  assert.match(browser, /getByLabel\("Password", \{ exact: true \}\)/);
+  assert.match(browser, /authenticatedIndicator\.count\(\)/);
+  assert.doesNotMatch(browser, /\.account-strip \.account-indicator/);
+});
