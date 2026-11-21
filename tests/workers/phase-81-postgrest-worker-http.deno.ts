@@ -156,6 +156,46 @@ Deno.test({
         "concurrent owner-A requests must not claim owner-B queue rows");
       console.log("Phase 81: tenant isolation verified");
 
+      // Retire only the two exact disposable queue leftovers after tenant
+      // isolation has been proven. Phase 103.3 subsequently exercises the
+      // trusted global cron claim and must not consume unrelated fixtures.
+      const leftoverIds = [
+        "81000000-3000-4000-8000-000000000004",
+        "81000000-3000-4000-8000-000000000002",
+      ];
+      const { data: leftovers, error: leftoversError } = await admin
+        .from("workflow_runs")
+        .select("id,owner_id,status,attempt,lease_token,lease_until")
+        .in("id", leftoverIds);
+      assert(!leftoversError && leftovers?.length === 2,
+        "Phase 81 disposable leftovers missing; refusing fixture cleanup");
+      const expectedOwners = new Map([
+        ["81000000-3000-4000-8000-000000000004", userId],
+        ["81000000-3000-4000-8000-000000000002", required("PHASE81_USER_B_ID")],
+      ]);
+      assert(leftovers.every((row) =>
+        expectedOwners.get(row.id) === row.owner_id &&
+        row.status === "queued" && row.attempt === 0 &&
+        row.lease_token === null && row.lease_until === null
+      ), "Phase 81 leftovers changed unexpectedly; refusing cleanup");
+
+      const { data: childSteps, error: childStepsError } = await admin
+        .from("workflow_step_runs").select("id").in("run_id", leftoverIds);
+      assert(!childStepsError && childSteps?.length === 0,
+        "Phase 81 leftovers have step records; refusing cleanup");
+      const { data: childLogs, error: childLogsError } = await admin
+        .from("workflow_logs").select("id").in("run_id", leftoverIds);
+      assert(!childLogsError && childLogs?.length === 0,
+        "Phase 81 leftovers have log records; refusing cleanup");
+
+      const { data: deletedLeftovers, error: deleteError } = await admin
+        .from("workflow_runs").delete().in("id", leftoverIds).select("id");
+      assert(!deleteError && deletedLeftovers?.length === 2 &&
+        new Set(deletedLeftovers.map((row) => row.id)).size === 2 &&
+        leftoverIds.every((id) => deletedLeftovers.some((row) => row.id === id)),
+        "exact Phase 81 disposable leftovers could not be safely retired");
+      console.log("Phase 81: verified and retired exact disposable queue leftovers");
+
 
     } finally {
       console.log("Phase 81: shutting down local worker HTTP server");
