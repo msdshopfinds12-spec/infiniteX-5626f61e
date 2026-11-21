@@ -28,7 +28,7 @@ test("both worker adapters use the same safe action and bounded retry runtime", 
     assert.ok(source.includes("Deno.serve("), `${name} worker must expose a Deno handler`);
   }
   assert.ok(authenticatedWorker.includes("completeWorkflowStepWithLease("));
-  assert.ok(cronWorker.includes("completeWorkflowStepWithOutbox("));
+  assert.ok(cronWorker.includes("completeWorkflowStepWithLease("));
   for (const action of ["pass_through","set_value","merge_json","uppercase_text","lowercase_text","append_text","prepend_text"]) {
     assert.ok(sharedActions.includes(action), `shared action missing: ${action}`);
   }
@@ -73,17 +73,25 @@ test("lease adapter and supervisor fail closed on ambiguous transport and enforc
   assert.ok(leaseSupervisor.includes("this.#controller.abort(error)"));
 });
 
-test("cron adapter retains authenticated secret boundary and legacy lifecycle until its own migration", () => {
+test("cron adapter verifies its secret before the global lease claim and fences every transition", () => {
   assert.ok(authBoundary.includes("x-simula-worker-secret"));
   assert.ok(authBoundary.includes("secret.length < 32"));
   assert.ok(authBoundary.includes("simula_verify_worker_secret"));
   assertOrdered(authBoundary, 'admin.rpc("simula_verify_worker_secret"', "return { ok: true, admin",
     "cron boundary must verify secret before exposing privileged client");
-  assert.ok(cronWorker.includes("simula_claim_workflow_runs_internal"));
-  assertOrdered(cronWorker, "authenticateCronRequest({", "simula_claim_workflow_runs_internal",
-    "cron worker must verify its secret before claiming privileged queue rows");
-  assert.ok(cronWorker.includes("isClaimedRunValid(run)"));
-  assert.ok(cronWorker.includes("completeWorkflowStepWithOutbox("));
+  assert.ok(cronWorker.includes("authenticateCronRequest"));
+  assertOrdered(cronWorker, "authenticateCronRequest({", "claimCronWorkflowLeases(",
+    "cron worker must verify its secret before global queue claim");
+  for (const rpc of [
+    "claimCronWorkflowLeases(", "heartbeatWorkflowLease(", "startWorkflowStepWithLease(",
+    "failWorkflowStepWithLease(", "completeWorkflowStepWithLease(", "finishWorkflowRunWithLease(",
+  ]) assert.ok(cronWorker.includes(rpc), "cron lifecycle must use " + rpc);
+  assert.ok(!cronWorker.includes("simula_claim_workflow_runs_internal"));
+  assert.ok(!cronWorker.includes("completeWorkflowStepWithOutbox("));
+  assert.ok(!cronWorker.includes('.from("workflow_step_runs").insert('));
+  assert.ok(!cronWorker.includes('.from("workflow_step_runs").update('));
+  assert.ok(!cronWorker.includes('.from("workflow_runs").update('));
+  assert.ok(cronWorker.includes("const ownerId = lease.ownerId"));
 });
 
 test("shared legacy completion helper remains strict while cron migration is pending", () => {
