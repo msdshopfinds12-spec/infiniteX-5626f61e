@@ -258,14 +258,14 @@ jobs:
             ORDER BY connections DESC;
           "
           docker rm -f infinitex-phase81-postgrest >/dev/null
-          docker run -d --name infinitex-phase81-postgrest \\
-            --network container:infinitex-phase81-postgres \\
-            -e PGRST_DB_URI=postgres://authenticator:phase81-local-only@127.0.0.1:5432/infinitex_rehearsal \\
-            -e PGRST_DB_SCHEMAS=public \\
-            -e PGRST_DB_ANON_ROLE=anon \\
-            -e PGRST_JWT_SECRET=phase81-disposable-local-signing-secret-not-production \\
-            -e PGRST_DB_EXTRA_SEARCH_PATH=public,extensions,private \\
-            -e PGRST_SERVER_PORT=3000 \\
+          docker run -d --name infinitex-phase81-postgrest \
+            --network container:infinitex-phase81-postgres \
+            -e PGRST_DB_URI=postgres://authenticator:phase81-local-only@127.0.0.1:5432/infinitex_rehearsal \
+            -e PGRST_DB_SCHEMAS=public \
+            -e PGRST_DB_ANON_ROLE=anon \
+            -e PGRST_JWT_SECRET=phase81-disposable-local-signing-secret-not-production \
+            -e PGRST_DB_EXTRA_SEARCH_PATH=public,extensions,private \
+            -e PGRST_SERVER_PORT=3000 \
             postgrest/postgrest:v12.2.12
           for attempt in $(seq 1 45); do
             if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then break; fi
