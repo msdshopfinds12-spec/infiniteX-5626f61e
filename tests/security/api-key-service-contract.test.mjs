@@ -73,6 +73,9 @@ test("create validates label, scopes, and expiry before making a request", async
   assert.deepEqual(await service.create({ label: "valid", scopes: ["admin" ] }), {
     status: "error", code: "invalid_scopes",
   });
+  assert.deepEqual(await service.create({ label: "valid", scopes: ["api:read", "api:read"] }), {
+    status: "error", code: "invalid_scopes",
+  });
   assert.deepEqual(await service.create({ label: "valid", expiresInDays: 366 }), {
     status: "error", code: "invalid_expiration",
   });
