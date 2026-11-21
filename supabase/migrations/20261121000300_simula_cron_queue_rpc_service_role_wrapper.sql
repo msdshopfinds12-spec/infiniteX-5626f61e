@@ -25,6 +25,29 @@ REVOKE ALL ON FUNCTION public.simula_claim_workflow_runs_internal(integer)
 GRANT EXECUTE ON FUNCTION public.simula_claim_workflow_runs_internal(integer)
   TO service_role;
 
+DO $privileges$
+BEGIN
+  IF NOT pg_catalog.has_function_privilege(
+    'service_role',
+    'public.simula_claim_workflow_runs_internal(integer)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'service_role_missing_cron_queue_claim_execute';
+  END IF;
+  IF pg_catalog.has_function_privilege(
+    'anon',
+    'public.simula_claim_workflow_runs_internal(integer)',
+    'EXECUTE'
+  ) OR pg_catalog.has_function_privilege(
+    'authenticated',
+    'public.simula_claim_workflow_runs_internal(integer)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'untrusted_role_has_cron_queue_claim_execute';
+  END IF;
+END
+$privileges$;
+
 COMMENT ON FUNCTION public.simula_claim_workflow_runs_internal(integer) IS
   'PostgREST public-schema entry point for the private cross-owner queue claim; executable only by service_role.';
 
