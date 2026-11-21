@@ -52,7 +52,7 @@ export default function Sidebar({
           <div className="avatar" aria-hidden="true">IX</div>
           <div className="user-meta">
             <span className="user-name">InfiniteX Workspace</span>
-            <span className="user-role">Demo environment</span>
+            <span className="user-role">{workspaceLabel}</span>
           </div>
         </div>
       </div>
