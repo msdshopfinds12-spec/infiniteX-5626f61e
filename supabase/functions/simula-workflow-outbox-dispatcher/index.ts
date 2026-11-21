@@ -11,7 +11,7 @@ const handler = createOutboxDryRunDispatcherHandler({
       createClient,
     });
     if (!result.ok) {
-      return { ok: false, status: result.status, error: result.error };
+      return { ok: false, status: result.status ?? 401, error: result.error ?? "unauthorized" };
     }
     return {
       ok: true,
