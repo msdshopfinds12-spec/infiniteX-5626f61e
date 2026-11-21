@@ -31,7 +31,7 @@ That permits a delayed worker to finalize an event after its lease deadline, pro
 
 The patch retains the existing `SECURITY DEFINER`, empty `search_path`, service-role-only EXECUTE grant, bounded error validation, and row lock.
 
-After `SELECT ... FOR UPDATE` and after the already-succeeded idempotent replay case, it verifies:
+After `SELECT ... FOR UPDATE` and after the already-succeeded idempotent replay case, it verifies the deadline with `clock_timestamp()`. Both terminal UPDATE statements also include `lease_until > clock_timestamp()` and require exactly one affected row, closing the time gap between the preliminary check and the state write:
 
 ```sql
 IF v_row.status <> 'processing'
