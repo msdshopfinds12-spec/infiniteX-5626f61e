@@ -46,7 +46,7 @@ function SnapshotCard({
 /**
  * Account overview with bounded metadata reads only. State is keyed to the
  * authenticated identity epoch so stale account data is never shown after
- * sign-out or account switching.
+ * sign-out or account switching. Late results from a prior identity are discarded.
  */
 export default function OverviewSummary({
   userId,
