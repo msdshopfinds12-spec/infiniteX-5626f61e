@@ -25,6 +25,7 @@ AS $function$
 DECLARE
   v_row private.simula_workflow_outbox%ROWTYPE;
   v_status text;
+  v_rows integer;
 BEGIN
   IF p_id IS NULL OR p_lock_token IS NULL OR p_succeeded IS NULL THEN
     RAISE EXCEPTION 'outbox_completion_identity_required' USING ERRCODE = '22023';
@@ -67,7 +68,12 @@ BEGIN
     SET status = v_status, lock_token = NULL, lease_until = NULL,
         last_error = NULL, completed_at = pg_catalog.clock_timestamp(),
         updated_at = pg_catalog.clock_timestamp()
-    WHERE id = p_id AND lock_token = p_lock_token;
+    WHERE id = p_id AND lock_token = p_lock_token
+      AND lease_until > pg_catalog.clock_timestamp();
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    IF v_rows <> 1 THEN
+      RAISE EXCEPTION 'outbox_lease_expired' USING ERRCODE = '40001';
+    END IF;
   ELSE
     v_status := CASE WHEN v_row.attempts >= 8 THEN 'dead' ELSE 'pending' END;
     UPDATE private.simula_workflow_outbox
@@ -81,7 +87,12 @@ BEGIN
           ))
           ELSE available_at END,
         updated_at = pg_catalog.clock_timestamp()
-    WHERE id = p_id AND lock_token = p_lock_token;
+    WHERE id = p_id AND lock_token = p_lock_token
+      AND lease_until > pg_catalog.clock_timestamp();
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    IF v_rows <> 1 THEN
+      RAISE EXCEPTION 'outbox_lease_expired' USING ERRCODE = '40001';
+    END IF;
   END IF;
 
   RETURN QUERY SELECT v_status, false;
