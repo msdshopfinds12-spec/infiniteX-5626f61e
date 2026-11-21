@@ -51,7 +51,15 @@ BEGIN
   END IF;
   IF p_result IS NULL
      OR pg_catalog.jsonb_typeof(p_result) <> 'object'
-     OR pg_catalog.pg_column_size(p_result) > 8192 THEN
+     OR pg_catalog.pg_column_size(p_result) > 8192
+     OR (SELECT pg_catalog.count(*) FROM pg_catalog.jsonb_object_keys(p_result)) <> 6
+     OR p_result->>'mode' IS DISTINCT FROM 'dry_run'
+     OR p_result->>'delivery_attempted' IS DISTINCT FROM 'false'
+     OR p_result->>'event_type' IS DISTINCT FROM 'notification.requested'
+     OR p_result->>'adapter' IS DISTINCT FROM 'notification-intent-preview-v1'
+     OR p_result->>'outcome' IS DISTINCT FROM 'validated_not_delivered'
+     OR pg_catalog.jsonb_typeof(p_result->'idempotency_key') <> 'string'
+     OR pg_catalog.char_length(p_result->>'idempotency_key') NOT BETWEEN 1 AND 200 THEN
     RAISE EXCEPTION 'outbox_simulation_result_invalid' USING ERRCODE = '22023';
   END IF;
 
