@@ -65,8 +65,8 @@ jobs:
         with:
           deno-version: v2.2.12
 
-      - name: Install locked dependencies
-        run: npm ci
+      - name: Install locked dependencies with transient-only recovery
+        run: bash scripts/ci/npm-ci-retry.sh
 
       - name: Verify existing worker contract and regression gates
         run: |
