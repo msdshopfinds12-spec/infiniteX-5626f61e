@@ -65,9 +65,10 @@ Deno.test({
         password: syntheticPassword,
         email_confirm: true,
       });
-      assert(!createdUser.error && Boolean(createdUser.data.user?.id),
+      const createdAuthUser = createdUser.data.user;
+      assert(!createdUser.error && createdAuthUser !== null,
         "synthetic auth user creation failed: " + (createdUser.error?.message ?? ""));
-      syntheticOwnerId = createdUser.data.user.id;
+      syntheticOwnerId = createdAuthUser.id;
       const ownerId = syntheticOwnerId;
       assert(UUID.test(ownerId), "synthetic owner ID must be a UUID");
 
