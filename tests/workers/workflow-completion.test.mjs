@@ -3,24 +3,28 @@ import assert from "node:assert/strict";
 import { completeWorkflowStepWithOutbox } from "../../supabase/functions/_shared/workflow-completion.ts";
 
 const validInput = {
-  ownerId: "owner-1",
-  runId: "run-1",
-  stepId: "step-1",
+  ownerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  runId: "11111111-1111-4111-8111-111111111111",
+  stepId: "22222222-2222-4222-8222-222222222222",
   attempt: 1,
   output: { ok: true },
 };
 
-test("completion helper rejects malformed runtime input before invoking RPC", async () => {
+test("completion helper rejects malformed runtime identities before invoking RPC", async () => {
   const invalidInputs = [
     null,
     undefined,
     {},
     { ...validInput, ownerId: null },
     { ...validInput, ownerId: 42 },
+    { ...validInput, ownerId: "owner-1" },
     { ...validInput, runId: "   " },
+    { ...validInput, runId: "run-1" },
     { ...validInput, stepId: false },
+    { ...validInput, stepId: "step-1" },
     { ...validInput, attempt: 0 },
     { ...validInput, attempt: Number.NaN },
+    { ...validInput, attempt: 2_147_483_648 },
     { ...validInput, output: [] },
     { ...validInput, output: null },
   ];
@@ -30,7 +34,7 @@ test("completion helper rejects malformed runtime input before invoking RPC", as
     await assert.rejects(
       completeWorkflowStepWithOutbox(async () => {
         calls += 1;
-        return { data: [{ step_run_id: "step-run-1" }], error: null };
+        return { data: [{ step_run_id: "33333333-3333-4333-8333-333333333333" }], error: null };
       }, input),
       { message: "step_run_finish_invalid_input" },
     );
@@ -46,19 +50,21 @@ test("completion helper rejects a missing RPC function before invoking anything"
   );
 });
 
-test("completion helper accepts a valid RPC envelope and returns normalized identity", async () => {
+test("completion helper accepts canonical UUID identities and returns normalized result", async () => {
   const result = await completeWorkflowStepWithOutbox(
     async (name, args) => {
       assert.equal(name, "simula_complete_step_with_outbox");
-      assert.equal(args.p_owner_id, "owner-1");
+      assert.equal(args.p_owner_id, validInput.ownerId);
+      assert.equal(args.p_run_id, validInput.runId);
+      assert.equal(args.p_step_id, validInput.stepId);
       assert.equal(args.p_attempt, 1);
-      return { data: [{ step_run_id: "step-run-1", outbox_id: null, replayed: false }], error: null };
+      return { data: [{ step_run_id: "33333333-3333-4333-8333-333333333333", outbox_id: null, replayed: false }], error: null };
     },
     validInput,
   );
 
   assert.deepEqual(result, {
-    stepRunId: "step-run-1",
+    stepRunId: "33333333-3333-4333-8333-333333333333",
     outboxId: null,
     replayed: false,
   });
@@ -89,8 +95,8 @@ test("completion helper rejects multiple returned completion rows", async () => 
     completeWorkflowStepWithOutbox(
       async () => ({
         data: [
-          { step_run_id: "step-run-1" },
-          { step_run_id: "step-run-2" },
+          { step_run_id: "33333333-3333-4333-8333-333333333333" },
+          { step_run_id: "44444444-4444-4444-8444-444444444444" },
         ],
         error: null,
       }),
@@ -98,4 +104,43 @@ test("completion helper rejects multiple returned completion rows", async () => 
     ),
     { message: "workflow_step_attempt_superseded" },
   );
+});
+
+test("completion helper rejects malformed PostgreSQL result fields instead of coercing them", async () => {
+  const invalidRows = [
+    { step_run_id: "not-a-uuid", outbox_id: null, replayed: false },
+    { step_run_id: "33333333-3333-4333-8333-333333333333", outbox_id: "not-a-uuid", replayed: false },
+    { step_run_id: "33333333-3333-4333-8333-333333333333", outbox_id: null, replayed: "false" },
+    { step_run_id: "33333333-3333-4333-8333-333333333333", outbox_id: null },
+  ];
+
+  for (const row of invalidRows) {
+    await assert.rejects(
+      completeWorkflowStepWithOutbox(
+        async () => ({ data: [row], error: null }),
+        validInput,
+      ),
+      { message: "workflow_step_attempt_superseded" },
+    );
+  }
+});
+
+test("completion helper accepts a valid outbox UUID and preserves replay state", async () => {
+  const result = await completeWorkflowStepWithOutbox(
+    async () => ({
+      data: [{
+        step_run_id: "33333333-3333-4333-8333-333333333333",
+        outbox_id: "55555555-5555-4555-8555-555555555555",
+        replayed: true,
+      }],
+      error: null,
+    }),
+    validInput,
+  );
+
+  assert.deepEqual(result, {
+    stepRunId: "33333333-3333-4333-8333-333333333333",
+    outboxId: "55555555-5555-4555-8555-555555555555",
+    replayed: true,
+  });
 });
