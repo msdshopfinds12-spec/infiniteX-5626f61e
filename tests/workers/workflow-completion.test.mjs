@@ -34,7 +34,7 @@ test("completion helper rejects malformed runtime input before invoking RPC", as
     await assert.rejects(
       completeWorkflowStepWithOutbox(async () => {
         calls += 1;
-        return { data: [{ step_run_id: "step-81000000-3000-4000-8000-000000000005" }], error: null };
+        return { data: [{ step_run_id: "81000000-4000-4000-8000-000000000005" }], error: null };
       }, input),
       { message: "step_run_finish_invalid_input" },
     );
@@ -62,7 +62,7 @@ test("completion helper accepts a valid RPC envelope and returns normalized iden
   );
 
   assert.deepEqual(result, {
-    stepRunId: "step-81000000-3000-4000-8000-000000000005",
+    stepRunId: "81000000-4000-4000-8000-000000000005",
     outboxId: null,
     replayed: false,
   });
@@ -93,14 +93,14 @@ test("completion helper rejects multiple returned completion rows", async () => 
     completeWorkflowStepWithOutbox(
       async () => ({
         data: [
-          { step_run_id: "step-81000000-3000-4000-8000-000000000005" },
+          { step_run_id: "81000000-4000-4000-8000-000000000005", outbox_id: null, replayed: false },
           { step_run_id: "81000000-4000-4000-8000-000000000002" },
         ],
         error: null,
       }),
       validInput,
     ),
-    { message: "workflow_step_attempt_superseded" },
+    { message: "step_run_finish_invalid_response" },
   );
 });
 
