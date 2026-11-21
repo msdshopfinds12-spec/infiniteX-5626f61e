@@ -17,8 +17,13 @@ const postgrestFetch: typeof fetch = (input, init) => {
   const target = new URL(source);
   if (target.pathname === "/rest/v1") target.pathname = "/";
   else if (target.pathname.startsWith("/rest/v1/")) target.pathname = target.pathname.slice("/rest/v1".length);
-  if (input instanceof Request) return fetch(new Request(target, input));
-  return fetch(target, init);
+
+  // Bound database HTTP calls so stalled PostgREST requests cannot consume
+  // the entire GitHub Actions job timeout.
+  const timeoutSignal = AbortSignal.timeout(20_000);
+  const signal = init?.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+  if (input instanceof Request) return fetch(new Request(target, input), { signal });
+  return fetch(target, { ...init, signal });
 };
 
 const createPostgrestClient = ((
@@ -34,6 +39,7 @@ Deno.test({
   name: "Phase 81: real worker HTTP request persists through PostgREST into disposable PostgreSQL",
   sanitizeOps: false,
   sanitizeResources: false,
+  timeout: 90_000,
   fn: async () => {
     const url = required("PHASE81_POSTGREST_URL");
     const userJwt = required("PHASE81_USER_JWT");
@@ -73,7 +79,11 @@ Deno.test({
     });
 
     const workerPort = 8081;
-    const server = Deno.serve({ hostname: "127.0.0.1", port: workerPort, onListen() {} }, handler);
+    const server = Deno.serve({
+      hostname: "127.0.0.1",
+      port: workerPort,
+      onListen() { console.log("Phase 81: local worker HTTP server listening"); },
+    }, handler);
     try {
       const endpoint = "http://127.0.0.1:" + workerPort + "/functions/v1/simula-workflow-worker";
       const request = () => fetch(endpoint, {
@@ -83,11 +93,14 @@ Deno.test({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ limit: 1 }),
+        signal: AbortSignal.timeout(25_000),
       });
 
       // Launch two independent HTTP requests at the same time. PostgreSQL's
       // atomic claim RPC must assign distinct owner-A queue rows to each worker.
+      console.log("Phase 81: dispatching two concurrent authenticated worker requests");
       const responses = await Promise.all([request(), request()]);
+      console.log("Phase 81: both worker HTTP responses received", responses.map((response) => response.status));
       const bodies = await Promise.all(responses.map((response) => response.json()));
       assert(responses.every((response) => response.status === 200), "both concurrent worker HTTP requests must return 200");
       assert(bodies.every((body) => body.claimed === 1 && body.succeeded === 1 && body.failed === 0),
@@ -112,6 +125,7 @@ Deno.test({
         "both owner-A runs must persist succeeded state at generation 1");
       assert(runs.every((run) => run.output?.phase81 === "http-postgrest" && run.output?.verified === true),
         "both runs must persist the complete two-step output");
+      console.log("Phase 81: workflow run persistence verified");
 
       const { data: steps, error: stepsError } = await admin
         .from("workflow_step_runs")
@@ -120,6 +134,7 @@ Deno.test({
       assert(!stepsError && steps?.length === 4, "four step-run records (two per workflow) must persist");
       assert(steps.every((step) => step.status === "succeeded" && step.attempt === 1),
         "all concurrent step runs must succeed at generation 1");
+      console.log("Phase 81: step-run persistence verified");
       for (const ownerRunId of ownerRunIds) {
         assert(steps.filter((step) => step.run_id === ownerRunId).length === 2,
           "each concurrent workflow must persist exactly two step runs");
@@ -130,6 +145,7 @@ Deno.test({
         .select("event,run_id")
         .in("run_id", ownerRunIds);
       assert(!logsError && logs?.length === 6, "four step events and two workflow events must persist");
+      console.log("Phase 81: workflow log persistence verified");
 
       const { data: tenantB, error: tenantBError } = await admin
         .from("workflow_runs")
@@ -139,9 +155,11 @@ Deno.test({
 
       assert(!tenantBError && tenantB?.status === "queued" && tenantB.attempt === 0,
         "concurrent owner-A requests must not claim owner-B queue rows");
+      console.log("Phase 81: tenant isolation verified");
 
 
     } finally {
+      console.log("Phase 81: shutting down local worker HTTP server");
       await server.shutdown();
     }
   },
