@@ -67,9 +67,10 @@ Deno.test({
       // disposable queue has no eligible rows before invoking that global path.
       // This is intentionally fail-closed: never consume another fixture's work.
       const queueBefore = await admin.from("workflow_runs")
-        .select("id,owner_id,status,attempt,lease_token,lease_until");
-      assert(!queueBefore.error && Array.isArray(queueBefore.data),
-        "cannot establish disposable global-queue isolation");
+        .select("id,owner_id,status,attempt,lease_token,lease_until", { count: "exact" });
+      assert(!queueBefore.error && Array.isArray(queueBefore.data) &&
+        queueBefore.count === queueBefore.data.length,
+        "cannot establish complete disposable global-queue isolation (pagination or count mismatch)");
       const now = Date.now();
       const globallyEligible = queueBefore.data.filter((row) => {
         const attempt = Number(row.attempt);
@@ -178,10 +179,11 @@ Deno.test({
 
       // The global claim must not alter any pre-existing workflow run.
       const unrelatedAfter = await admin.from("workflow_runs")
-        .select("id,owner_id,status,attempt,lease_token,lease_until")
+        .select("id,owner_id,status,attempt,lease_token,lease_until", { count: "exact" })
         .neq("id", runId);
-      assert(!unrelatedAfter.error && Array.isArray(unrelatedAfter.data),
-        "cannot verify unrelated queue rows after global claim");
+      assert(!unrelatedAfter.error && Array.isArray(unrelatedAfter.data) &&
+        unrelatedAfter.count === unrelatedAfter.data.length,
+        "cannot verify the complete unrelated queue after global claim (pagination or count mismatch)");
       const unrelatedSnapshotAfter = unrelatedAfter.data
         .map((row) => ({
           id: row.id, owner_id: row.owner_id, status: row.status,
