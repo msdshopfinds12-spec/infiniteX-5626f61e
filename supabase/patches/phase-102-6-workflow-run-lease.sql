@@ -28,7 +28,8 @@ CREATE INDEX IF NOT EXISTS workflow_runs_queued_lease_claim_idx
 
 CREATE OR REPLACE FUNCTION private.simula_claim_workflow_runs_lease_internal(
   p_limit integer DEFAULT 3,
-  p_lease_seconds integer DEFAULT 90
+  p_lease_seconds integer DEFAULT 90,
+  p_run_id uuid DEFAULT NULL
 )
 RETURNS TABLE (
   id uuid,
@@ -56,6 +57,7 @@ BEGIN
       AND wr.lease_until IS NOT NULL
       AND wr.lease_until <= pg_catalog.clock_timestamp()
       AND wr.attempt >= 5
+      AND (p_run_id IS NULL OR wr.id = p_run_id)
     ORDER BY wr.lease_until ASC, wr.id ASC
     FOR UPDATE SKIP LOCKED
   )
@@ -76,6 +78,7 @@ BEGIN
     SELECT wr.id
     FROM public.workflow_runs AS wr
     WHERE wr.attempt < 5
+      AND (p_run_id IS NULL OR wr.id = p_run_id)
       AND (
         wr.status = 'queued'
         OR (
@@ -264,7 +267,7 @@ REVOKE ALL ON FUNCTION private.simula_finish_workflow_run_lease(uuid, uuid, inte
   FROM PUBLIC, anon, authenticated;
 
 GRANT USAGE ON SCHEMA private TO service_role;
-GRANT EXECUTE ON FUNCTION private.simula_claim_workflow_runs_lease_internal(integer, integer)
+GRANT EXECUTE ON FUNCTION private.simula_claim_workflow_runs_lease_internal(integer, integer, uuid)
   TO service_role;
 GRANT EXECUTE ON FUNCTION private.simula_heartbeat_workflow_run(uuid, uuid, integer, uuid, integer)
   TO service_role;
