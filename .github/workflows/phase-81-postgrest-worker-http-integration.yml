@@ -5,6 +5,7 @@ on:
     branches:
       - phase-81/postgrest-worker-http-integration
       - phase-101-6-isolated-concurrency-hardening
+      - phase-103-6-test-reliability-hardening
     paths:
       - ".github/workflows/phase-81-postgrest-worker-http-integration.yml"
       - "supabase/migrations/**"
