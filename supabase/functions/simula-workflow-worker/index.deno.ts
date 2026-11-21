@@ -53,7 +53,7 @@ Deno.test("authenticated HTTP handler rejects malformed JSON before queue claim"
   const calls: string[] = [];
   const handler = createAuthenticatedWorkerHandler({
     createClient: (() => ({
-      auth: { getUser: async () => ({ data: { user: { id: "owner-1" } }, error: null }) },
+      auth: { getUser: async () => ({ data: { user: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" } }, error: null }) },
       rpc: async (name: string) => { calls.push(name); return { data: [], error: null }; },
     })) as never,
     env: configuredEnv,
@@ -73,7 +73,7 @@ Deno.test("authenticated HTTP handler returns sanitized queue claim failure", as
   const calls: string[] = [];
   const handler = createAuthenticatedWorkerHandler({
     createClient: (() => ({
-      auth: { getUser: async () => ({ data: { user: { id: "owner-1" } }, error: null }) },
+      auth: { getUser: async () => ({ data: { user: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" } }, error: null }) },
       rpc: async (name: string) => { calls.push(name); return { data: null, error: new Error("private database detail") }; },
     })) as never,
     env: configuredEnv,
@@ -219,26 +219,29 @@ class StatefulDatabase {
   claimedRun: DbRow;
   constructor() {
     this.claimedRun = {
-      id: "run-1", workflow_id: "workflow-1", owner_id: "owner-1",
+      id: "11111111-1111-4111-8111-111111111111", workflow_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", owner_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       input: { seed: "start" }, attempt: 1,
     };
     this.tables = {
-      workflows: [{ id: "workflow-1", owner_id: "owner-1", status: "active" }],
+      workflows: [{ id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", owner_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", status: "active" }],
       workflow_steps: [
-        { id: "step-1", workflow_id: "workflow-1", step_order: 1, name: "First", action_type: "transform", config: { suffix: "-one" }, retry_limit: 0, timeout_seconds: 5 },
-        { id: "step-2", workflow_id: "workflow-1", step_order: 2, name: "Second", action_type: "transform", config: { suffix: "-two" }, retry_limit: 0, timeout_seconds: 5 },
+        { id: "22222222-2222-4222-8222-222222222222", workflow_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", step_order: 1, name: "First", action_type: "transform", config: { suffix: "-one" }, retry_limit: 0, timeout_seconds: 5 },
+        { id: "33333333-3333-4333-8333-333333333333", workflow_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", step_order: 2, name: "Second", action_type: "transform", config: { suffix: "-two" }, retry_limit: 0, timeout_seconds: 5 },
       ],
       workflow_step_runs: [],
-      workflow_runs: [{ id: "run-1", owner_id: "owner-1", status: "running", attempt: 1 }],
+      workflow_runs: [{ id: "11111111-1111-4111-8111-111111111111", owner_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", status: "running", attempt: 1 }],
       workflow_logs: [],
     };
   }
-  nextId() { this.sequence++; return "generated-" + this.sequence; }
+  nextId() {
+    this.sequence++;
+    return "00000000-0000-4000-8000-" + this.sequence.toString(16).padStart(12, "0");
+  }
   client(key: string) {
     return {
       auth: {
         getUser: async (_token: string) => ({
-          data: { user: key === "publishable" ? { id: "owner-1" } : null },
+          data: { user: key === "publishable" ? { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" } : null },
           error: key === "publishable" ? null : new Error("wrong key"),
         }),
       },
@@ -346,8 +349,8 @@ Deno.test("authenticated worker fails closed when transactional completion RPC f
 Deno.test("authenticated worker fences a stale claimed attempt from newer persisted step state", async () => {
   const db = new StatefulDatabase();
   db.tables.workflow_step_runs.push({
-    id: "newer-step-run", run_id: "run-1", step_id: "step-1",
-    owner_id: "owner-1", status: "succeeded", attempt: 2,
+    id: "66666666-6666-4666-8666-666666666666", run_id: "11111111-1111-4111-8111-111111111111", step_id: "22222222-2222-4222-8222-222222222222",
+    owner_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", status: "succeeded", attempt: 2,
   });
   let actions = 0;
   const handler = createAuthenticatedWorkerHandler({
@@ -435,7 +438,7 @@ Deno.test("cron worker fails closed when a step-run database insert fails", asyn
 
 Deno.test("authenticated worker rejects a claimed run owned by another user without executing actions", async () => {
   const db = new StatefulDatabase();
-  db.claimedRun.owner_id = "different-owner";
+  db.claimedRun.owner_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
   let actions = 0;
   const handler = createAuthenticatedWorkerHandler({
     createClient: statefulCreateClient(db),
@@ -556,8 +559,8 @@ Deno.test("shared completion helper validates input before calling the database"
   try {
     await completeWorkflowStepWithOutbox(async () => {
       calls++;
-      return { data: [{ step_run_id: "step-run-1" }], error: null };
-    }, { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 0, output: {} });
+      return { data: [{ step_run_id: "22222222-2222-4222-8222-2222222222221111111-1111-4111-8111-111111111111" }], error: null };
+    }, { ownerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", runId: "11111111-1111-4111-8111-111111111111", stepId: "22222222-2222-4222-8222-222222222222", attempt: 0, output: {} });
   } catch (error) {
     rejected = error instanceof Error && error.message === "step_run_finish_invalid_input";
   }
@@ -571,24 +574,24 @@ Deno.test("shared completion helper normalizes a valid transactional RPC respons
   const result = await completeWorkflowStepWithOutbox(async (name, args) => {
     calledName = name;
     calledArgs = args;
-    return { data: [{ step_run_id: "step-run-1", outbox_id: null, replayed: false }], error: null };
-  }, { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 2, output: { ok: true } });
+    return { data: [{ step_run_id: "22222222-2222-4222-8222-2222222222221111111-1111-4111-8111-111111111111", outbox_id: null, replayed: false }], error: null };
+  }, { ownerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", runId: "11111111-1111-4111-8111-111111111111", stepId: "22222222-2222-4222-8222-222222222222", attempt: 2, output: { ok: true } });
   assert(calledName === "simula_complete_step_with_outbox", "helper must call the fixed transactional RPC");
-  assert(calledArgs.p_owner_id === "owner-1" && calledArgs.p_attempt === 2, "helper must bind owner and attempt");
-  assert(result.stepRunId === "step-run-1" && result.outboxId === null && !result.replayed,
+  assert(calledArgs.p_owner_id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" && calledArgs.p_attempt === 2, "helper must bind owner and attempt");
+  assert(result.stepRunId === "22222222-2222-4222-8222-2222222222221111111-1111-4111-8111-111111111111" && result.outboxId === null && !result.replayed,
     "helper must normalize the completion result");
 });
 
 Deno.test("shared completion helper fails closed for RPC errors, thrown errors, and malformed results", async () => {
   const failures: Array<() => Promise<unknown>> = [
     () => completeWorkflowStepWithOutbox(async () => ({ data: null, error: new Error("private database detail") }),
-      { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 1, output: {} }),
+      { ownerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", runId: "11111111-1111-4111-8111-111111111111", stepId: "22222222-2222-4222-8222-222222222222", attempt: 1, output: {} }),
     () => completeWorkflowStepWithOutbox(async () => { throw new Error("transport detail"); },
-      { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 1, output: {} }),
+      { ownerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", runId: "11111111-1111-4111-8111-111111111111", stepId: "22222222-2222-4222-8222-222222222222", attempt: 1, output: {} }),
     () => completeWorkflowStepWithOutbox(async () => ({ data: [{ outbox_id: null }], error: null }),
-      { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 1, output: {} }),
+      { ownerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", runId: "11111111-1111-4111-8111-111111111111", stepId: "22222222-2222-4222-8222-222222222222", attempt: 1, output: {} }),
     () => completeWorkflowStepWithOutbox(async () => undefined as never,
-      { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 1, output: {} }),
+      { ownerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", runId: "11111111-1111-4111-8111-111111111111", stepId: "22222222-2222-4222-8222-222222222222", attempt: 1, output: {} }),
   ];
   const messages: string[] = [];
   for (const failure of failures) {
