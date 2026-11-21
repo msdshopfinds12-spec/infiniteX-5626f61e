@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - phase-81/postgrest-worker-http-integration
+      - phase-101-6-isolated-concurrency-hardening
     paths:
       - ".github/workflows/phase-81-postgrest-worker-http-integration.yml"
       - "supabase/migrations/**"
+      - "supabase/patches/**"
       - "supabase/functions/simula-workflow-worker/**"
       - "supabase/functions/_shared/**"
       - "tests/database/phase-81-postgrest-worker-fixtures.sql"
@@ -19,6 +21,7 @@ on:
     paths:
       - ".github/workflows/phase-81-postgrest-worker-http-integration.yml"
       - "supabase/migrations/**"
+      - "supabase/patches/**"
       - "supabase/functions/simula-workflow-worker/**"
       - "supabase/functions/_shared/**"
       - "tests/database/phase-81-postgrest-worker-fixtures.sql"
@@ -99,6 +102,15 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: infinitex_rehearsal
         run: node scripts/rehearse-migration-chain.mjs
+
+      - name: Apply Phase 102.4 lease-expiry patch to disposable database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: psql -X -v ON_ERROR_STOP=1 -f supabase/patches/phase-102-4-outbox-expiry-guard.sql
 
       - name: Seed synthetic identities and workflow fixtures
         env:
