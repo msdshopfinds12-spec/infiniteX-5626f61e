@@ -56,6 +56,11 @@ const WORKFLOW_LOG_COLUMNS =
 const DEFAULT_LIMIT = 50;
 const DEFAULT_RUN_LIMIT = 10;
 const MAX_LIMIT = 100;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_PATTERN.test(value);
+}
 
 function validLimit(limit: number): boolean {
   return Number.isSafeInteger(limit) && limit >= 1 && limit <= MAX_LIMIT;
@@ -91,7 +96,7 @@ export function createWorkflowReadService(
 
     async listWorkflowRuns(workflowId, options = {}) {
       const normalizedWorkflowId = workflowId.trim();
-      if (!normalizedWorkflowId) {
+      if (!isUuid(normalizedWorkflowId)) {
         return { status: "error", code: "invalid_workflow_id" } as const;
       }
       const limit = options.limit ?? DEFAULT_RUN_LIMIT;
@@ -114,7 +119,7 @@ export function createWorkflowReadService(
 
     async listRunLogs(runId, options = {}) {
       const normalizedRunId = runId.trim();
-      if (!normalizedRunId) {
+      if (!isUuid(normalizedRunId)) {
         return { status: "error", code: "invalid_run_id" } as const;
       }
       const limit = options.limit ?? 50;
