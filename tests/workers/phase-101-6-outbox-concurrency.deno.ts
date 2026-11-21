@@ -73,12 +73,12 @@ Deno.test({
       const makeArgs = (runId: string, key: string) => ({
         p_owner_id: userId, p_run_id: runId, p_step_id: stepId, p_attempt: 1,
         p_output: { phase: "101.6", result: "synthetic" },
-        p_event_type: "notification.requested", p_idempotency_key: key,
-        p_payload: { recipient_ref: "synthetic-phase-1016", template: "test-only" },
+        p_event_type: "workflow.step.completed", p_idempotency_key: key,
+        p_payload: { run_id: runId, step_id: stepId, attempt: 1 },
       });
 
       // Same-run calls should serialize: one creates, the other replays.
-      const sameArgs = makeArgs(runSame, "phase1016-same-run:" + runSame);
+      const sameArgs = makeArgs(runSame, "workflow.step.completed:" + runSame + ":" + stepId + ":1");
       const sameResults = await Promise.all([
         admin.rpc("simula_complete_step_with_outbox", sameArgs),
         admin.rpc("simula_complete_step_with_outbox", sameArgs),
@@ -100,12 +100,12 @@ Deno.test({
       });
       assert(Boolean(eventTypeConflict.error), "same key with a different event type must be rejected");
       const payloadConflict = await admin.rpc("simula_complete_step_with_outbox", {
-        ...sameArgs, p_payload: { recipient_ref: "different-synthetic-ref", template: "test-only" },
+        ...sameArgs, p_payload: { run_id: runSame, step_id: stepId, attempt: 2 },
       });
       assert(Boolean(payloadConflict.error), "same key with a different payload must be rejected");
 
       // Independent runs contend for one owner-scoped idempotency key.
-      const crossKey = "phase1016-cross-run-race:" + crypto.randomUUID();
+      const crossKey = "workflow.step.completed:" + runRaceA + ":" + stepId + ":1";
       const crossResults = await Promise.all([
         admin.rpc("simula_complete_step_with_outbox", makeArgs(runRaceA, crossKey)),
         admin.rpc("simula_complete_step_with_outbox", makeArgs(runRaceB, crossKey)),
