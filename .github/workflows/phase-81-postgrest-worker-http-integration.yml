@@ -130,6 +130,15 @@ jobs:
           PGDATABASE: infinitex_rehearsal
         run: psql -X -v ON_ERROR_STOP=1 -f supabase/patches/phase-102-6-workflow-run-lease.sql
 
+      - name: Apply Phase 103.1 owner-scoped lease claim patch to disposable database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: psql -X -v ON_ERROR_STOP=1 -f supabase/patches/phase-103-1-owner-scoped-workflow-lease-claim.sql
+
       - name: Generate short-lived local-only JWTs
         env:
           PHASE81_JWT_SECRET: phase81-disposable-local-signing-secret-not-production
