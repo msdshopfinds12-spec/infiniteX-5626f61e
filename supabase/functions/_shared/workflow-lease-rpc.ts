@@ -36,10 +36,9 @@ async function invoke(rpc: LeaseRpc, name: string, args: Record<string, unknown>
 
 export async function claimWorkflowLeases(
   rpc: LeaseRpc,
-  options: { ownerId: string; limit?: number; leaseSeconds?: number; runId?: string },
+  options: { ownerId: string; limit?: number; leaseSeconds?: number },
 ): Promise<ClaimedWorkflowLease[]> {
-  if (!isCanonicalUuid(options.ownerId) ||
-      (options.runId !== undefined && !isCanonicalUuid(options.runId))) {
+  if (!isCanonicalUuid(options.ownerId)) {
     throw new WorkflowLeaseError("LEASE_INVALID");
   }
   const limit = options.limit ?? 3;
@@ -48,16 +47,13 @@ export async function claimWorkflowLeases(
       !Number.isInteger(leaseSeconds) || leaseSeconds < 30 || leaseSeconds > 900) {
     throw new WorkflowLeaseError("LEASE_INVALID");
   }
-  // Omit the optional UUID filter when absent. Sending an explicit JSON null
-  // can prevent PostgREST from resolving a typed optional UUID argument against
-  // its cached function signature; PostgreSQL already supplies DEFAULT NULL.
-  const args: Record<string, unknown> = {
+  // The public PostgREST facade intentionally has exactly these three
+  // parameters. The private SQL implementation owns the optional run filter.
+  const data = await invoke(rpc, LEASE_RPC.claim, {
     p_limit: limit,
     p_lease_seconds: leaseSeconds,
     p_owner_id: options.ownerId,
-  };
-  if (options.runId !== undefined) args.p_run_id = options.runId;
-  const data = await invoke(rpc, LEASE_RPC.claim, args);
+  });
   if (!Array.isArray(data)) throw new WorkflowLeaseError("LEASE_INVALID");
   return data.map((row) => {
     if (!row || typeof row !== "object" || Array.isArray(row)) {
