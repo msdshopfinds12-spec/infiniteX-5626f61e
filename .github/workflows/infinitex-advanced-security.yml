@@ -6,6 +6,7 @@ on:
       - diagnostic/phase-1026-claim-eligibility
     paths:
       - ".github/workflows/infinitex-advanced-security.yml"
+      - ".github/workflows/phase-81-postgrest-worker-http-integration.yml"
       - "docs/security/**"
       - "src/features/auth/**"
       - "src/features/security/**"
