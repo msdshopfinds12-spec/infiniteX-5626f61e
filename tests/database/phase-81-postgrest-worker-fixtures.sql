@@ -59,7 +59,8 @@ GRANT USAGE, SELECT ON SEQUENCE public.phase81_workflow_logs_id_seq TO service_r
 INSERT INTO auth.users(id, raw_user_meta_data)
 VALUES
   ('81000000-0000-4000-8000-000000000001', '{"full_name":"Phase 81 synthetic owner A"}'::jsonb),
-  ('81000000-0000-4000-8000-000000000002', '{"full_name":"Phase 81 synthetic owner B"}'::jsonb)
+  ('81000000-0000-4000-8000-000000000002', '{"full_name":"Phase 81 synthetic owner B"}'::jsonb),
+  ('81000000-0000-4000-8000-000000000003', '{"full_name":"Phase 103 isolated lease test owner"}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.user_projects(id, user_id, title, project_type, content)
@@ -77,13 +78,15 @@ ON CONFLICT (key_hash) DO NOTHING;
 INSERT INTO public.workflows(id, owner_id, name, status, trigger_type)
 VALUES
   ('81000000-1000-4000-8000-000000000001', '81000000-0000-4000-8000-000000000001', 'Phase 81 HTTP worker A', 'active', 'manual'),
-  ('81000000-1000-4000-8000-000000000002', '81000000-0000-4000-8000-000000000002', 'Phase 81 HTTP worker B', 'active', 'manual')
+  ('81000000-1000-4000-8000-000000000002', '81000000-0000-4000-8000-000000000002', 'Phase 81 HTTP worker B', 'active', 'manual'),
+  ('81000000-1000-4000-8000-000000000003', '81000000-0000-4000-8000-000000000003', 'Phase 103 isolated lease tests', 'active', 'manual')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.workflow_steps(id, workflow_id, step_order, name, action_type, config, retry_limit, timeout_seconds)
 VALUES
   ('81000000-2000-4000-8000-000000000001', '81000000-1000-4000-8000-000000000001', 1, 'Set integration marker', 'set_value', '{"key":"phase81","value":"http-postgrest"}'::jsonb, 0, 10),
-  ('81000000-2000-4000-8000-000000000002', '81000000-1000-4000-8000-000000000001', 2, 'Set completion marker', 'set_value', '{"key":"verified","value":true}'::jsonb, 0, 10)
+  ('81000000-2000-4000-8000-000000000002', '81000000-1000-4000-8000-000000000001', 2, 'Set completion marker', 'set_value', '{"key":"verified","value":true}'::jsonb, 0, 10),
+  ('81000000-2000-4000-8000-000000000003', '81000000-1000-4000-8000-000000000003', 1, 'Isolated lease test step', 'set_value', '{"key":"phase103","value":true}'::jsonb, 0, 10)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.workflow_runs(id, workflow_id, owner_id, status, input, attempt)
