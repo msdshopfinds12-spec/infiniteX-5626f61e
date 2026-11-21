@@ -106,7 +106,6 @@ export type CronWorkerDependencies = {
   createClient: typeof createClient;
   env: { get(name: string): string | undefined };
   executeSafeAction: typeof executeSafeAction;
-  now?: () => Date;
 };
 
 const headers = {
@@ -116,7 +115,6 @@ const headers = {
 
 export function createCronWorkerHandler(deps: CronWorkerDependencies) {
   const { createClient, env, executeSafeAction } = deps;
-  const now = deps.now ?? (() => new Date());
   const respond = (status: number, body: JsonRecord) =>
     new Response(JSON.stringify(body), { status, headers });
 
