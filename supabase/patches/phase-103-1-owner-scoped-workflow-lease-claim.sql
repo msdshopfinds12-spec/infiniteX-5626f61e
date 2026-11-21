@@ -7,7 +7,9 @@ BEGIN;
 -- Remove the previous public facade before replacing its implementation
 -- signature; this avoids ambiguous PostgREST overload resolution.
 DROP FUNCTION IF EXISTS public.simula_claim_workflow_runs_lease_internal(integer, integer, uuid);
+DROP FUNCTION IF EXISTS public.simula_claim_workflow_runs_lease_internal(integer, integer, uuid, uuid);
 DROP FUNCTION IF EXISTS private.simula_claim_workflow_runs_lease_internal(integer, integer, uuid);
+DROP FUNCTION IF EXISTS private.simula_claim_workflow_runs_lease_internal(integer, integer, uuid, uuid);
 
 CREATE FUNCTION private.simula_claim_workflow_runs_lease_internal(
   p_limit integer DEFAULT 3,
