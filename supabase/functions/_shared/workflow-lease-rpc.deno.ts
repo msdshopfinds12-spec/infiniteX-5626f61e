@@ -32,6 +32,8 @@ Deno.test("claim adapter validates and maps owner-scoped database lease rows", a
   const leases = await claimWorkflowLeases(rpc, { ownerId: leaseRow.owner_id, limit: 2, leaseSeconds: 60 });
   assert(leases.length === 1 && leases[0].runId === leaseRow.id && leases[0].attempt === 2, "lease mapped");
   assert(captured?.p_owner_id === leaseRow.owner_id && captured.p_limit === 2, "owner scope sent");
+  assert(!Object.prototype.hasOwnProperty.call(captured, "p_run_id"),
+    "absent optional UUID filter must be omitted so PostgREST uses DEFAULT NULL");
 });
 
 Deno.test("claim adapter rejects malformed database rows", async () => {
