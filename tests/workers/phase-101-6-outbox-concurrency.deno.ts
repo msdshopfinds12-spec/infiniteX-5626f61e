@@ -126,8 +126,13 @@ Deno.test({
       // UUID-scoped cleanup only; both operations are attempted independently.
       const stepCleanup = await admin.from("workflow_step_runs").delete().in("run_id", runIds);
       const runCleanup = await admin.from("workflow_runs").delete().in("id", runIds);
-      assert(!stepCleanup.error, "phase1016 step cleanup failed: " + (stepCleanup.error?.message ?? ""));
-      assert(!runCleanup.error, "phase1016 run cleanup failed: " + (runCleanup.error?.message ?? ""));
+      const cleanupFailures = [
+        stepCleanup.error ? "step cleanup: " + stepCleanup.error.message : null,
+        runCleanup.error ? "run cleanup: " + runCleanup.error.message : null,
+      ].filter((failure): failure is string => failure !== null);
+      if (cleanupFailures.length > 0) {
+        throw new Error("PHASE1016_FIXTURE_CLEANUP_FAILED: " + cleanupFailures.join("; "));
+      }
     }
   },
 });
