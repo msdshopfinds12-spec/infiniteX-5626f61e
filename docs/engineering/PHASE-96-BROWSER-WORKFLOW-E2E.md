@@ -21,6 +21,11 @@ The Playwright test starts a local Vite production preview with synthetic public
 6. Return a terminal succeeded state on a later read, exercising Phase 95 polling in Chromium.
 7. Assert no direct browser table writes, correct bearer identity, exactly one enqueue call, no uncaught page errors and no horizontal mobile overflow.
 
+
+## Defect discovered and corrected during E2E design
+
+A review of the Phase 95 polling lifecycle found that its timeout refreshed the run list once, but the timer was not necessarily re-armed when the refreshed response remained active: the effect depended on the boolean `shouldPoll`, which stays `true` across queued → queued responses. Phase 96 corrected the effect dependency to include the refresh counter, so each active refresh schedules the next bounded interval and a terminal response stops the loop. The Chromium scenario intentionally returns queued on multiple reads before succeeded, making this regression observable.
+
 ## Security properties exercised
 
 - The browser receives only a synthetic `sb_publishable_*` key; no service-role or secret key is configured.
