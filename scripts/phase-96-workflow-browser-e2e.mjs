@@ -145,7 +145,7 @@ try {
     }
 
     if (path.startsWith("/functions/v1/")) {
-      functionRequests.push({ method, path, authorization, body: method === "POST" ? request.postDataJSON() : null });
+      if (method !== "OPTIONS") functionRequests.push({ method, path, authorization, body: method === "POST" ? request.postDataJSON() : null });
       if (method === "OPTIONS") {
         await route.fulfill({ status: 204, headers: corsHeaders(origin) });
         return;
