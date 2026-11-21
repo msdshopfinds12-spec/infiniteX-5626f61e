@@ -239,6 +239,8 @@ jobs:
           PHASE1032_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-103-2-lease-fenced-step-transitions.deno.ts
           deno check --no-lock --node-modules-dir=auto tests/workers/phase-103-3-cron-worker-lease.deno.ts
           PHASE1033_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-103-3-cron-worker-lease.deno.ts
+          deno check --no-lock --node-modules-dir=auto tests/workers/phase-103-4-lease-concurrency.deno.ts
+          PHASE1034_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-103-4-lease-concurrency.deno.ts
 
       - name: Collect disposable service logs
         if: always()
