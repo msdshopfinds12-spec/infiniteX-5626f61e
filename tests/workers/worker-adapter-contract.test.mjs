@@ -67,7 +67,7 @@ test("both adapters fence state writes by owner and attempt generation", () => {
 test("shared completion helper owns the fixed RPC and strict result validation", () => {
   assert.ok(sharedCompletion.includes('"simula_complete_step_with_outbox"'));
   assert.ok(sharedCompletion.includes("p_attempt: input.attempt"));
-  assert.ok(sharedCompletion.includes('typeof row.step_run_id !== "string"'));
+  assert.ok(sharedCompletion.includes('typeof row.step_run_id === "string"'));
   assert.ok(sharedCompletion.includes("step_run_finish_failed"));
   assert.ok(sharedCompletion.includes("workflow_step_attempt_superseded"));
 });
