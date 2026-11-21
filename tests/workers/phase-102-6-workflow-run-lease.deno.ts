@@ -121,13 +121,66 @@ Deno.test({
       });
       assert(Boolean(expiredHeartbeat.error), "expired lease must not be resurrected");
 
+      const { data: beforeReclaim, error: beforeReclaimError } = await admin
+        .from("workflow_runs")
+        .select("id,owner_id,status,attempt,lease_token,lease_until")
+        .eq("id", runId)
+        .maybeSingle();
+      assert(!beforeReclaimError, "reclaim preflight inspection failed: " +
+        (beforeReclaimError?.message ?? ""));
+      assert(beforeReclaim?.owner_id === ownerId &&
+        beforeReclaim.status === "running" &&
+        beforeReclaim.attempt === first.attempt &&
+        beforeReclaim.lease_token === first.lease_token &&
+        Date.parse(beforeReclaim.lease_until) <= Date.now(),
+        "reclaim precondition mismatch: " + JSON.stringify({
+          found: Boolean(beforeReclaim),
+          ownerMatches: beforeReclaim?.owner_id === ownerId,
+          status: beforeReclaim?.status,
+          attempt: beforeReclaim?.attempt,
+          attemptExpected: first.attempt,
+          tokenMatches: beforeReclaim?.lease_token === first.lease_token,
+          leaseUntil: beforeReclaim?.lease_until,
+          clientNow: new Date().toISOString(),
+        }));
+
       const reclaim = await admin.rpc("simula_claim_workflow_runs_lease_internal", claimArgs);
-      assert(!reclaim.error && Array.isArray(reclaim.data), "expired run reclaim RPC failed");
+      if (reclaim.error || !Array.isArray(reclaim.data)) {
+        throw new Error("RECLAIM_RPC_FAILED: " + JSON.stringify({
+          message: reclaim.error?.message ?? null,
+          code: reclaim.error?.code ?? null,
+          details: reclaim.error?.details ?? null,
+          hint: reclaim.error?.hint ?? null,
+        }));
+      }
       const second = reclaim.data.find((row: { id: string }) => row.id === runId) as
         | { attempt: number; lease_token: string; lease_until: string } | undefined;
-      assert(second && second.attempt === 2 && UUID.test(second.lease_token) &&
-        second.lease_token !== first.lease_token && Date.parse(second.lease_until) > Date.now(),
-        "reclaim must advance generation and issue a fresh, unexpired token");
+      if (!second) {
+        const { data: afterReclaim, error: afterReclaimError } = await admin
+          .from("workflow_runs")
+          .select("id,owner_id,status,attempt,lease_token,lease_until")
+          .eq("id", runId)
+          .maybeSingle();
+        throw new Error("RECLAIM_ROW_NOT_RETURNED: " + JSON.stringify({
+          returnedRowCount: reclaim.data.length,
+          returnedIds: reclaim.data.map((row: { id: string }) => row.id),
+          afterReclaimError: afterReclaimError?.message ?? null,
+          afterReclaim: afterReclaim ? {
+            id: afterReclaim.id,
+            ownerMatches: afterReclaim.owner_id === ownerId,
+            status: afterReclaim.status,
+            attempt: afterReclaim.attempt,
+            tokenChanged: afterReclaim.lease_token !== first.lease_token,
+            leaseUntil: afterReclaim.lease_until,
+          } : null,
+        }));
+      }
+      assert(second.attempt === 2,
+        "reclaim generation mismatch: expected 2, received " + second.attempt);
+      assert(UUID.test(second.lease_token), "reclaim returned an invalid lease token");
+      assert(second.lease_token !== first.lease_token, "reclaim reused the previous lease token");
+      assert(Date.parse(second.lease_until) > Date.now(),
+        "reclaim returned a non-future lease expiry: " + second.lease_until);
 
       const staleFinish = await admin.rpc("simula_finish_workflow_run_lease", {
         p_run_id: runId, p_owner_id: ownerId, p_attempt: first.attempt,
