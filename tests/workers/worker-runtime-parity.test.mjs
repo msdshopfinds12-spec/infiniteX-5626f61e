@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
+const completionPath = "../../supabase/functions/_shared/workflow-completion.ts";
 
 test("authenticated worker uses bounded input and exact-origin policy", async () => {
   const source = await read("../../supabase/functions/simula-workflow-worker/index.ts");
@@ -25,8 +26,9 @@ for (const [name, path] of [
   ["authenticated", "../../supabase/functions/simula-workflow-worker/index.ts"],
   ["cron", "../../supabase/functions/simula-workflow-cron-worker/index.ts"],
 ]) {
-  test(name + " worker protects every step/run update with attempt-generation compare-and-set", async () => {
+  test(name + " worker protects state transitions with attempt-generation compare-and-set", async () => {
     const source = await read(path);
+    const helper = await read(completionPath);
     const updates = (source.match(/\.update\(/g) ?? []).length;
     const olderGenerationGuards = (source.match(/\.lt\(["']attempt["'],\s*stepAttempt\)/g) ?? []).length;
     const stepGenerationGuards = (source.match(/\.eq\(["']attempt["'],\s*stepAttempt\)/g) ?? []).length;
@@ -35,12 +37,12 @@ for (const [name, path] of [
     assert.ok(updates >= 5, "expected explicit state updates for start, failure, and run lifecycle transitions");
     assert.equal(olderGenerationGuards, 2, "both step-start paths must reject equal/newer stored generations");
     assert.ok(stepGenerationGuards >= 1, "step failure must match the claimed generation");
-    assert.match(source, /simula_complete_step_with_outbox/);
-    assert.match(source, /p_attempt:\s*stepAttempt/);
+    assert.match(source, /completeWorkflowStepWithOutbox/);
+    assert.match(helper, /simula_complete_step_with_outbox/);
+    assert.match(helper, /p_attempt:\s*input\.attempt/);
     assert.doesNotMatch(source, /\.from\(["']workflow_step_runs["']\)[\s\S]{0,220}?\.update\(\{[\s\S]{0,120}?status:\s*["']succeeded/,
-      "successful step completion must use the transactional RPC, not a direct step update");
+      "successful step completion must use the shared transactional RPC, not a direct step update");
     assert.ok(runGenerationGuards >= 2, "run completion/failure must match the claimed generation");
-    assert.match(source, /workflow_step_attempt_superseded/);
     assert.match(source, /workflow_run_attempt_superseded/);
     assert.match(source, /status:\s*"superseded"/);
     assert.doesNotMatch(source, /\.upsert\(/);

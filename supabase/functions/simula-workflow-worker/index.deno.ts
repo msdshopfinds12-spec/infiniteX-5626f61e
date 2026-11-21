@@ -1,6 +1,7 @@
 import { createAuthenticatedWorkerHandler } from "../simula-workflow-worker/index.ts";
 import { createCronWorkerHandler } from "../simula-workflow-cron-worker/index.ts";
 import { createCorsHeaders } from "../_shared/cors.ts";
+import { completeWorkflowStepWithOutbox } from "../_shared/workflow-completion.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -546,4 +547,59 @@ Deno.test("cron worker fails closed when transactional completion RPC fails", as
     "failed completion RPC must not be bypassed with a direct succeeded update");
   assert(db.tables.workflow_runs[0].status === "failed",
     "cron must fail the workflow rather than mark it succeeded");
+});
+
+
+Deno.test("shared completion helper validates input before calling the database", async () => {
+  let calls = 0;
+  let rejected = false;
+  try {
+    await completeWorkflowStepWithOutbox(async () => {
+      calls++;
+      return { data: [{ step_run_id: "step-run-1" }], error: null };
+    }, { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 0, output: {} });
+  } catch (error) {
+    rejected = error instanceof Error && error.message === "step_run_finish_invalid_input";
+  }
+  assert(rejected, "invalid attempt generation must be rejected");
+  assert(calls === 0, "invalid input must not reach the database");
+});
+
+Deno.test("shared completion helper normalizes a valid transactional RPC response", async () => {
+  let calledName = "";
+  let calledArgs: Record<string, unknown> = {};
+  const result = await completeWorkflowStepWithOutbox(async (name, args) => {
+    calledName = name;
+    calledArgs = args;
+    return { data: [{ step_run_id: "step-run-1", outbox_id: null, replayed: false }], error: null };
+  }, { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 2, output: { ok: true } });
+  assert(calledName === "simula_complete_step_with_outbox", "helper must call the fixed transactional RPC");
+  assert(calledArgs.p_owner_id === "owner-1" && calledArgs.p_attempt === 2, "helper must bind owner and attempt");
+  assert(result.stepRunId === "step-run-1" && result.outboxId === null && !result.replayed,
+    "helper must normalize the completion result");
+});
+
+Deno.test("shared completion helper fails closed for RPC errors, thrown errors, and malformed results", async () => {
+  const failures: Array<() => Promise<unknown>> = [
+    () => completeWorkflowStepWithOutbox(async () => ({ data: null, error: new Error("private database detail") }),
+      { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 1, output: {} }),
+    () => completeWorkflowStepWithOutbox(async () => { throw new Error("transport detail"); },
+      { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 1, output: {} }),
+    () => completeWorkflowStepWithOutbox(async () => ({ data: [{ outbox_id: null }], error: null }),
+      { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 1, output: {} }),
+    () => completeWorkflowStepWithOutbox(async () => undefined as never,
+      { ownerId: "owner-1", runId: "run-1", stepId: "step-1", attempt: 1, output: {} }),
+  ];
+  const messages: string[] = [];
+  for (const failure of failures) {
+    try { await failure(); } catch (error) {
+      messages.push(error instanceof Error ? error.message : "unknown");
+    }
+  }
+  assert(messages.length === 4, "all invalid completion paths must reject");
+  assert(messages[0] === "step_run_finish_failed" && messages[1] === "step_run_finish_failed",
+    "database and transport errors must be sanitized");
+  assert(messages[2] === "workflow_step_attempt_superseded",
+    "missing completion identity must fail as superseded");
+  assert(messages[3] === "step_run_finish_failed", "malformed RPC envelopes must fail with a sanitized error");
 });

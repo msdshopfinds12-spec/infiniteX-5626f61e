@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { executeSafeAction } from "../_shared/workflow-actions.mjs";
+import { completeWorkflowStepWithOutbox } from "../_shared/workflow-completion.ts";
 import { authenticateCronRequest } from "../_shared/worker-auth-boundary.mjs";
 import {
   clampBatchLimit,
@@ -182,22 +183,10 @@ export function createCronWorkerHandler(deps: CronWorkerDependencies) {
         payload = output;
         // Keep cron and authenticated workers on the same atomic completion path.
         // Never fall back to a direct success update if the RPC fails.
-        const { data: completionRows, error: finishStepError } = await admin.rpc(
-          "simula_complete_step_with_outbox",
-          {
-            p_owner_id: ownerId,
-            p_run_id: run.id,
-            p_step_id: step.id,
-            p_attempt: stepAttempt,
-            p_output: output,
-            p_event_type: null,
-            p_idempotency_key: null,
-            p_payload: {},
-          },
+        await completeWorkflowStepWithOutbox(
+          async (name, args) => await admin.rpc(name, args as never),
+          { ownerId, runId: run.id, stepId: step.id, attempt: stepAttempt, output },
         );
-        if (finishStepError) throw new Error("step_run_finish_failed");
-        const completion = Array.isArray(completionRows) ? completionRows[0] : completionRows;
-        if (!completion?.step_run_id) throw new Error("workflow_step_attempt_superseded");
         await logEvent(admin, ownerId, run.workflow_id, run.id, "info", "workflow_step_succeeded", {
           step_id: step.id, step_order: step.step_order, action_type: step.action_type,
         });

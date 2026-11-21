@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { executeSafeAction } from "../_shared/workflow-actions.mjs";
+import { completeWorkflowStepWithOutbox } from "../_shared/workflow-completion.ts";
 import { authenticateBearerRequest } from "../_shared/worker-auth-boundary.mjs";
 import { corsHeadersForRequest } from "../_shared/cors.ts";
 import {
@@ -249,22 +250,10 @@ export function createAuthenticatedWorkerHandler(deps: AuthenticatedWorkerDepend
         payload = actionOutput;
         // Step completion and optional outbox intent are committed atomically.
         // No direct-update fallback: RPC failure must fail closed.
-        const { data: completionRows, error: stepFinishError } = await admin.rpc(
-          "simula_complete_step_with_outbox",
-          {
-            p_owner_id: ownerId,
-            p_run_id: run.id,
-            p_step_id: step.id,
-            p_attempt: stepAttempt,
-            p_output: actionOutput,
-            p_event_type: null,
-            p_idempotency_key: null,
-            p_payload: {},
-          },
+        await completeWorkflowStepWithOutbox(
+          async (name, args) => await admin.rpc(name, args as never),
+          { ownerId, runId: run.id, stepId: step.id, attempt: stepAttempt, output: actionOutput },
         );
-        if (stepFinishError) throw new Error("step_run_finish_failed");
-        const completion = Array.isArray(completionRows) ? completionRows[0] : completionRows;
-        if (!completion?.step_run_id) throw new Error("workflow_step_attempt_superseded");
 
         await logEvent(admin, ownerId, run.workflow_id, run.id, "info", "workflow_step_succeeded", {
           step_id: step.id,
