@@ -35,6 +35,16 @@ Deno.test({
       },
     });
 
+    // The cron worker calls this public PostgREST RPC; its implementation
+    // remains private and the migration grants execution only to service_role.
+    const { data: cronClaims, error: cronClaimError } = await admin.rpc(
+      "simula_claim_workflow_runs_internal",
+      { p_limit: 1 },
+    );
+    assert(!cronClaimError, "service-role cron queue claim must resolve through public PostgREST: " + (cronClaimError?.message ?? ""));
+    assert(cronClaims?.length === 1 && cronClaims[0].attempt === 1,
+      "service-role cron queue claim must atomically claim exactly one queued run");
+
     const runId = "81000000-3000-4000-8000-000000000005";
     const stepId = "81000000-2000-4000-8000-000000000001";
     const workflowId = "81000000-1000-4000-8000-000000000001";
