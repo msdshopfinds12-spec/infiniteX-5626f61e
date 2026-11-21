@@ -373,7 +373,7 @@ Deno.test({
       }).output();
       const directPgOutput = new TextDecoder().decode(directPg.stdout) +
         new TextDecoder().decode(directPg.stderr);
-      const directPgResultLine = directPgOutput.split("\\n").find((line) =>
+      const directPgResultLine = directPgOutput.split("\n").find((line) =>
         line.includes("PHASE1034_DIRECT_PG_REPLAY_RESULT")
       ) ?? null;
       console.error("PHASE1034_DIRECT_PG_REPLAY_DIAGNOSTIC", {
