@@ -3,6 +3,8 @@ import {
   heartbeatWorkflowLease,
   finishWorkflowRunWithLease,
   completeWorkflowStepWithLease,
+  startWorkflowStepWithLease,
+  failWorkflowStepWithLease,
   type LeaseRpc,
 } from "./workflow-lease-rpc.ts";
 import { WorkflowLeaseError } from "./workflow-lease-contract.ts";
@@ -93,4 +95,37 @@ Deno.test("completion adapter rejects an outbox identity mismatch before RPC", a
     }, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", {}, event);
   } catch (error) { rejected = error instanceof WorkflowLeaseError && error.code === "LEASE_INVALID"; }
   assert(rejected && calls === 0, "mismatched event cannot reach database");
+});
+
+Deno.test("start and fail step adapters send complete fenced identity", async () => {
+  const names: string[] = [];
+  const rpc: LeaseRpc = async (name, args) => {
+    names.push(name);
+    assert(args.p_run_id === leaseRow.id && args.p_owner_id === leaseRow.owner_id, "owner/run identity");
+    assert(args.p_attempt === 2 && args.p_lease_token === leaseRow.lease_token, "attempt/token fence");
+    assert(args.p_step_id === "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "step identity");
+    if (name === "simula_start_workflow_step_with_lease") {
+      assert(args.p_input !== undefined, "step input forwarded");
+      return { data: [{ step_run_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", replayed: false }], error: null };
+    }
+    assert(name === "simula_fail_workflow_step_with_lease" && args.p_error === "synthetic failure", "failure payload");
+    return { data: [{ step_run_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" }], error: null };
+  };
+  const identity = { runId: leaseRow.id, ownerId: leaseRow.owner_id, attempt: 2, leaseToken: leaseRow.lease_token };
+  await startWorkflowStepWithLease(rpc, identity, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", { safe: true });
+  await failWorkflowStepWithLease(rpc, identity, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "synthetic failure");
+  assert(names.join(",") === "simula_start_workflow_step_with_lease,simula_fail_workflow_step_with_lease", "correct RPCs");
+});
+
+Deno.test("finish adapter sends the exact database terminal contract", async () => {
+  const rpc: LeaseRpc = async (name, args) => {
+    assert(name === "simula_finish_workflow_run_lease", "finish RPC name");
+    assert(args.p_run_id === leaseRow.id && args.p_owner_id === leaseRow.owner_id, "run owner");
+    assert(args.p_attempt === 2 && args.p_lease_token === leaseRow.lease_token, "generation fence");
+    assert(args.p_terminal_status === "failed" && args.p_error === "synthetic failure", "terminal status and error");
+    return { data: [{ id: leaseRow.id, status: "failed", attempt: 2 }], error: null };
+  };
+  await finishWorkflowRunWithLease(rpc, {
+    runId: leaseRow.id, ownerId: leaseRow.owner_id, attempt: 2, leaseToken: leaseRow.lease_token,
+  }, "failed", undefined, "synthetic failure");
 });
