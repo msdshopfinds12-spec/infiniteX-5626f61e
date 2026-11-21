@@ -57,12 +57,38 @@ The helper continues to pass null event metadata. This change hardens the comple
 | GitHub source commits | SOURCE CHANGED |
 | Read-service regression tests added | SOURCE CHANGED |
 | Worker completion regression tests added | SOURCE CHANGED |
-| Exact-head test/build CI | NOT VERIFIED — no PR-triggered test run is available on this branch yet |
-| Local npm test execution | NOT RUN |
-| Production schema parity | NOT VERIFIED |
+| Core quality gates | PASS on tested source SHA `a6ff38ed525a8764b11a8dd8cd7b47778b46ce7a` |
+| GitHub Actions Node 22 tests | PASS: 227/227 main regression tests; 8/8 Edge Function security tests; 18/18 worker runtime tests |
+| Disposable migration replay and tenant isolation | PASS in isolated PostgreSQL 17 + PostgREST; synthetic identities only |
 | Production migration | NOT PERFORMED |
-| Outbox dispatcher delivery | NOT VERIFIED |
+| Disposable PostgreSQL/PostgREST worker journey | PASS on tested source SHA `a6ff38ed525a8764b11a8dd8cd7b47778b46ce7a` |
 | Deployment | NOT PERFORMED; Vercel checks report a deployment-rate-limit blocker, not a source build result |
+
+## Verified GitHub Actions evidence
+
+All checks below ran against source SHA `a6ff38ed525a8764b11a8dd8cd7b47778b46ce7a`:
+
+- [InfiniteX Quality Gates — successful run](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44857536543)
+  - `npm ci`: PASS
+  - `npm audit --audit-level=low`: PASS
+  - TypeScript lint (`npm run lint`): PASS
+  - `npm test`: 227 passed, 0 failed
+  - Edge Function and worker security tests: 8 passed, 0 failed
+  - Worker runtime parity tests: 18 passed, 0 failed
+  - Production build (`tsc -b && vite build`): PASS; Vite transformed 1,629 modules
+- [Phase 82 PostgREST worker HTTP integration — successful run](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44857536578)
+  - `npm ci` and pre-integration regression gates: PASS
+  - Disposable Supabase PostgreSQL 17 startup: PASS
+  - Migration-chain replay: PASS
+  - Synthetic identity and fixture setup: PASS
+  - Local-only JWT generation: PASS
+  - Disposable PostgREST startup: PASS
+  - Deno worker HTTP journey against PostgREST/PostgreSQL: PASS
+  - Cleanup of disposable services: PASS
+
+The integration job logs contain expected denials from negative authorization tests (RLS write denial and restricted API-key hash column access). These are test evidence, not production errors. All containers were removed by the workflow cleanup step.
+
+The documentation-only commit that records these results does not change application source. Core quality CI is configured to run again on the resulting branch head.
 
 ## Remaining critical work
 
