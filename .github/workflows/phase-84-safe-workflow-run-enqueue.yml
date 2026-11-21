@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - phase-84-safe-workflow-run-enqueue
+      - phase-94-workflow-enqueue-to-worker-e2e
     paths:
       - ".github/workflows/phase-84-safe-workflow-run-enqueue.yml"
       - "supabase/migrations/**"
@@ -152,6 +153,8 @@ jobs:
           deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-82-postgrest-rls.deno.ts
           deno check --no-lock --node-modules-dir=auto tests/workers/phase-84-workflow-run-request.deno.ts
           deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-84-workflow-run-request.deno.ts
+          deno check --no-lock --node-modules-dir=auto tests/workers/phase-94-enqueue-to-worker-e2e.deno.ts
+          deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-94-enqueue-to-worker-e2e.deno.ts
 
       - name: Collect disposable service logs
         if: always()
