@@ -274,4 +274,83 @@ GRANT EXECUTE ON FUNCTION private.simula_heartbeat_workflow_run(uuid, uuid, inte
 GRANT EXECUTE ON FUNCTION private.simula_finish_workflow_run_lease(uuid, uuid, integer, uuid, text, jsonb, text)
   TO service_role;
 
+
+-- PostgREST exposes only the public schema in the disposable integration
+-- harness. These narrow public RPC facades keep implementation functions in
+-- private while granting invocation exclusively to service_role. They are
+-- invoker-security wrappers; the private implementation owns SECURITY DEFINER.
+CREATE OR REPLACE FUNCTION public.simula_claim_workflow_runs_lease_internal(
+  p_limit integer DEFAULT 3,
+  p_lease_seconds integer DEFAULT 90,
+  p_run_id uuid DEFAULT NULL
+)
+RETURNS TABLE (
+  id uuid,
+  workflow_id uuid,
+  owner_id uuid,
+  input jsonb,
+  attempt integer,
+  lease_token uuid,
+  lease_until timestamptz
+)
+LANGUAGE sql
+SECURITY INVOKER
+SET search_path = ''
+AS $function$
+  SELECT * FROM private.simula_claim_workflow_runs_lease_internal(
+    p_limit, p_lease_seconds, p_run_id
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.simula_heartbeat_workflow_run(
+  p_run_id uuid,
+  p_owner_id uuid,
+  p_attempt integer,
+  p_lease_token uuid,
+  p_extend_seconds integer DEFAULT 90
+)
+RETURNS TABLE (lease_until timestamptz, heartbeat_at timestamptz)
+LANGUAGE sql
+SECURITY INVOKER
+SET search_path = ''
+AS $function$
+  SELECT * FROM private.simula_heartbeat_workflow_run(
+    p_run_id, p_owner_id, p_attempt, p_lease_token, p_extend_seconds
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.simula_finish_workflow_run_lease(
+  p_run_id uuid,
+  p_owner_id uuid,
+  p_attempt integer,
+  p_lease_token uuid,
+  p_terminal_status text,
+  p_output jsonb DEFAULT NULL,
+  p_error text DEFAULT NULL
+)
+RETURNS TABLE (id uuid, status text, attempt integer)
+LANGUAGE sql
+SECURITY INVOKER
+SET search_path = ''
+AS $function$
+  SELECT * FROM private.simula_finish_workflow_run_lease(
+    p_run_id, p_owner_id, p_attempt, p_lease_token,
+    p_terminal_status, p_output, p_error
+  );
+$function$;
+
+REVOKE ALL ON FUNCTION public.simula_claim_workflow_runs_lease_internal(integer, integer, uuid)
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.simula_heartbeat_workflow_run(uuid, uuid, integer, uuid, integer)
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.simula_finish_workflow_run_lease(uuid, uuid, integer, uuid, text, jsonb, text)
+  FROM PUBLIC, anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION public.simula_claim_workflow_runs_lease_internal(integer, integer, uuid)
+  TO service_role;
+GRANT EXECUTE ON FUNCTION public.simula_heartbeat_workflow_run(uuid, uuid, integer, uuid, integer)
+  TO service_role;
+GRANT EXECUTE ON FUNCTION public.simula_finish_workflow_run_lease(uuid, uuid, integer, uuid, text, jsonb, text)
+  TO service_role;
+
 COMMIT;
