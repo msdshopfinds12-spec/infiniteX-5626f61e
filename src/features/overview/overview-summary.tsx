@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import { FolderKanban, GitBranch, RefreshCw } from "lucide-react";
 import type { ProjectReadService } from "../projects/project-read-service.ts";
 import type { WorkflowReadService } from "../workflows/workflow-read-service.ts";
@@ -24,7 +25,7 @@ function SnapshotCard({
   label: string;
   value: number | null;
   error: string | null;
-  icon: typeof GitBranch;
+  icon: LucideIcon;
 }) {
   return (
     <article className="overview-stat">
