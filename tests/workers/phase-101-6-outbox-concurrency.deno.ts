@@ -70,7 +70,8 @@ Deno.test({
         p_limit: 3, p_lease_seconds: 300, p_owner_id: ownerId,
       });
       assert(!claim.error && Array.isArray(claim.data), "owner-scoped lease claim failed: " + (claim.error?.message ?? ""));
-      const leases = claim.data.filter((row: { id: string }) => runIds.includes(row.id));
+      const runIdSet = new Set<string>(runIds);
+      const leases = claim.data.filter((row: { id: string }) => runIdSet.has(row.id));
       assert(leases.length === 3, "all three synthetic runs must receive distinct leases");
       const byRun = new Map(leases.map((row: {
         id: string; owner_id: string; attempt: number; lease_token: string; lease_until: string;
