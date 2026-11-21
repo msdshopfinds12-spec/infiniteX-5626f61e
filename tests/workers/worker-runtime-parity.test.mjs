@@ -58,9 +58,10 @@ test("cron worker delegates every lifecycle transition to fenced lease RPCs", as
     "failWorkflowStepWithLease(", "completeWorkflowStepWithLease(", "finishWorkflowRunWithLease(",
   ]) assert.ok(source.includes(token), "missing cron fenced transition: " + token);
   for (const table of ["workflow_step_runs", "workflow_runs"]) {
-    assert.ok(!source.includes('.from("' + table + '").update('), "direct update remains for " + table);
-    assert.ok(!source.includes('.from("' + table + '").insert('), "direct insert remains for " + table);
-    assert.ok(!source.includes('.from("' + table + '").upsert('), "direct upsert remains for " + table);
+    for (const method of ["insert", "update", "upsert"]) {
+      assert.ok(!source.includes('.from("' + table + '").' + method + '('),
+        "direct state mutation remains for " + table + "." + method);
+    }
   }
   assert.ok(!source.includes("simula_claim_workflow_runs_internal"));
   assert.ok(!source.includes("completeWorkflowStepWithOutbox("));
