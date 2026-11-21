@@ -1,9 +1,12 @@
+import { validateWorkflowOutboxEvent, type WorkflowOutboxEvent } from "./workflow-outbox-contract.ts";
+
 export type WorkflowStepCompletionInput = {
   ownerId: string;
   runId: string;
   stepId: string;
   attempt: number;
   output: Record<string, unknown>;
+  outboxEvent?: WorkflowOutboxEvent;
 };
 
 export type WorkflowStepCompletionResult = {
@@ -39,6 +42,12 @@ export async function completeWorkflowStepWithOutbox(
     typeof input.stepId !== "string" || !input.stepId.trim() ||
     !Number.isSafeInteger(input.attempt) || input.attempt < 1 ||
     !isRecord(input.output) ||
+    (input.outboxEvent !== undefined && !validateWorkflowOutboxEvent(input.outboxEvent)) ||
+    (input.outboxEvent !== undefined && (
+      input.outboxEvent.payload.run_id !== input.runId ||
+      input.outboxEvent.payload.step_id !== input.stepId ||
+      input.outboxEvent.payload.attempt !== input.attempt
+    )) ||
     typeof rpc !== "function"
   ) {
     throw new Error("step_run_finish_invalid_input");
@@ -52,9 +61,9 @@ export async function completeWorkflowStepWithOutbox(
       p_step_id: input.stepId,
       p_attempt: input.attempt,
       p_output: input.output,
-      p_event_type: null,
-      p_idempotency_key: null,
-      p_payload: {},
+      p_event_type: input.outboxEvent?.eventType ?? null,
+      p_idempotency_key: input.outboxEvent?.idempotencyKey ?? null,
+      p_payload: input.outboxEvent?.payload ?? {},
     });
   } catch {
     throw new Error("step_run_finish_failed");
