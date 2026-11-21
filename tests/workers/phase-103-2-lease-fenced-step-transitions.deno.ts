@@ -76,12 +76,17 @@ Deno.test({
       });
       assert(!runError, "synthetic run insert failed: " + (runError?.message ?? ""));
 
+      // Isolate the claim to this synthetic fixture. Other queued rows may
+      // exist for the same owner in the shared disposable rehearsal database.
       const claim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
-        p_limit: 1, p_lease_seconds: 90, p_owner_id: ownerId,
+        p_limit: 1, p_lease_seconds: 90, p_run_id: runId, p_owner_id: ownerId,
       });
       assert(!claim.error && Array.isArray(claim.data) && claim.data.length === 1,
         "synthetic run lease claim failed: " + (claim.error?.message ?? ""));
-      const lease = claim.data[0] as { attempt: number; lease_token: string; lease_until: string };
+      assert(claim.data[0]?.id === runId,
+        "claim must return the exact synthetic run requested: " +
+          JSON.stringify({ expectedRunId: runId, returnedRunIds: claim.data.map((row: { id: string }) => row.id) }));
+      const lease = claim.data[0] as { id: string; attempt: number; lease_token: string; lease_until: string };
       assert(lease.attempt === 1 && UUID.test(lease.lease_token) && Date.parse(lease.lease_until) > Date.now(),
         "claim must return active generation and lease token");
 
