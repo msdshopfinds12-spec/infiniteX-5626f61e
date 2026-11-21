@@ -217,7 +217,7 @@ export function createAuthenticatedWorkerHandler(deps: AuthenticatedWorkerDepend
               retryLimit,
               {
                 maxElapsedMs: timeoutSeconds * 1000,
-                sleep: (ms) => abortableSleep(ms, supervisor.signal),
+                sleep: (ms: number) => abortableSleep(ms, supervisor.signal),
               },
             );
           } catch (actionError) {
