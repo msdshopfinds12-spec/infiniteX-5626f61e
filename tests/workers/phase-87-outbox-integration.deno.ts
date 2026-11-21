@@ -25,7 +25,6 @@ Deno.test({
   name: "Phase 87.1: transactional outbox idempotency, concurrent claims, retry and lease fencing",
   sanitizeOps: false,
   sanitizeResources: false,
-  timeout: 120_000,
   fn: async () => {
     const url = required("PHASE81_POSTGREST_URL");
     const serviceJwt = required("PHASE81_SERVICE_JWT");
