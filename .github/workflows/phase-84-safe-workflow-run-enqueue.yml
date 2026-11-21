@@ -5,6 +5,7 @@ on:
     branches:
       - phase-84-safe-workflow-run-enqueue
       - phase-94-workflow-enqueue-to-worker-e2e
+      - phase-97-database-security-audit
     paths:
       - ".github/workflows/phase-84-safe-workflow-run-enqueue.yml"
       - "supabase/migrations/**"
@@ -15,6 +16,8 @@ on:
       - "docs/database/MIGRATION-PROVENANCE-CLASSIFICATION.json"
       - "docs/engineering/PHASE-84-SAFE-WORKFLOW-RUN-ENQUEUE.md"
       - "docs/engineering/PHASE-94-ENQUEUE-TO-WORKER-END-TO-END.md"
+      - "docs/engineering/PHASE-97-DATABASE-SECURITY-AUDIT.md"
+      - "tests/database/phase-97-database-security-audit.sql"
       - "supabase/functions/_shared/**"
       - "tests/database/phase-81-postgrest-worker-fixtures.sql"
       - "tests/workers/**"
@@ -118,6 +121,15 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: infinitex_rehearsal
         run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-81-postgrest-worker-fixtures.sql
+
+      - name: Run Phase 97 database security catalog audit
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-97-database-security-audit.sql
 
       - name: Generate short-lived local-only JWTs
         env:
