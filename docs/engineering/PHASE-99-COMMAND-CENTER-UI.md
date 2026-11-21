@@ -47,3 +47,21 @@
 ## Browser test harness correction
 
 The first Phase 99 Chromium attempt reached the browser journey but failed on a strict Playwright locator: the text "Authenticated session" is intentionally present in both the account strip and the session-aware sidebar footer. The initial `.first()` selector resolved to the sidebar footer, which is intentionally hidden at mobile widths. The test now targets `.account-strip .account-indicator` directly, the visible account status element. This is a test-selector ambiguity, not an authentication or application runtime defect. The corrected exact-head browser run is required before marking browser verification complete.
+
+## Final exact-head verification
+
+- Exact SHA: `359de15b846cda4b59bdcc22849df9dd0ad6edd1`.
+- [Quality Gates run 44885695778](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44885695778) — SUCCESS.
+- [Chromium browser E2E run 44885695807](https://github.com/msdshopfinds12-spec/infiniteX-5626f61e/actions/runs/44885695807) — SUCCESS.
+- Node regression and UI contract suites: PASS.
+- npm audit: 0 vulnerabilities.
+- TypeScript and Deno checks: PASS.
+- Production build: PASS.
+- Chromium 390 × 844 journey: authenticated workflow enqueue → queued → succeeded; AI Runtime view displayed disabled provider and no sample agents; Activity view displayed no global event stream and no fabricated timestamps; no direct browser table writes; no uncaught page errors; no horizontal overflow.
+
+The first browser attempts were retained as failed CI history: an outdated frontend copy assertion, followed by two mobile-hidden sidebar selector ambiguities. These were corrected. The final exact-head browser run passed; earlier failures are not represented as successful verification.
+
+**Verification status:** VERIFIED IN REPOSITORY CI AND SYNTHETIC CHROMIUM.
+**Physical Android:** NOT TESTED.
+**Production backend / deployment parity:** NOT VERIFIED.
+**Release status:** NOT APPROVED.
