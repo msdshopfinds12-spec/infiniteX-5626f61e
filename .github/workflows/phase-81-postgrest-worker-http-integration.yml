@@ -10,6 +10,8 @@ on:
       - diagnostic/phase-1026-claim-eligibility
     paths:
       - ".github/workflows/phase-81-postgrest-worker-http-integration.yml"
+      - ".github/workflows/infinitex-advanced-security.yml"
+      - "docs/security/**"
       - "supabase/migrations/**"
       - "supabase/patches/**"
       - "supabase/functions/simula-workflow-worker/**"
