@@ -102,7 +102,7 @@ export default function WorkflowRunHistory({
       clearTimer();
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [shouldPoll, requestKey]);
+  }, [shouldPoll, requestKey, retryCount]);
 
   if (currentState.status === "loading") {
     return <p className="muted" role="status">Loading recent runs…</p>;
