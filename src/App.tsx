@@ -105,7 +105,7 @@ export default function App({
           <main className="content">
             {authState?.status === "authenticated" && (
               <div className="account-strip">
-                <span className="account-indicator"><span /> Authenticated session</span>
+                <span className="account-indicator" data-testid="authenticated-session-indicator"><span /> Authenticated session</span>
                 <button className="btn btn-ghost account-signout" type="button" onClick={handleSignOut}>
                   <LogOut size={15} /> Sign out
                 </button>
