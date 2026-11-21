@@ -52,8 +52,8 @@ Deno.test({
     const runId = crypto.randomUUID();
     let workflowCreated = false;
     try {
-      // The owner-scoped public facade intentionally exposes no run-ID filter.
-      // Phase 81 consumes the shared owner-A fixtures before this isolated run.
+      // Scope every claim to this synthetic run through the public facade's p_run_id filter.
+      // This prevents unrelated owner-A queue fixtures from changing the test outcome.
       const { error: workflowError } = await admin.from("workflows").insert({
         id: workflowId, owner_id: ownerId, name: "phase-1026-lease-fixture",
         status: "draft", trigger_type: "manual",
@@ -68,15 +68,17 @@ Deno.test({
       assert(!runError, "synthetic run seed failed: " + (runError?.message ?? ""));
 
       // A different authenticated owner scope must never claim this run.
+      const claimArgs = {
+        p_limit: 1, p_lease_seconds: 30, p_owner_id: ownerId, p_run_id: runId,
+      };
       const wrongOwnerClaim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
-        p_limit: 1, p_lease_seconds: 30, p_owner_id: "81000000-0000-4000-8000-000000000004",
+        ...claimArgs, p_owner_id: "81000000-0000-4000-8000-000000000004",
       });
       assert(!wrongOwnerClaim.error && Array.isArray(wrongOwnerClaim.data) &&
         wrongOwnerClaim.data.length === 0,
         "owner-scoped claim must not disclose or claim another owner's run");
 
       // Concurrent claims against one queue row must produce exactly one owner.
-      const claimArgs = { p_limit: 1, p_lease_seconds: 30, p_owner_id: ownerId };
       const claims = await Promise.all([
         admin.rpc("simula_claim_workflow_runs_lease_internal", claimArgs),
         admin.rpc("simula_claim_workflow_runs_lease_internal", claimArgs),
@@ -106,12 +108,14 @@ Deno.test({
         p_run_id: runId, p_owner_id: ownerId, p_attempt: first.attempt,
         p_lease_token: crypto.randomUUID(), p_extend_seconds: 60,
       });
-      assert(Boolean(staleToken.error), "a non-matching lease token must be rejected");
+      assert(staleToken.error?.code === "40001" &&
+        staleToken.error.message === "workflow_run_lease_superseded",
+        "a non-matching lease token must be rejected by the database lease fence");
 
       // Simulate worker loss by expiring only this synthetic fixture row.
       // This direct mutation is permitted solely in the opt-in disposable DB.
       const { data: expiredRows, error: expireError } = await admin.from("workflow_runs")
-        .update({ lease_until: new Date(Date.now() - 5_000).toISOString() })
+        .update({ lease_until: "2000-01-01T00:00:00.000Z" })
         .eq("id", runId).eq("lease_token", first.lease_token).eq("status", "running")
         .select("id,owner_id,status,attempt,lease_until");
       assert(!expireError, "synthetic lease expiry setup failed: " + (expireError?.message ?? ""));
@@ -130,7 +134,14 @@ Deno.test({
         p_run_id: runId, p_owner_id: ownerId, p_attempt: first.attempt,
         p_lease_token: first.lease_token, p_extend_seconds: 60,
       });
-      assert(Boolean(expiredHeartbeat.error), "expired lease must not be resurrected");
+      console.error("PHASE1026_EXPIRED_HEARTBEAT_DIAGNOSTIC", {
+        code: expiredHeartbeat.error?.code ?? null,
+        message: expiredHeartbeat.error?.message ?? null,
+        details: expiredHeartbeat.error?.details ?? null,
+      });
+      assert(expiredHeartbeat.error?.code === "40001" &&
+        expiredHeartbeat.error.message === "workflow_run_lease_expired",
+        "expired lease must be rejected by PostgreSQL with SQLSTATE 40001");
 
       const { data: beforeReclaim, error: beforeReclaimError } = await admin
         .from("workflow_runs")
@@ -224,13 +235,17 @@ Deno.test({
         p_lease_token: first.lease_token, p_terminal_status: "succeeded",
         p_output: { stale: true },
       });
-      assert(Boolean(staleFinish.error), "superseded worker must not finish the reclaimed run");
+      assert(staleFinish.error?.code === "40001" &&
+        staleFinish.error.message === "workflow_run_lease_superseded",
+        "superseded worker must be rejected by the database lease fence");
 
       const nullStatus = await admin.rpc("simula_finish_workflow_run_lease", {
         p_run_id: runId, p_owner_id: ownerId, p_attempt: second.attempt,
         p_lease_token: second.lease_token, p_terminal_status: null,
       });
-      assert(Boolean(nullStatus.error), "null terminal status must be rejected");
+      assert(nullStatus.error?.code === "22023" &&
+        nullStatus.error.message === "workflow_run_terminal_status_invalid",
+        "null terminal status must be rejected by database input validation");
 
       const finish = await admin.rpc("simula_finish_workflow_run_lease", {
         p_run_id: runId, p_owner_id: ownerId, p_attempt: second.attempt,
