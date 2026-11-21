@@ -77,7 +77,7 @@ Deno.test({
       assert(!runError, "synthetic run insert failed: " + (runError?.message ?? ""));
 
       const claim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
-        p_limit: 1, p_lease_seconds: 90, p_run_id: runId, p_owner_id: ownerId,
+        p_limit: 1, p_lease_seconds: 90, p_owner_id: ownerId,
       });
       assert(!claim.error && Array.isArray(claim.data) && claim.data.length === 1,
         "synthetic run lease claim failed: " + (claim.error?.message ?? ""));
