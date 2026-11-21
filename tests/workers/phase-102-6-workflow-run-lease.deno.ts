@@ -30,7 +30,7 @@ Deno.test({
       throw new Error("PHASE1026_BLOCKED: writes require loopback HTTP PostgREST on port 3000");
     }
     const serviceJwt = required("PHASE81_SERVICE_JWT");
-    const ownerId = required("PHASE81_USER_ID");
+    const ownerId = "81000000-0000-4000-8000-000000000003";
     assert(UUID.test(ownerId), "PHASE1026_BLOCKED: owner ID must be a canonical UUID");
 
     const postgrestFetch: typeof fetch = (input, init) => {
@@ -69,7 +69,7 @@ Deno.test({
 
       // A different authenticated owner scope must never claim this run.
       const wrongOwnerClaim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
-        p_limit: 1, p_lease_seconds: 30, p_owner_id: crypto.randomUUID(),
+        p_limit: 1, p_lease_seconds: 30, p_owner_id: "81000000-0000-4000-8000-000000000004",
       });
       assert(!wrongOwnerClaim.error && Array.isArray(wrongOwnerClaim.data) &&
         wrongOwnerClaim.data.length === 0,
