@@ -29,8 +29,6 @@ Deno.test({
       throw new Error("PHASE1032_BLOCKED: writes require loopback PostgREST on port 3000");
     }
     const serviceJwt = required("PHASE81_SERVICE_JWT");
-    const ownerId = required("PHASE81_USER_ID");
-    assert(UUID.test(ownerId), "owner ID must be a UUID");
 
     const localFetch: typeof fetch = (input, init) => {
       const source = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
@@ -55,8 +53,22 @@ Deno.test({
     const foreignStep = crypto.randomUUID();
     const idempotencyKey = "phase1032:" + runId + ":step1:attempt1";
     const createdWorkflows: string[] = [];
+    const syntheticOwnerId = required("PHASE1032_OWNER_ID");
+    assert(UUID.test(syntheticOwnerId), "pre-seeded Phase 103.2 owner ID must be a UUID");
+    const ownerFixture = await admin.from("workflows")
+      .select("id,owner_id")
+      .eq("id", "81000000-1000-4000-8000-000000000003")
+      .eq("owner_id", syntheticOwnerId)
+      .maybeSingle();
+    assert(!ownerFixture.error && ownerFixture.data !== null,
+      "pre-seeded Phase 103.2 owner fixture is missing or mismatched");
 
     try {
+      // Reuse the isolated Auth identity pre-seeded in the disposable SQL fixture.
+      // This rehearsal starts PostgreSQL + PostgREST, not GoTrue; calling the
+      // Auth Admin API here would cross an unavailable service boundary.
+      const ownerId = syntheticOwnerId;
+
       for (const [id, name] of [[workflowA, "phase-1032-primary"], [workflowB, "phase-1032-foreign"]] as const) {
         const { error } = await admin.from("workflows").insert({
           id, owner_id: ownerId, name, status: "draft", trigger_type: "manual",
@@ -76,12 +88,19 @@ Deno.test({
       });
       assert(!runError, "synthetic run insert failed: " + (runError?.message ?? ""));
 
+      // Use only the supported public PostgREST facade. The internal
+      // implementation lives in the private schema and is intentionally
+      // unavailable through the public API. This synthetic owner has exactly
+      // one queued run, so the owner-scoped public claim is deterministic.
       const claim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
         p_limit: 1, p_lease_seconds: 90, p_owner_id: ownerId,
       });
       assert(!claim.error && Array.isArray(claim.data) && claim.data.length === 1,
         "synthetic run lease claim failed: " + (claim.error?.message ?? ""));
-      const lease = claim.data[0] as { attempt: number; lease_token: string; lease_until: string };
+      assert(claim.data[0]?.id === runId,
+        "claim must return the exact synthetic run requested: " +
+          JSON.stringify({ expectedRunId: runId, returnedRunIds: claim.data.map((row: { id: string }) => row.id) }));
+      const lease = claim.data[0] as { id: string; attempt: number; lease_token: string; lease_until: string };
       assert(lease.attempt === 1 && UUID.test(lease.lease_token) && Date.parse(lease.lease_until) > Date.now(),
         "claim must return active generation and lease token");
 
@@ -168,9 +187,19 @@ Deno.test({
 
       console.log("PHASE 103.2 LEASE-FENCED STEP TRANSITIONS: PASS");
     } finally {
+      const cleanupErrors: string[] = [];
       for (const workflowId of createdWorkflows.reverse()) {
-        const { error } = await admin.from("workflows").delete().eq("id", workflowId);
-        if (error) throw new Error("PHASE1032_FIXTURE_CLEANUP_FAILED: " + error.message);
+        try {
+          const { error } = await admin.from("workflows").delete().eq("id", workflowId);
+          if (error) cleanupErrors.push("workflow " + workflowId + ": " + error.message);
+        } catch (error) {
+          cleanupErrors.push("workflow " + workflowId + ": " + String(error));
+        }
+      }
+      // The owner is a shared, pre-seeded disposable fixture identity.
+      // Never delete it; only test-created workflow rows are cleaned up.
+      if (cleanupErrors.length > 0) {
+        throw new Error("PHASE1032_FIXTURE_CLEANUP_FAILED: " + cleanupErrors.join("; "));
       }
     }
   },
