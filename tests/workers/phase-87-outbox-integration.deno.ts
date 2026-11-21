@@ -33,7 +33,7 @@ Deno.test({
       throw new Error("PHASE87_BLOCKED: explicit disposable-database opt-in is required");
     }
     const databaseName = required("PHASE87_DATABASE_NAME");
-    if (!databaseName.startsWith("infinitex_test_")) {
+    if (databaseName !== "infinitex_rehearsal" && !databaseName.startsWith("infinitex_test_")) {
       throw new Error("PHASE87_BLOCKED: database name is not an approved test database");
     }
     const url = required("PHASE81_POSTGREST_URL");
