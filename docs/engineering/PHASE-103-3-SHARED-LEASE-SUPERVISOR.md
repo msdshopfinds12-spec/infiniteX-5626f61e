@@ -53,7 +53,7 @@ The adapter must reject malformed values before issuing an RPC. The database rem
 4. Renew using the exact run ID, owner ID, attempt, and lease token.
 5. On renewal rejection, ambiguous transport failure beyond the safety budget, or explicit cancellation, abort the work signal and mark the supervisor terminal.
 6. Do not resume a terminal supervisor. A new claim creates a new supervisor.
-7. `release()` must be idempotent and must not pretend that an already-lost lease was released successfully.
+7. `release()` is a local supervisor shutdown only (it stops timers and aborts local work); it does not release or terminalize the database lease. The worker must use the fenced finish RPC for terminal state. Local release must be idempotent and must not wait indefinitely for stalled network I/O.
 8. Shutdown must clear scheduled work and await or safely detach any in-flight heartbeat without allowing a late response to revive the lease.
 
 ## 6. Critical concurrency and failure rules
@@ -86,7 +86,7 @@ Preserve safe internal causes for diagnostics while returning sanitized errors a
 
 ### Unit tests
 - malformed UUID, attempt, token, and timestamp rejected
-- heartbeat interval bounds and single-flight behavior
+- heartbeat interval and transport-timeout bounds, single-flight behavior, and stalled-transport timeout
 - successful renewal updates expiry without changing identity
 - lease rejection aborts work exactly once
 - transport ambiguity enters terminal/safe state after configured budget
