@@ -185,6 +185,15 @@ jobs:
             \$verify\$;
           "
 
+      - name: Diagnose direct PostgreSQL lease reclaim in rollback-only transaction
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/database/phase-102-6-claim-eligibility-diagnostics.sql
+
       - name: Apply Phase 103.2 lease-fenced step transition patch to disposable database
         env:
           PGHOST: 127.0.0.1
