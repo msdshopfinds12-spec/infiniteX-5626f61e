@@ -21,6 +21,7 @@ test("completion helper rejects malformed runtime input before invoking RPC", as
     { ...validInput, stepId: false },
     { ...validInput, attempt: 0 },
     { ...validInput, attempt: Number.NaN },
+    { ...validInput, attempt: 2_147_483_648 },
     { ...validInput, output: [] },
     { ...validInput, output: null },
   ];
