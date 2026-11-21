@@ -11,7 +11,7 @@ $guard$;
 
 BEGIN;
 
-SELECT pg_catalog.jsonb_pretty(pg_catalog.coalesce(
+SELECT pg_catalog.jsonb_pretty(coalesce(
   (SELECT pg_catalog.jsonb_agg(pg_catalog.to_jsonb(p))
    FROM pg_catalog.pg_policies p
    WHERE p.schemaname = 'public'
