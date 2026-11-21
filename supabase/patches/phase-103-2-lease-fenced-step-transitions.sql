@@ -234,6 +234,24 @@ BEGIN
     RAISE EXCEPTION 'workflow_run_lease_expired' USING ERRCODE = '40001';
   END IF;
 
+  -- Acquire the step row before the delegated function can inspect/lock an
+  -- existing outbox idempotency record. The legacy function's replay branch
+  -- otherwise locks outbox before step, reversing the documented lock order.
+  -- Accept running (first completion) or succeeded (exact idempotent replay);
+  -- the delegated function still validates the exact output and outbox identity.
+  PERFORM 1
+  FROM public.workflow_step_runs AS sr
+  WHERE sr.run_id = p_run_id
+    AND sr.step_id = p_step_id
+    AND sr.owner_id = p_owner_id
+    AND sr.attempt = p_attempt
+    AND sr.status IN ('running', 'succeeded')
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'workflow_step_generation_superseded' USING ERRCODE = '40001';
+  END IF;
+
   RETURN QUERY
   SELECT * FROM public.simula_complete_step_with_outbox(
     p_owner_id, p_run_id, p_step_id, p_attempt, p_output,
