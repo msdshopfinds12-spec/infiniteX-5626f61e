@@ -17,7 +17,7 @@ Consolidate the duplicated successful-step completion RPC boundary used by the a
 
 ## Verification requirements
 
-- Deno tests for input validation, exact RPC name/arguments, successful normalization, RPC rejection, thrown transport errors, and malformed/missing completion identity.
+- Deno tests for input validation, exact RPC name/arguments, successful normalization, RPC rejection, thrown transport errors, malformed RPC envelopes, and missing completion identity.
 - Existing authenticated and cron worker happy-path tests must still verify the RPC is used for every step.
 - Existing fail-closed tests must still prove no direct-success fallback.
 - Run type safety, worker runtime, HTTP/PostgREST/PostgreSQL integration, and regression workflows on the exact resulting head SHA.
