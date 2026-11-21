@@ -12,6 +12,7 @@ on:
       - phase-94-workflow-enqueue-to-worker-e2e
       - phase-95-workflow-status-synchronization
       - phase-96-browser-workflow-e2e
+      - phase-97-database-security-audit
       - eng/infinitex-p0-p1-auth-2026-11-20
 
 permissions:
