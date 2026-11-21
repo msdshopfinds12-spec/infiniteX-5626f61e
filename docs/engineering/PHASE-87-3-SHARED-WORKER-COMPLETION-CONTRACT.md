@@ -10,7 +10,7 @@ Consolidate the duplicated successful-step completion RPC boundary used by the a
 - Validate owner/run/step identifiers, positive safe-integer attempt generation, and object output before any RPC call.
 - Invoke only the fixed `simula_complete_step_with_outbox` RPC.
 - Normalize the supported object-or-single-row-array response shape.
-- Require a non-empty `step_run_id`.
+- Require a non-empty `step_run_id`; reject non-string or blank completion identities.
 - Sanitize transport and database errors; never disclose raw database details.
 - Keep direct database success-update fallback prohibited.
 - Route both worker implementations through the shared helper.
