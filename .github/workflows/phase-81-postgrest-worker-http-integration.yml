@@ -139,6 +139,15 @@ jobs:
           PGDATABASE: infinitex_rehearsal
         run: psql -X -v ON_ERROR_STOP=1 -f supabase/patches/phase-103-1-owner-scoped-workflow-lease-claim.sql
 
+      - name: Apply Phase 103.2 lease-fenced step transition patch to disposable database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: supabase_admin
+          PGPASSWORD: postgres
+          PGDATABASE: infinitex_rehearsal
+        run: psql -X -v ON_ERROR_STOP=1 -f supabase/patches/phase-103-2-lease-fenced-step-transitions.sql
+
       - name: Generate short-lived local-only JWTs
         env:
           PHASE81_JWT_SECRET: phase81-disposable-local-signing-secret-not-production
@@ -178,6 +187,8 @@ jobs:
           deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-101-6-outbox-concurrency.deno.ts
           deno check --no-lock --node-modules-dir=auto tests/workers/phase-102-6-workflow-run-lease.deno.ts
           PHASE1026_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-102-6-workflow-run-lease.deno.ts
+          deno check --no-lock --node-modules-dir=auto tests/workers/phase-103-2-lease-fenced-step-transitions.deno.ts
+          PHASE1032_ALLOW_DISPOSABLE_DB_WRITES=true deno test --no-check --allow-env --allow-net=127.0.0.1 tests/workers/phase-103-2-lease-fenced-step-transitions.deno.ts
 
       - name: Collect disposable service logs
         if: always()
