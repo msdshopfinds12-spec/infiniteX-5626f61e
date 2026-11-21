@@ -34,11 +34,12 @@ async function invoke(rpc: LeaseRpc, name: string, args: Record<string, unknown>
   return result.data;
 }
 
-export async function claimWorkflowLeases(
+async function claimLeases(
   rpc: LeaseRpc,
-  options: { ownerId: string; limit?: number; leaseSeconds?: number },
+  ownerId: string | null,
+  options: { limit?: number; leaseSeconds?: number },
 ): Promise<ClaimedWorkflowLease[]> {
-  if (!isCanonicalUuid(options.ownerId)) {
+  if (ownerId !== null && !isCanonicalUuid(ownerId)) {
     throw new WorkflowLeaseError("LEASE_INVALID");
   }
   const limit = options.limit ?? 3;
@@ -48,11 +49,12 @@ export async function claimWorkflowLeases(
     throw new WorkflowLeaseError("LEASE_INVALID");
   }
   // The public PostgREST facade intentionally has exactly these three
-  // parameters. The private SQL implementation owns the optional run filter.
+  // parameters. A null owner scope is reserved for the already-authenticated
+  // service-role cron worker; bearer workers must use claimWorkflowLeases.
   const data = await invoke(rpc, LEASE_RPC.claim, {
     p_limit: limit,
     p_lease_seconds: leaseSeconds,
-    p_owner_id: options.ownerId,
+    p_owner_id: ownerId,
   });
   if (!Array.isArray(data)) throw new WorkflowLeaseError("LEASE_INVALID");
   return data.map((row) => {
@@ -70,6 +72,26 @@ export async function claimWorkflowLeases(
     });
     return Object.freeze({ ...lease, workflowId: item.workflow_id, input: item.input });
   });
+}
+
+export function claimWorkflowLeases(
+  rpc: LeaseRpc,
+  options: { ownerId: string; limit?: number; leaseSeconds?: number },
+): Promise<ClaimedWorkflowLease[]> {
+  return claimLeases(rpc, options.ownerId, options);
+}
+
+/**
+ * Global queue claim for a trusted cron worker only.
+ * Call only after authenticateCronRequest succeeds and with the service-role RPC.
+ * The database still returns complete owner identity and every transition is
+ * fenced by that owner, run, attempt, and lease token.
+ */
+export function claimCronWorkflowLeases(
+  rpc: LeaseRpc,
+  options: { limit?: number; leaseSeconds?: number } = {},
+): Promise<ClaimedWorkflowLease[]> {
+  return claimLeases(rpc, null, options);
 }
 
 export async function heartbeatWorkflowLease(
