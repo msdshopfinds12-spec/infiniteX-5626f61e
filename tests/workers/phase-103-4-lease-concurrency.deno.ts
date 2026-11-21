@@ -18,7 +18,7 @@ function assertLeaseSuperseded(error: LeaseRpcError, operation: string): void {
 
 async function assertStaleLeaseRejected<T extends {
   error: { code?: string; message?: string } | null;
-}>(operation: string, invoke: () => Promise<T>): Promise<void> {
+}>(operation: string, invoke: () => PromiseLike<T>): Promise<void> {
   const startedAt = performance.now();
   let response: T;
   try {
