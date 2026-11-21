@@ -14,6 +14,7 @@ on:
       - phase-96-browser-workflow-e2e
       - phase-97-database-security-audit
       - phase-98-ai-runtime-foundation
+      - phase-99-command-center-ui
       - eng/infinitex-p0-p1-auth-2026-11-20
 
 permissions:
