@@ -227,6 +227,26 @@ Deno.test({
     );
     assert(!simulationError && simulated?.[0]?.status === "simulated" && simulated[0].replayed === false,
       "current lease must record a distinct simulated non-delivery state: " + (simulationError?.message ?? ""));
+    const { error: simulationExtraKeyError } = await admin.rpc(
+      "simula_record_workflow_outbox_simulation",
+      {
+        p_id: simulationOutboxId,
+        p_lock_token: simulationLease.lock_token,
+        p_result: { ...simulationResult, callback_url: "https://invalid.example" },
+      },
+    );
+    assert(Boolean(simulationExtraKeyError), "simulation RPC must reject extra payload keys");
+
+    const { error: simulationDeliveryClaimError } = await admin.rpc(
+      "simula_record_workflow_outbox_simulation",
+      {
+        p_id: simulationOutboxId,
+        p_lock_token: simulationLease.lock_token,
+        p_result: { ...simulationResult, delivery_attempted: true },
+      },
+    );
+    assert(Boolean(simulationDeliveryClaimError), "simulation RPC must reject any claim of provider delivery");
+
     const { data: simulationReplay, error: simulationReplayError } = await admin.rpc(
       "simula_record_workflow_outbox_simulation",
       {
