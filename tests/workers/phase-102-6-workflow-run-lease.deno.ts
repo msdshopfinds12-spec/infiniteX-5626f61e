@@ -52,20 +52,8 @@ Deno.test({
     const runId = crypto.randomUUID();
     let workflowCreated = false;
     try {
-      // The claim RPC is a global queue. Refuse to run if unrelated eligible
-      // work exists, rather than accidentally claiming somebody else's fixture.
-      const { data: queueRows, error: queueError } = await admin
-        .from("workflow_runs").select("id,status,lease_until,attempt")
-        .in("status", ["queued", "running"]);
-      assert(!queueError, "queue isolation preflight failed: " + (queueError?.message ?? ""));
-      const competing = (queueRows ?? []).filter((row: {
-        status: string; lease_until: string | null;
-      }) => row.status === "queued" ||
-        (row.status === "running" && row.lease_until !== null &&
-          Date.parse(row.lease_until) <= Date.now()));
-      assert(competing.length === 0,
-        "PHASE1026_BLOCKED: disposable queue is not isolated; " + competing.length + " eligible rows exist");
-
+      // The optional p_run_id filter keeps this integration fixture isolated
+      // from the other queued rows seeded by the shared Phase 81 harness.
       const { error: workflowError } = await admin.from("workflows").insert({
         id: workflowId, owner_id: ownerId, name: "phase-1026-lease-fixture",
         status: "draft", trigger_type: "manual",
@@ -80,7 +68,7 @@ Deno.test({
       assert(!runError, "synthetic run seed failed: " + (runError?.message ?? ""));
 
       // Concurrent claims against one queue row must produce exactly one owner.
-      const claimArgs = { p_limit: 1, p_lease_seconds: 30 };
+      const claimArgs = { p_limit: 1, p_lease_seconds: 30, p_run_id: runId };
       const claims = await Promise.all([
         admin.rpc("simula_claim_workflow_runs_lease_internal", claimArgs),
         admin.rpc("simula_claim_workflow_runs_lease_internal", claimArgs),
