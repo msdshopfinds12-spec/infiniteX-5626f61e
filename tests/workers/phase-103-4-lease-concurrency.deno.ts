@@ -191,6 +191,19 @@ Deno.test({
         "stale generation must not fail a step owned by the current generation");
 
       const event = createWorkflowStepCompletedEvent({ runId, stepId, attempt: secondLease.attempt });
+
+      // A superseded generation must not complete the step or create an outbox row.
+      const staleComplete = await admin.rpc("simula_complete_step_with_outbox_lease", {
+        ...firstIdentity,
+        p_step_id: stepId,
+        p_output: { result: "stale-generation-must-not-win" },
+        p_event_type: event.eventType,
+        p_idempotency_key: event.idempotencyKey,
+        p_payload: event.payload,
+      });
+      assert(Boolean(staleComplete.error),
+        "stale generation completion must be rejected before any outbox write");
+
       const complete = await admin.rpc("simula_complete_step_with_outbox_lease", {
         ...secondIdentity,
         p_step_id: stepId,
@@ -199,8 +212,52 @@ Deno.test({
         p_idempotency_key: event.idempotencyKey,
         p_payload: event.payload,
       });
-      assert(!complete.error && complete.data?.length === 1,
-        "current generation must atomically complete the step and outbox");
+      assert(!complete.error && complete.data?.length === 1 &&
+        complete.data[0]?.replayed === false &&
+        typeof complete.data[0]?.step_run_id === "string" &&
+        typeof complete.data[0]?.outbox_id === "string",
+        "first current-generation completion must atomically create one step result and outbox event");
+
+      // Exact replay must return the original identities, not create a second event.
+      const replay = await admin.rpc("simula_complete_step_with_outbox_lease", {
+        ...secondIdentity,
+        p_step_id: stepId,
+        p_output: { result: "phase-103.4-pass" },
+        p_event_type: event.eventType,
+        p_idempotency_key: event.idempotencyKey,
+        p_payload: event.payload,
+      });
+      assert(!replay.error && replay.data?.length === 1 &&
+        replay.data[0]?.replayed === true &&
+        replay.data[0]?.step_run_id === complete.data[0].step_run_id &&
+        replay.data[0]?.outbox_id === complete.data[0].outbox_id,
+        "identical completion replay must return the original step and outbox IDs");
+
+      // Reusing the same owner-scoped key with different event content must fail closed.
+      const conflictingPayload = await admin.rpc("simula_complete_step_with_outbox_lease", {
+        ...secondIdentity,
+        p_step_id: stepId,
+        p_output: { result: "phase-103.4-pass" },
+        p_event_type: event.eventType,
+        p_idempotency_key: event.idempotencyKey,
+        p_payload: { ...event.payload, conflict_probe: true },
+      });
+      assert(Boolean(conflictingPayload.error) &&
+        String(conflictingPayload.error.message).includes("outbox_idempotency_conflict"),
+        "same idempotency key with altered payload must raise outbox_idempotency_conflict");
+
+      // Matching event identity with a different step output must not be treated as replay.
+      const conflictingOutput = await admin.rpc("simula_complete_step_with_outbox_lease", {
+        ...secondIdentity,
+        p_step_id: stepId,
+        p_output: { result: "different-output-must-not-replay" },
+        p_event_type: event.eventType,
+        p_idempotency_key: event.idempotencyKey,
+        p_payload: event.payload,
+      });
+      assert(Boolean(conflictingOutput.error) &&
+        String(conflictingOutput.error.message).includes("outbox_replay_step_state_mismatch"),
+        "same event key with altered step output must raise outbox_replay_step_state_mismatch");
 
       const staleFinish = await admin.rpc("simula_finish_workflow_run_lease", {
         ...firstIdentity, p_terminal_status: "failed", p_error: "stale-generation-must-not-finish",
