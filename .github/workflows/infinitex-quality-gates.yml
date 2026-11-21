@@ -15,6 +15,7 @@ on:
       - phase-97-database-security-audit
       - phase-98-ai-runtime-foundation
       - phase-99-command-center-ui
+      - phase-100-api-key-request-hardening
       - eng/infinitex-p0-p1-auth-2026-11-20
 
 permissions:
