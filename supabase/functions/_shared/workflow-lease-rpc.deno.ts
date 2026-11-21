@@ -2,9 +2,11 @@ import {
   claimWorkflowLeases,
   heartbeatWorkflowLease,
   finishWorkflowRunWithLease,
+  completeWorkflowStepWithLease,
   type LeaseRpc,
 } from "./workflow-lease-rpc.ts";
 import { WorkflowLeaseError } from "./workflow-lease-contract.ts";
+import { createWorkflowStepCompletedEvent } from "./workflow-outbox-contract.ts";
 
 const leaseRow = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -74,4 +76,21 @@ Deno.test("transport rejection is classified as ambiguous rather than retried", 
     if (error instanceof WorkflowLeaseError) code = error.code;
   }
   assert(calls === 1 && code === "LEASE_TRANSPORT_AMBIGUOUS", "ambiguous outcome surfaced once");
+});
+
+Deno.test("completion adapter rejects an outbox identity mismatch before RPC", async () => {
+  let calls = 0;
+  const rpc: LeaseRpc = async () => { calls++; return { data: [], error: null }; };
+  const event = createWorkflowStepCompletedEvent({
+    runId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    stepId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    attempt: 2,
+  });
+  let rejected = false;
+  try {
+    await completeWorkflowStepWithLease(rpc, {
+      runId: leaseRow.id, ownerId: leaseRow.owner_id, attempt: 2, leaseToken: leaseRow.lease_token,
+    }, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", {}, event);
+  } catch (error) { rejected = error instanceof WorkflowLeaseError && error.code === "LEASE_INVALID"; }
+  assert(rejected && calls === 0, "mismatched event cannot reach database");
 });
