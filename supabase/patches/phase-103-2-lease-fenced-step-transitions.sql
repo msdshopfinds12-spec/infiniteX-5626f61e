@@ -159,6 +159,18 @@ BEGIN
     RAISE EXCEPTION 'workflow_run_lease_expired' USING ERRCODE = '40001';
   END IF;
 
+  -- Validate the step-to-workflow relationship explicitly. A privileged
+  -- service caller must not be able to cross-link a step from another workflow
+  -- into this run, even if a malformed legacy step-run row already exists.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.workflow_steps AS s
+    WHERE s.id = p_step_id
+      AND s.workflow_id = v_run.workflow_id
+  ) THEN
+    RAISE EXCEPTION 'workflow_step_ownership_mismatch' USING ERRCODE = '42501';
+  END IF;
+
   UPDATE public.workflow_step_runs AS sr
   SET status = 'failed',
       error_message = p_error,
