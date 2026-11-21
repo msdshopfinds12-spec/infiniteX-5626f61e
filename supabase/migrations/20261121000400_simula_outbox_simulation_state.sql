@@ -23,6 +23,16 @@ ALTER TABLE private.simula_workflow_outbox
     (status <> 'simulated' AND simulated_at IS NULL AND simulation_result IS NULL)
   );
 
+ALTER TABLE private.simula_workflow_outbox
+  ADD CONSTRAINT simula_workflow_outbox_simulation_result_bounded
+  CHECK (
+    simulation_result IS NULL
+    OR (
+      pg_catalog.jsonb_typeof(simulation_result) = 'object'
+      AND pg_catalog.pg_column_size(simulation_result) <= 8192
+    )
+  );
+
 CREATE OR REPLACE FUNCTION public.simula_record_workflow_outbox_simulation(
   p_id uuid,
   p_lock_token uuid,
