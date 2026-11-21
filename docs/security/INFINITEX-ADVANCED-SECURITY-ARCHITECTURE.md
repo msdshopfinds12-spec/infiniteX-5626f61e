@@ -76,6 +76,12 @@ No migration or live RLS policy change is authorized by this work.
 - Use exact CORS origin allowlists and return no ACAO header for denied browser origins.
 - Never treat a WAF regex match as a substitute for parameterized SQL, output encoding, SSRF-safe egress controls, or server-side validation.
 
+## 6A. Browser-facing deployment response headers
+
+The repository includes a Vercel response-header baseline in `vercel.json`: one-year HSTS with `includeSubDomains`, MIME sniffing protection, clickjacking protection, a conservative referrer policy, disabled camera/microphone/geolocation permissions, and no legacy cross-domain policy files. A Node regression test checks the exact configuration.
+
+This is repository configuration only. It does not prove that a Vercel deployment has consumed the file or that the live response headers are present. Verify deployed headers after a separately approved deployment. A strict Content Security Policy is intentionally deferred until the actual script, analytics, Supabase, image, and OAuth origin inventory is complete; adding a guessed CSP can break authentication or application behavior.
+
 ## 7. Cryptography and key management
 
 - Prefer provider-managed TLS and managed encryption-at-rest controls.
