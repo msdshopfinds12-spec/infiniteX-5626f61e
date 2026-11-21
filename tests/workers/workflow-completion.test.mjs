@@ -3,24 +3,28 @@ import assert from "node:assert/strict";
 import { completeWorkflowStepWithOutbox } from "../../supabase/functions/_shared/workflow-completion.ts";
 
 const validInput = {
-  ownerId: "owner-1",
-  runId: "run-1",
-  stepId: "step-1",
+  ownerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  runId: "11111111-1111-4111-8111-111111111111",
+  stepId: "22222222-2222-4222-8222-222222222222",
   attempt: 1,
   output: { ok: true },
 };
 
-test("completion helper rejects malformed runtime input before invoking RPC", async () => {
+test("completion helper rejects malformed runtime identities before invoking RPC", async () => {
   const invalidInputs = [
     null,
     undefined,
     {},
     { ...validInput, ownerId: null },
     { ...validInput, ownerId: 42 },
+    { ...validInput, ownerId: "owner-1" },
     { ...validInput, runId: "   " },
+    { ...validInput, runId: "run-1" },
     { ...validInput, stepId: false },
+    { ...validInput, stepId: "step-1" },
     { ...validInput, attempt: 0 },
     { ...validInput, attempt: Number.NaN },
+    { ...validInput, attempt: 2_147_483_648 },
     { ...validInput, output: [] },
     { ...validInput, output: null },
   ];
@@ -46,11 +50,13 @@ test("completion helper rejects a missing RPC function before invoking anything"
   );
 });
 
-test("completion helper accepts a valid RPC envelope and returns normalized identity", async () => {
+test("completion helper accepts canonical UUID identities and returns normalized result", async () => {
   const result = await completeWorkflowStepWithOutbox(
     async (name, args) => {
       assert.equal(name, "simula_complete_step_with_outbox");
-      assert.equal(args.p_owner_id, "owner-1");
+      assert.equal(args.p_owner_id, validInput.ownerId);
+      assert.equal(args.p_run_id, validInput.runId);
+      assert.equal(args.p_step_id, validInput.stepId);
       assert.equal(args.p_attempt, 1);
       return { data: [{ step_run_id: "step-run-1", outbox_id: null, replayed: false }], error: null };
     },
