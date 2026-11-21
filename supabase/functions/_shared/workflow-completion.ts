@@ -40,7 +40,7 @@ export async function completeWorkflowStepWithOutbox(
     typeof input.ownerId !== "string" || !input.ownerId.trim() ||
     typeof input.runId !== "string" || !input.runId.trim() ||
     typeof input.stepId !== "string" || !input.stepId.trim() ||
-    !Number.isSafeInteger(input.attempt) || input.attempt < 1 ||
+    !Number.isSafeInteger(input.attempt) || input.attempt < 1 || input.attempt > 2_147_483_647 ||
     !isRecord(input.output) ||
     (input.outboxEvent !== undefined && !validateWorkflowOutboxEvent(input.outboxEvent)) ||
     (input.outboxEvent !== undefined && (
