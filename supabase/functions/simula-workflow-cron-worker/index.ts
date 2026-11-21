@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { executeSafeAction } from "../_shared/workflow-actions.mjs";
+import { executeSafeAction, resolveWorkflowOutboxEvent } from "../_shared/workflow-actions.mjs";
 import { completeWorkflowStepWithOutbox } from "../_shared/workflow-completion.ts";
 import { authenticateCronRequest } from "../_shared/worker-auth-boundary.mjs";
 import {
@@ -183,9 +183,10 @@ export function createCronWorkerHandler(deps: CronWorkerDependencies) {
         payload = output;
         // Keep cron and authenticated workers on the same atomic completion path.
         // Never fall back to a direct success update if the RPC fails.
+        const outboxEvent = resolveWorkflowOutboxEvent(step.action_type, config);
         await completeWorkflowStepWithOutbox(
           async (name, args) => await admin.rpc(name, args as never),
-          { ownerId, runId: run.id, stepId: step.id, attempt: stepAttempt, output },
+          { ownerId, runId: run.id, stepId: step.id, attempt: stepAttempt, output, event: outboxEvent },
         );
         await logEvent(admin, ownerId, run.workflow_id, run.id, "info", "workflow_step_succeeded", {
           step_id: step.id, step_order: step.step_order, action_type: step.action_type,
