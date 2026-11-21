@@ -7,7 +7,7 @@ Make the Phase 87 transactional-outbox integration test safe to execute repeated
 ## Changes in this phase
 
 - Require explicit `PHASE87_ALLOW_DISPOSABLE_DB_WRITES=true`.
-- Require `PHASE87_DATABASE_NAME=infinitex_rehearsal` (or another approved `infinitex_test_*` name).
+- Require `PHASE87_DATABASE_NAME=infinitex_rehearsal` or another approved `infinitex_test_*` name.
 - Restrict the PostgREST URL to a loopback host before constructing the service client.
 - Validate the synthetic owner ID as a canonical lowercase UUID.
 - Generate a fresh run UUID for each test invocation.
