@@ -14,7 +14,7 @@ Connect a deliberately closed event-producing workflow action to the existing tr
 Only `emit_notification_intent` is event-producing in this phase. It maps to the fixed event type `notification.requested`.
 
 Required config:
-- `recipient_ref`: UUID-shaped opaque recipient reference.
+- `recipient_ref`: UUID-shaped opaque recipient reference; the completion boundary additionally requires it to equal the authenticated workflow owner until a separately reviewed recipient-authorization model exists.
 - `template_key`: 1–64 characters matching `[a-z0-9._-]`, beginning with an alphanumeric character.
 
 The event payload contains exactly those two fields. Arbitrary event names, URLs, HTTP headers, credentials, executable instructions, and provider payloads are rejected. All other existing actions remain non-event-producing and pass null event metadata.
