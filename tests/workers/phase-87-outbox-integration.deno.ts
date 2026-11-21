@@ -162,6 +162,98 @@ Deno.test({
     assert(!finalReplayError && finalReplay?.[0]?.replayed === true
       && finalReplay[0].outbox_id === outboxId,
       "completion replay after delivery must return the same outbox event");
-    console.log("Phase 87: transactional outbox integration verified");
+    const simulationRunId = "81000000-3000-4000-8000-000000000006";
+    console.log("Phase 91: creating a separate synthetic event for non-delivery simulation");
+    const { error: simulationRunError } = await admin.from("workflow_runs").insert({
+      id: simulationRunId,
+      workflow_id: workflowId,
+      owner_id: userId,
+      status: "running",
+      input: { seed: "phase91-outbox-simulation" },
+      attempt: 1,
+    });
+    assert(!simulationRunError, "simulation workflow run must be seeded: " + (simulationRunError?.message ?? ""));
+    const { error: simulationStepError } = await admin.from("workflow_step_runs").insert({
+      run_id: simulationRunId,
+      step_id: stepId,
+      owner_id: userId,
+      status: "running",
+      input: { seed: "phase91-outbox-simulation" },
+      attempt: 1,
+    });
+    assert(!simulationStepError, "simulation step run must be seeded: " + (simulationStepError?.message ?? ""));
+
+    const simulationCompletionArgs = {
+      p_owner_id: userId,
+      p_run_id: simulationRunId,
+      p_step_id: stepId,
+      p_attempt: 1,
+      p_output: { simulated: true },
+      p_event_type: "notification.requested",
+      p_idempotency_key: "phase91-disposable-simulation-0001",
+      p_payload: { recipient_ref: userId, template_key: "phase91-test" },
+    };
+    const { data: simulationCompletion, error: simulationCompletionError } = await admin.rpc(
+      "simula_complete_step_with_outbox",
+      simulationCompletionArgs,
+    );
+    assert(!simulationCompletionError && simulationCompletion?.length === 1,
+      "simulation event must be created transactionally: " + (simulationCompletionError?.message ?? ""));
+    const simulationOutboxId = simulationCompletion[0].outbox_id;
+    const { data: simulationClaims, error: simulationClaimError } = await admin.rpc(
+      "simula_claim_workflow_outbox",
+      { p_limit: 5 },
+    );
+    assert(!simulationClaimError, "simulation event must be claimable");
+    const simulationLease = (simulationClaims ?? []).find(
+      (row: { id: string }) => row.id === simulationOutboxId,
+    );
+    assert(simulationLease, "simulation event must receive a lease");
+    const simulationResult = {
+      mode: "dry_run",
+      delivery_attempted: false,
+      event_type: "notification.requested",
+      adapter: "notification-intent-preview-v1",
+      outcome: "validated_not_delivered",
+      idempotency_key: "phase91-disposable-simulation-0001",
+    };
+    const { data: simulated, error: simulationError } = await admin.rpc(
+      "simula_record_workflow_outbox_simulation",
+      {
+        p_id: simulationOutboxId,
+        p_lock_token: simulationLease.lock_token,
+        p_result: simulationResult,
+      },
+    );
+    assert(!simulationError && simulated?.[0]?.status === "simulated" && simulated[0].replayed === false,
+      "current lease must record a distinct simulated non-delivery state: " + (simulationError?.message ?? ""));
+    const { data: simulationReplay, error: simulationReplayError } = await admin.rpc(
+      "simula_record_workflow_outbox_simulation",
+      {
+        p_id: simulationOutboxId,
+        p_lock_token: simulationLease.lock_token,
+        p_result: simulationResult,
+      },
+    );
+    assert(!simulationReplayError && simulationReplay?.[0]?.status === "simulated" && simulationReplay[0].replayed === true,
+      "identical simulation replay must be idempotent");
+    const { error: simulationConflictError } = await admin.rpc(
+      "simula_record_workflow_outbox_simulation",
+      {
+        p_id: simulationOutboxId,
+        p_lock_token: simulationLease.lock_token,
+        p_result: { ...simulationResult, outcome: "delivered" },
+      },
+    );
+    assert(Boolean(simulationConflictError), "simulation replay with a different result must fail closed");
+    const { data: afterSimulationClaims, error: afterSimulationClaimError } = await admin.rpc(
+      "simula_claim_workflow_outbox",
+      { p_limit: 5 },
+    );
+    assert(!afterSimulationClaimError, "post-simulation claim scan must succeed");
+    assert(!(afterSimulationClaims ?? []).some((row: { id: string }) => row.id === simulationOutboxId),
+      "simulated non-delivery event must not be claimable as pending work");
+
+    console.log("Phase 91: transactional outbox integration verified");
   },
 });
