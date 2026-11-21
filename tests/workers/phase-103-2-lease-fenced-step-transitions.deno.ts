@@ -29,8 +29,6 @@ Deno.test({
       throw new Error("PHASE1032_BLOCKED: writes require loopback PostgREST on port 3000");
     }
     const serviceJwt = required("PHASE81_SERVICE_JWT");
-    const ownerId = required("PHASE81_USER_ID");
-    assert(UUID.test(ownerId), "owner ID must be a UUID");
 
     const localFetch: typeof fetch = (input, init) => {
       const source = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
@@ -55,8 +53,24 @@ Deno.test({
     const foreignStep = crypto.randomUUID();
     const idempotencyKey = "phase1032:" + runId + ":step1:attempt1";
     const createdWorkflows: string[] = [];
+    let syntheticOwnerId: string | null = null;
 
     try {
+      // Give this test an isolated owner so the supported public claim RPC
+      // cannot pick unrelated queued runs belonging to a shared fixture user.
+      const syntheticEmail = "phase1032-" + crypto.randomUUID() + "@example.invalid";
+      const syntheticPassword = crypto.randomUUID() + "Aa1!";
+      const createdUser = await admin.auth.admin.createUser({
+        email: syntheticEmail,
+        password: syntheticPassword,
+        email_confirm: true,
+      });
+      assert(!createdUser.error && Boolean(createdUser.data.user?.id),
+        "synthetic auth user creation failed: " + (createdUser.error?.message ?? ""));
+      syntheticOwnerId = createdUser.data.user.id;
+      const ownerId = syntheticOwnerId;
+      assert(UUID.test(ownerId), "synthetic owner ID must be a UUID");
+
       for (const [id, name] of [[workflowA, "phase-1032-primary"], [workflowB, "phase-1032-foreign"]] as const) {
         const { error } = await admin.from("workflows").insert({
           id, owner_id: ownerId, name, status: "draft", trigger_type: "manual",
@@ -76,10 +90,12 @@ Deno.test({
       });
       assert(!runError, "synthetic run insert failed: " + (runError?.message ?? ""));
 
-      // Isolate the claim to this synthetic fixture. Other queued rows may
-      // exist for the same owner in the shared disposable rehearsal database.
+      // Use only the supported public PostgREST facade. The internal
+      // implementation lives in the private schema and is intentionally
+      // unavailable through the public API. This synthetic owner has exactly
+      // one queued run, so the owner-scoped public claim is deterministic.
       const claim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
-        p_limit: 1, p_lease_seconds: 90, p_run_id: runId, p_owner_id: ownerId,
+        p_limit: 1, p_lease_seconds: 90, p_owner_id: ownerId,
       });
       assert(!claim.error && Array.isArray(claim.data) && claim.data.length === 1,
         "synthetic run lease claim failed: " + (claim.error?.message ?? ""));
@@ -176,6 +192,10 @@ Deno.test({
       for (const workflowId of createdWorkflows.reverse()) {
         const { error } = await admin.from("workflows").delete().eq("id", workflowId);
         if (error) throw new Error("PHASE1032_FIXTURE_CLEANUP_FAILED: " + error.message);
+      }
+      if (syntheticOwnerId) {
+        const { error } = await admin.auth.admin.deleteUser(syntheticOwnerId);
+        if (error) throw new Error("PHASE1032_AUTH_FIXTURE_CLEANUP_FAILED: " + error.message);
       }
     }
   },
