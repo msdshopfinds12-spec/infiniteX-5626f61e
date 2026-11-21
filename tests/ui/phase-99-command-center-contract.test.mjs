@@ -34,7 +34,7 @@ test("Phase 99 app labels provider, production security and activity truthfully"
 test("Phase 99 navigation reflects the session and retains accessible names", async () => {
   const sidebar = await read("src/components/Sidebar.tsx");
   assert.match(sidebar, /workspaceLabel/);
-  assert.match(sidebar, /Authenticated session/);
+  assert.match(sidebar, /workspaceLabel = "Preview mode"/);
   assert.match(sidebar, /aria-label=\{item.label\}/);
   assert.match(sidebar, /aria-current=\{active \? "page" : undefined\}/);
 });
