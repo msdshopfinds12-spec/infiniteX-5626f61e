@@ -64,7 +64,14 @@ export async function completeWorkflowStepWithOutbox(
     throw new Error("step_run_finish_failed");
   }
 
-  const row = Array.isArray(response.data) ? response.data[0] : response.data;
+  // The RPC contract is exactly one completion row. Never silently select
+  // an arbitrary row from an ambiguous or empty result set.
+  const row = Array.isArray(response.data)
+    ? response.data.length === 1
+      ? response.data[0]
+      : null
+    : response.data;
+
   if (!isRecord(row) || typeof row.step_run_id !== "string" || !row.step_run_id.trim()) {
     throw new Error("workflow_step_attempt_superseded");
   }
