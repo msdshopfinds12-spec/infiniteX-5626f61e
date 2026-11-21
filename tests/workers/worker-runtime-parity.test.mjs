@@ -50,9 +50,9 @@ test("cron worker retains generation compare-and-set until Phase 103.5 migration
   const source = await read("../../supabase/functions/simula-workflow-cron-worker/index.ts");
   const helper = await read(completionPath);
   const updates = (source.match(/\.update\(/g) ?? []).length;
-  const olderGenerationGuards = (source.match(/\.lt\(["']attempt["'],\s*stepAttempt\\)/g) ?? []).length;
-  const stepGenerationGuards = (source.match(/\.eq\(["']attempt["'],\s*stepAttempt\\)/g) ?? []).length;
-  const runGenerationGuards = (source.match(/\.eq\(["']attempt["'],\s*run\.attempt\\)/g) ?? []).length;
+  const olderGenerationGuards = (source.match(/\.lt\(["']attempt["'],\s*stepAttempt\)/g) ?? []).length;
+  const stepGenerationGuards = (source.match(/\.eq\(["']attempt["'],\s*stepAttempt\)/g) ?? []).length;
+  const runGenerationGuards = (source.match(/\.eq\(["']attempt["'],\s*run\.attempt\)/g) ?? []).length;
   assert.ok(updates >= 5, "cron legacy transitions remain explicit pending Phase 103.5");
   assert.equal(olderGenerationGuards, 2);
   assert.ok(stepGenerationGuards >= 1);
@@ -62,7 +62,7 @@ test("cron worker retains generation compare-and-set until Phase 103.5 migration
   assert.ok(runGenerationGuards >= 2);
   assert.match(source, /workflow_run_attempt_superseded/);
   assert.match(source, /status:\s*"superseded"/);
-  assert.doesNotMatch(source, /\.upsert\\(/);
+  assert.doesNotMatch(source, /\.upsert\(/);
 });
 
 test("API-key manager rejects wildcard CORS and uses streamed JSON size limits", async () => {
