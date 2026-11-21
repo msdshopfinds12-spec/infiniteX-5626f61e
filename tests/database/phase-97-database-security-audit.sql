@@ -11,14 +11,6 @@ $guard$;
 
 BEGIN;
 
-SELECT pg_catalog.jsonb_pretty(coalesce(
-  (SELECT pg_catalog.jsonb_agg(pg_catalog.to_jsonb(p))
-   FROM pg_catalog.pg_policies p
-   WHERE p.schemaname = 'public'
-     AND p.tablename IN ('workflows','workflow_steps','workflow_runs','workflow_step_runs','workflow_logs')),
-  '[]'::jsonb
-)) AS phase97_policy_catalog;
-
 DO $audit$
 DECLARE
   v_missing text;
@@ -91,7 +83,7 @@ BEGIN
       AND policyname = 'Owners manage workflows'
       AND 'authenticated' = ANY(roles)
       AND cmd = 'ALL' AND qual IS NOT NULL AND with_check IS NOT NULL
-      AND qual LIKE '%auth.uid%' AND with_check LIKE '%auth.uid%'
+      AND qual LIKE '%uid()%' AND with_check LIKE '%uid()%'
   ) THEN RAISE EXCEPTION 'workflow owner ALL policy missing or incomplete'; END IF;
 
   IF NOT EXISTS (
@@ -100,7 +92,7 @@ BEGIN
       AND policyname = 'Owners manage workflow steps'
       AND 'authenticated' = ANY(roles)
       AND cmd = 'ALL' AND qual IS NOT NULL AND with_check IS NOT NULL
-      AND qual LIKE '%auth.uid%' AND with_check LIKE '%auth.uid%'
+      AND qual LIKE '%uid()%' AND with_check LIKE '%uid()%'
   ) THEN RAISE EXCEPTION 'workflow-step owner ALL policy missing or incomplete'; END IF;
 
   IF NOT EXISTS (
@@ -108,13 +100,13 @@ BEGIN
     WHERE schemaname = 'public' AND tablename = 'workflow_runs'
       AND policyname = 'Owners view workflow runs'
       AND 'authenticated' = ANY(roles) AND cmd = 'SELECT'
-      AND qual LIKE '%auth.uid%'
+      AND qual LIKE '%uid()%'
   ) OR NOT EXISTS (
     SELECT 1 FROM pg_catalog.pg_policies
     WHERE schemaname = 'public' AND tablename = 'workflow_runs'
       AND policyname = 'Owners create workflow runs'
       AND 'authenticated' = ANY(roles) AND cmd = 'INSERT'
-      AND with_check LIKE '%auth.uid%'
+      AND with_check LIKE '%uid()%'
   ) THEN RAISE EXCEPTION 'workflow-run owner SELECT/INSERT policies missing'; END IF;
 
   IF NOT EXISTS (
@@ -122,7 +114,7 @@ BEGIN
     WHERE schemaname = 'public' AND tablename = 'workflow_step_runs'
       AND policyname = 'Owners view step runs'
       AND 'authenticated' = ANY(roles) AND cmd = 'SELECT'
-      AND qual LIKE '%auth.uid%'
+      AND qual LIKE '%uid()%'
   ) THEN RAISE EXCEPTION 'workflow-step-run owner SELECT policy missing'; END IF;
 
   IF NOT EXISTS (
@@ -130,7 +122,7 @@ BEGIN
     WHERE schemaname = 'public' AND tablename = 'workflow_logs'
       AND policyname = 'Owners view workflow logs'
       AND 'authenticated' = ANY(roles) AND cmd = 'SELECT'
-      AND qual LIKE '%auth.uid%'
+      AND qual LIKE '%uid()%'
   ) THEN RAISE EXCEPTION 'workflow-log owner SELECT policy missing'; END IF;
 
   -- All SECURITY DEFINER functions in application schemas must pin search_path.
