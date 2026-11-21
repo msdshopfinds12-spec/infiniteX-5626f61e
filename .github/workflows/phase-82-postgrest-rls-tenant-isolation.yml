@@ -3,6 +3,7 @@ name: InfiniteX Phase 82 PostgREST Worker HTTP Integration
 on:
   push:
     branches:
+      - phase-89-frontend-backend-reconciliation
       - phase-82/postgrest-rls-tenant-isolation
     paths:
       - ".github/workflows/phase-82-postgrest-rls-tenant-isolation.yml"
