@@ -48,6 +48,16 @@ function safeError(error: unknown): string {
   return message.slice(0, 500);
 }
 
+function safeLeaseDiagnostic(error: unknown): JsonRecord {
+  if (!(error instanceof WorkflowLeaseError) || !error.causeValue ||
+      typeof error.causeValue !== "object") return {};
+  const cause = error.causeValue as { code?: unknown; message?: unknown };
+  return {
+    database_code: typeof cause.code === "string" ? cause.code.slice(0, 32) : "unknown",
+    database_message: typeof cause.message === "string" ? cause.message.slice(0, 180) : "unknown",
+  };
+}
+
 function assertLeaseActive(supervisor: WorkflowLeaseSupervisor): void {
   if (supervisor.signal.aborted || supervisor.isTerminal) {
     const reason = supervisor.signal.reason;
@@ -143,7 +153,7 @@ export function createAuthenticatedWorkerHandler(deps: AuthenticatedWorkerDepend
     try {
       leases = await claimWorkflowLeases(rpc, { ownerId, limit, leaseSeconds: 90 });
     } catch (error) {
-      console.error("queue_lease_claim_failed", safeError(error));
+      console.error("queue_lease_claim_failed", safeError(error), safeLeaseDiagnostic(error));
       return respond(req, 500, { ok: false, error: "queue_claim_failed" });
     }
 
