@@ -12,6 +12,7 @@ import {
 
 export type RpcResponse = { data: unknown; error: unknown | null };
 export type LeaseRpc = (name: string, args: Record<string, unknown>) => Promise<RpcResponse>;
+export type ClaimedWorkflowLease = WorkflowLease & Readonly<{ workflowId: string; input: unknown }>;
 
 function oneRow(data: unknown): Record<string, unknown> {
   const row = Array.isArray(data) ? (data.length === 1 ? data[0] : null) : data;
@@ -36,7 +37,7 @@ async function invoke(rpc: LeaseRpc, name: string, args: Record<string, unknown>
 export async function claimWorkflowLeases(
   rpc: LeaseRpc,
   options: { ownerId: string; limit?: number; leaseSeconds?: number; runId?: string },
-): Promise<WorkflowLease[]> {
+): Promise<ClaimedWorkflowLease[]> {
   if (!isCanonicalUuid(options.ownerId) ||
       (options.runId !== undefined && !isCanonicalUuid(options.runId))) {
     throw new WorkflowLeaseError("LEASE_INVALID");
@@ -59,13 +60,15 @@ export async function claimWorkflowLeases(
       throw new WorkflowLeaseError("LEASE_INVALID");
     }
     const item = row as Record<string, unknown>;
-    return validateLease({
+    if (!isCanonicalUuid(item.workflow_id)) throw new WorkflowLeaseError("LEASE_INVALID");
+    const lease = validateLease({
       runId: item.id,
       ownerId: item.owner_id,
       attempt: item.attempt,
       leaseToken: item.lease_token,
       leaseUntil: item.lease_until,
     });
+    return Object.freeze({ ...lease, workflowId: item.workflow_id, input: item.input });
   });
 }
 
