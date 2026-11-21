@@ -261,6 +261,11 @@ Deno.test({
       );
 
       // Matching event identity with a different step output must not be treated as replay.
+      // Correlate this exact request with the concurrent read-only PostgreSQL sampler.
+      console.error("PHASE1034_OUTPUT_REPLAY_BEGIN", {
+        elapsedSinceLeaseHeartbeatMs: Math.round(performance.now() - conflictLeaseHeartbeatAt),
+        startedAt: new Date().toISOString(),
+      });
       const conflictRpcStartedAt = performance.now();
       const conflictingOutput = await admin.rpc("simula_complete_step_with_outbox_lease", {
         ...secondIdentity,

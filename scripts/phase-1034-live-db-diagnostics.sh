@@ -3,9 +3,9 @@
 # Deliberately captures metadata only; SQL text, row contents, and secrets are omitted.
 set -euo pipefail
 
-duration_seconds="${1:-24}"
-if [[ ! "$duration_seconds" =~ ^[0-9]+$ ]] || (( duration_seconds < 1 || duration_seconds > 45 )); then
-  echo "PHASE1034_DIAGNOSTICS_BLOCKED: duration must be an integer from 1 to 45 seconds" >&2
+duration_seconds="${1:-150}"
+if [[ ! "$duration_seconds" =~ ^[0-9]+$ ]] || (( duration_seconds < 1 || duration_seconds > 180 )); then
+  echo "PHASE1034_DIAGNOSTICS_BLOCKED: duration must be an integer from 1 to 180 seconds" >&2
   exit 2
 fi
 
@@ -18,7 +18,7 @@ if [[ "${PGHOST:-}" != "127.0.0.1" ||
   exit 2
 fi
 
-sample_count=$((duration_seconds * 4))
+sample_count=$duration_seconds
 for ((sample = 1; sample <= sample_count; sample++)); do
   psql -X -v ON_ERROR_STOP=1 -At -F '|' -c "
     SELECT
@@ -32,7 +32,9 @@ for ((sample = 1; sample <= sample_count; sample++)); do
       coalesce(round(extract(epoch FROM clock_timestamp() - a.query_start)::numeric * 1000)::text, ''),
       coalesce(round(extract(epoch FROM clock_timestamp() - a.xact_start)::numeric * 1000)::text, ''),
       coalesce(array_to_string(pg_blocking_pids(a.pid), ','), ''),
-      coalesce(a.backend_type, '')
+      coalesce(a.backend_type, ''),
+      (SELECT count(*) FROM pg_catalog.pg_locks AS l WHERE l.pid = a.pid AND NOT l.granted),
+      (SELECT count(*) FROM pg_catalog.pg_locks AS l WHERE l.pid = a.pid)
     FROM pg_catalog.pg_stat_activity AS a
     WHERE a.datname = current_database()
       AND a.pid <> pg_backend_pid()
@@ -40,11 +42,15 @@ for ((sample = 1; sample <= sample_count; sample++)); do
         a.state = 'active'
         OR a.xact_start IS NOT NULL
         OR cardinality(pg_blocking_pids(a.pid)) > 0
+        OR EXISTS (
+          SELECT 1 FROM pg_catalog.pg_locks AS l
+          WHERE l.pid = a.pid AND NOT l.granted
+        )
       )
     ORDER BY a.query_start NULLS LAST, a.pid;
   " || {
     echo "PHASE1034_LIVE_DB_SAMPLE_ERROR: read-only pg_stat_activity query failed" >&2
     exit 1
   }
-  sleep 0.25
+  sleep 1
 done
