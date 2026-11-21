@@ -49,3 +49,42 @@ Do not mark an outbox row `succeeded` merely because a dry-run adapter inspected
 ## Explicit non-goals
 
 No production migration, live database mutation, provider call, secret change, billing change, deployment, merge, or release is authorized.
+
+
+## Phase 91 — Non-delivery simulation lifecycle
+
+Phase 91 adds a distinct `simulated` outbox state. This closes the previous operational gap where a dry-run could validate an event but had no safe terminal state to record without falsely claiming provider delivery.
+
+### State and RPC contract
+
+- Candidate migration: `20261121000400_simula_outbox_simulation_state.sql`.
+- Adds `simulated_at` and bounded `simulation_result` metadata.
+- Adds `simula_record_workflow_outbox_simulation(p_id, p_lock_token, p_result)`.
+- Requires a current, unexpired lease token; stale or expired leases fail closed.
+- Clears the lease atomically and transitions only `processing → simulated`.
+- Identical replay is idempotent; a different replay result is rejected.
+- Existing `succeeded` remains reserved for confirmed delivery.
+- Simulated rows are excluded from future claims because the claim RPC only selects `pending` and expired `processing` rows.
+
+### Dispatcher execution
+
+The cron-authenticated Edge Function `simula-workflow-outbox-dispatcher`:
+1. Authenticates through the existing verified worker-secret boundary.
+2. Claims at most 25 rows using the existing lease RPC.
+3. Validates only the fixed `notification.requested` event and exact owner-bound payload.
+4. Records the dry-run result using the new lease-fenced simulation RPC.
+5. Sends malformed event data through the existing bounded retry/dead-letter path.
+6. Defers transient database errors without relabeling them as invalid payloads.
+
+The dispatcher has no provider client, no `fetch` call, no destination URL, and no secret resolver. Its response always includes `mode: dry_run` and `deliveryAttempted: false`. It cannot report a provider delivery.
+
+### Required verification
+
+- Deno unit tests for auth-before-claim, exact RPC sequence, malformed payload handling, transient failures, HTTP method and body limits.
+- Deno type-check of the Edge Function and shared dispatcher.
+- Disposable PostgreSQL/PostgREST integration for simulation, replay conflict, and claim exclusion.
+- Full exact-head CI after all changes.
+
+### Safety boundary
+
+This is an operational dry-run only. It does not send notifications, activate providers, apply migrations to connected Supabase, deploy Edge Functions, change secrets, or merge the branch. The migration remains a candidate until separately reviewed and approved.
