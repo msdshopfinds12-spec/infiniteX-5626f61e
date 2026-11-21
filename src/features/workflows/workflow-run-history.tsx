@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { WorkflowReadService, WorkflowRunReadResult } from "./workflow-read-service.ts";
 import WorkflowLogList from "./workflow-log-list";
+import { hasActiveWorkflowRuns, WORKFLOW_RUN_POLL_INTERVAL_MS } from "./workflow-run-polling.ts";
 
 type State =
   | Readonly<{ key: string; status: "loading" }>
@@ -61,6 +62,48 @@ export default function WorkflowRunHistory({
     ? state
     : ({ key: requestKey, status: "loading" } as const);
 
+  const shouldPoll = currentState.status === "success" &&
+    hasActiveWorkflowRuns(currentState.result.data);
+
+  // Poll only non-terminal runs. A hidden tab pauses network traffic; becoming
+  // visible triggers one immediate refresh. The fetch effect's active flag
+  // fences late responses after identity changes or unmount.
+  useEffect(() => {
+    if (!shouldPoll) return;
+
+    let timer: number | undefined;
+    let disposed = false;
+    const clearTimer = () => {
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+        timer = undefined;
+      }
+    };
+    const refresh = () => {
+      if (!disposed && document.visibilityState === "visible") {
+        clearTimer();
+        setRetryCount((count) => count + 1);
+      }
+    };
+    const schedule = () => {
+      if (disposed || document.visibilityState !== "visible") return;
+      clearTimer();
+      timer = window.setTimeout(refresh, WORKFLOW_RUN_POLL_INTERVAL_MS);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refresh();
+      else clearTimer();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    schedule();
+    return () => {
+      disposed = true;
+      clearTimer();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [shouldPoll, requestKey]);
+
   if (currentState.status === "loading") {
     return <p className="muted" role="status">Loading recent runs…</p>;
   }
@@ -81,7 +124,18 @@ export default function WorkflowRunHistory({
   }
 
   return (
-    <ul className="workflow-run-list" aria-label="Recent workflow runs">
+    <>
+      <div className="workflow-run-history-toolbar">
+        <span className="workflow-meta" role="status" aria-live="polite">
+          {shouldPoll
+            ? "Live status refresh · every 5 seconds while runs are active"
+            : "Run history is up to date"}
+        </span>
+        <button className="btn btn-ghost" type="button" onClick={() => setRetryCount((count) => count + 1)}>
+          Refresh now
+        </button>
+      </div>
+      <ul className="workflow-run-list" aria-label="Recent workflow runs">
       {currentState.result.data.map((run) => {
         const expanded = expandedRunId === run.id;
         const eventListId = "workflow-events-" + run.id;
@@ -120,6 +174,7 @@ export default function WorkflowRunHistory({
           </li>
         );
       })}
-    </ul>
+      </ul>
+    </>
   );
 }
