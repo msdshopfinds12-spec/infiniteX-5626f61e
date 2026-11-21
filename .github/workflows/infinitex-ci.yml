@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - phase-88-frontend-backend-reconciliation
       - eng/infinitex-unified-ui-backend-2026-11-20
   workflow_dispatch:
 
