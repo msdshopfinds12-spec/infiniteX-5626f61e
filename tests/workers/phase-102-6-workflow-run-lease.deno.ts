@@ -52,8 +52,8 @@ Deno.test({
     const runId = crypto.randomUUID();
     let workflowCreated = false;
     try {
-      // The optional p_run_id filter keeps this integration fixture isolated
-      // from the other queued rows seeded by the shared Phase 81 harness.
+      // The owner-scoped public facade intentionally exposes no run-ID filter.
+      // Phase 81 consumes the shared owner-A fixtures before this isolated run.
       const { error: workflowError } = await admin.from("workflows").insert({
         id: workflowId, owner_id: ownerId, name: "phase-1026-lease-fixture",
         status: "draft", trigger_type: "manual",
@@ -69,14 +69,14 @@ Deno.test({
 
       // A different authenticated owner scope must never claim this run.
       const wrongOwnerClaim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
-        p_limit: 1, p_lease_seconds: 30, p_run_id: runId, p_owner_id: crypto.randomUUID(),
+        p_limit: 1, p_lease_seconds: 30, p_owner_id: crypto.randomUUID(),
       });
       assert(!wrongOwnerClaim.error && Array.isArray(wrongOwnerClaim.data) &&
         wrongOwnerClaim.data.length === 0,
         "owner-scoped claim must not disclose or claim another owner's run");
 
       // Concurrent claims against one queue row must produce exactly one owner.
-      const claimArgs = { p_limit: 1, p_lease_seconds: 30, p_run_id: runId, p_owner_id: ownerId };
+      const claimArgs = { p_limit: 1, p_lease_seconds: 30, p_owner_id: ownerId };
       const claims = await Promise.all([
         admin.rpc("simula_claim_workflow_runs_lease_internal", claimArgs),
         admin.rpc("simula_claim_workflow_runs_lease_internal", claimArgs),
