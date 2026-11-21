@@ -7,6 +7,7 @@ on:
       - phase-101-6-isolated-concurrency-hardening
       - phase-103-6-test-reliability-hardening
       - phase-103-7-outbox-idempotency-verification
+      - diagnostic/phase-1026-claim-eligibility
     paths:
       - ".github/workflows/phase-81-postgrest-worker-http-integration.yml"
       - "supabase/migrations/**"
@@ -15,6 +16,7 @@ on:
       - "supabase/functions/simula-workflow-cron-worker/**"
       - "supabase/functions/_shared/**"
       - "tests/database/phase-81-postgrest-worker-fixtures.sql"
+      - "tests/database/phase-102-6-claim-eligibility-diagnostics.sql"
       - "tests/workers/**"
       - "scripts/rehearse-migration-chain.mjs"
       - "scripts/phase-81-generate-jwt.mjs"
