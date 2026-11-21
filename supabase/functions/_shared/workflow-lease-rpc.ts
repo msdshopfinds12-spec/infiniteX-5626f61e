@@ -12,6 +12,7 @@ import {
 
 export type RpcResponse = { data: unknown; error: unknown | null };
 export type LeaseRpc = (name: string, args: Record<string, unknown>) => Promise<RpcResponse>;
+export type ClaimedWorkflowLease = WorkflowLease & Readonly<{ workflowId: string; input: unknown }>;
 
 function oneRow(data: unknown): Record<string, unknown> {
   const row = Array.isArray(data) ? (data.length === 1 ? data[0] : null) : data;
@@ -35,10 +36,9 @@ async function invoke(rpc: LeaseRpc, name: string, args: Record<string, unknown>
 
 export async function claimWorkflowLeases(
   rpc: LeaseRpc,
-  options: { ownerId: string; limit?: number; leaseSeconds?: number; runId?: string },
-): Promise<WorkflowLease[]> {
-  if (!isCanonicalUuid(options.ownerId) ||
-      (options.runId !== undefined && !isCanonicalUuid(options.runId))) {
+  options: { ownerId: string; limit?: number; leaseSeconds?: number },
+): Promise<ClaimedWorkflowLease[]> {
+  if (!isCanonicalUuid(options.ownerId)) {
     throw new WorkflowLeaseError("LEASE_INVALID");
   }
   const limit = options.limit ?? 3;
@@ -47,10 +47,11 @@ export async function claimWorkflowLeases(
       !Number.isInteger(leaseSeconds) || leaseSeconds < 30 || leaseSeconds > 900) {
     throw new WorkflowLeaseError("LEASE_INVALID");
   }
+  // The public PostgREST facade intentionally has exactly these three
+  // parameters. The private SQL implementation owns the optional run filter.
   const data = await invoke(rpc, LEASE_RPC.claim, {
     p_limit: limit,
     p_lease_seconds: leaseSeconds,
-    p_run_id: options.runId ?? null,
     p_owner_id: options.ownerId,
   });
   if (!Array.isArray(data)) throw new WorkflowLeaseError("LEASE_INVALID");
@@ -59,13 +60,15 @@ export async function claimWorkflowLeases(
       throw new WorkflowLeaseError("LEASE_INVALID");
     }
     const item = row as Record<string, unknown>;
-    return validateLease({
+    if (!isCanonicalUuid(item.workflow_id)) throw new WorkflowLeaseError("LEASE_INVALID");
+    const lease = validateLease({
       runId: item.id,
       ownerId: item.owner_id,
       attempt: item.attempt,
       leaseToken: item.lease_token,
       leaseUntil: item.lease_until,
     });
+    return Object.freeze({ ...lease, workflowId: item.workflow_id, input: item.input });
   });
 }
 

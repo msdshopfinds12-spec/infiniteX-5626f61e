@@ -7,7 +7,9 @@ BEGIN;
 -- Remove the previous public facade before replacing its implementation
 -- signature; this avoids ambiguous PostgREST overload resolution.
 DROP FUNCTION IF EXISTS public.simula_claim_workflow_runs_lease_internal(integer, integer, uuid);
+DROP FUNCTION IF EXISTS public.simula_claim_workflow_runs_lease_internal(integer, integer, uuid, uuid);
 DROP FUNCTION IF EXISTS private.simula_claim_workflow_runs_lease_internal(integer, integer, uuid);
+DROP FUNCTION IF EXISTS private.simula_claim_workflow_runs_lease_internal(integer, integer, uuid, uuid);
 
 CREATE FUNCTION private.simula_claim_workflow_runs_lease_internal(
   p_limit integer DEFAULT 3,
@@ -115,10 +117,15 @@ GRANT USAGE ON SCHEMA private TO service_role;
 GRANT EXECUTE ON FUNCTION private.simula_claim_workflow_runs_lease_internal(integer, integer, uuid, uuid)
   TO service_role;
 
+-- PostgREST-facing facade deliberately exposes three named parameters.
+-- The private implementation retains the optional p_run_id filter, but the
+-- HTTP contract does not expose it: omitting a middle defaulted UUID parameter
+-- has caused PGRST202 resolution failures in PostgREST schema-cache matching.
+DROP FUNCTION IF EXISTS public.simula_claim_workflow_runs_lease_internal(integer, integer, uuid, uuid);
+
 CREATE FUNCTION public.simula_claim_workflow_runs_lease_internal(
   p_limit integer DEFAULT 3,
   p_lease_seconds integer DEFAULT 90,
-  p_run_id uuid DEFAULT NULL,
   p_owner_id uuid DEFAULT NULL
 )
 RETURNS TABLE (
@@ -130,13 +137,13 @@ SECURITY INVOKER
 SET search_path = ''
 AS $function$
   SELECT * FROM private.simula_claim_workflow_runs_lease_internal(
-    p_limit, p_lease_seconds, p_run_id, p_owner_id
+    p_limit, p_lease_seconds, NULL::uuid, p_owner_id
   );
 $function$;
 
-REVOKE ALL ON FUNCTION public.simula_claim_workflow_runs_lease_internal(integer, integer, uuid, uuid)
+REVOKE ALL ON FUNCTION public.simula_claim_workflow_runs_lease_internal(integer, integer, uuid)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.simula_claim_workflow_runs_lease_internal(integer, integer, uuid, uuid)
+GRANT EXECUTE ON FUNCTION public.simula_claim_workflow_runs_lease_internal(integer, integer, uuid)
   TO service_role;
 
 COMMIT;
