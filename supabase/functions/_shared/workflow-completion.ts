@@ -1,9 +1,15 @@
+export type WorkflowOutboxEvent = {
+  eventType: "notification.requested";
+  payload: { recipient_ref: string; template_key: string };
+};
+
 export type WorkflowStepCompletionInput = {
   ownerId: string;
   runId: string;
   stepId: string;
   attempt: number;
   output: Record<string, unknown>;
+  event?: WorkflowOutboxEvent | null;
 };
 
 export type WorkflowStepCompletionResult = {
@@ -51,6 +57,32 @@ export async function completeWorkflowStepWithOutbox(
     throw new Error("step_run_finish_invalid_input");
   }
 
+  const event = input.event ?? null;
+  let eventType: string | null = null;
+  let idempotencyKey: string | null = null;
+  let eventPayload: Record<string, unknown> = {};
+
+  if (event !== null) {
+    const payload = event && isRecord(event.payload) ? event.payload : null;
+    const recipientRef = payload?.recipient_ref;
+    const templateKey = payload?.template_key;
+    if (
+      event.eventType !== "notification.requested" ||
+      !payload ||
+      Object.keys(payload).length !== 2 ||
+      !isUuid(recipientRef) ||
+      typeof templateKey !== "string" ||
+      !/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(templateKey)
+    ) {
+      throw new Error("step_run_finish_invalid_event");
+    }
+    eventType = "notification.requested";
+    // Stable across worker retries for this immutable run/step generation.
+    idempotencyKey = `phase90:${input.ownerId}:${input.runId}:${input.stepId}:${input.attempt}:${eventType}`;
+    if (idempotencyKey.length > 200) throw new Error("step_run_finish_invalid_event");
+    eventPayload = { recipient_ref: recipientRef, template_key: templateKey };
+  }
+
   let response: RpcResponse;
   try {
     response = await rpc("simula_complete_step_with_outbox", {
@@ -59,9 +91,9 @@ export async function completeWorkflowStepWithOutbox(
       p_step_id: input.stepId,
       p_attempt: input.attempt,
       p_output: input.output,
-      p_event_type: null,
-      p_idempotency_key: null,
-      p_payload: {},
+      p_event_type: eventType,
+      p_idempotency_key: idempotencyKey,
+      p_payload: eventPayload,
     });
   } catch {
     throw new Error("step_run_finish_failed");
