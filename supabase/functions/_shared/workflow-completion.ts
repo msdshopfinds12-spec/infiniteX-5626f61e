@@ -21,26 +21,34 @@ type CompletionRpc = (
   args: Record<string, unknown>,
 ) => Promise<RpcResponse>;
 
+const CANONICAL_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const POSTGRES_INTEGER_MAX = 2_147_483_647;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function isCanonicalUuid(value: unknown): value is string {
+  return typeof value === "string" && CANONICAL_UUID.test(value);
+}
+
 /**
  * Shared fail-closed boundary for authenticated and cron workflow workers.
- * The database RPC is the sole authority for transactional step completion.
+ * The database RPC remains the sole authority for transactional completion.
  */
 export async function completeWorkflowStepWithOutbox(
   rpc: CompletionRpc,
   input: WorkflowStepCompletionInput,
 ): Promise<WorkflowStepCompletionResult> {
-  // TypeScript types do not validate values arriving across runtime boundaries.
-  // Validate the complete envelope before property access or string operations.
+  // Runtime validation mirrors PostgreSQL UUID/integer columns.
   if (
     !isRecord(input) ||
-    typeof input.ownerId !== "string" || !input.ownerId.trim() ||
-    typeof input.runId !== "string" || !input.runId.trim() ||
-    typeof input.stepId !== "string" || !input.stepId.trim() ||
-    !Number.isSafeInteger(input.attempt) || input.attempt < 1 || input.attempt > 2_147_483_647 ||
+    !isCanonicalUuid(input.ownerId) ||
+    !isCanonicalUuid(input.runId) ||
+    !isCanonicalUuid(input.stepId) ||
+    !Number.isSafeInteger(input.attempt) ||
+    input.attempt < 1 ||
+    input.attempt > POSTGRES_INTEGER_MAX ||
     !isRecord(input.output) ||
     (input.outboxEvent !== undefined && !validateWorkflowOutboxEvent(input.outboxEvent)) ||
     (input.outboxEvent !== undefined && (
@@ -73,21 +81,23 @@ export async function completeWorkflowStepWithOutbox(
     throw new Error("step_run_finish_failed");
   }
 
-  // The RPC contract is exactly one completion row. Never silently select
-  // an arbitrary row from an ambiguous or empty result set.
   const row = Array.isArray(response.data)
-    ? response.data.length === 1
-      ? response.data[0]
-      : null
+    ? response.data.length === 1 ? response.data[0] : null
     : response.data;
 
-  if (!isRecord(row) || typeof row.step_run_id !== "string" || !row.step_run_id.trim()) {
+  // Validate the entire database response contract; do not coerce malformed values.
+  if (
+    !isRecord(row) ||
+    !isCanonicalUuid(row.step_run_id) ||
+    !(row.outbox_id === null || isCanonicalUuid(row.outbox_id)) ||
+    typeof row.replayed !== "boolean"
+  ) {
     throw new Error("workflow_step_attempt_superseded");
   }
 
   return {
     stepRunId: row.step_run_id,
-    outboxId: typeof row.outbox_id === "string" && row.outbox_id.trim() ? row.outbox_id : null,
-    replayed: row.replayed === true,
+    outboxId: row.outbox_id,
+    replayed: row.replayed,
   };
 }
