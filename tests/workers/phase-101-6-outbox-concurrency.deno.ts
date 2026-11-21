@@ -67,7 +67,7 @@ Deno.test({
       // Claim all fixtures through the same owner-scoped lease facade used by
       // the workers. No direct lease-token or attempt mutation is permitted.
       const claim = await admin.rpc("simula_claim_workflow_runs_lease_internal", {
-        p_limit: 3, p_lease_seconds: 90, p_owner_id: ownerId,
+        p_limit: 3, p_lease_seconds: 300, p_owner_id: ownerId,
       });
       assert(!claim.error && Array.isArray(claim.data), "owner-scoped lease claim failed: " + (claim.error?.message ?? ""));
       const leases = claim.data.filter((row: { id: string }) => runIds.includes(row.id));
