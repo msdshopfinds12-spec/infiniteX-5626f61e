@@ -29,6 +29,10 @@ The new `tests/database/phase-97-database-security-audit.sql` is run after the m
 
 The SQL file refuses to run unless `current_database() = 'infinitex_rehearsal'`. It performs catalog and privilege assertions inside a transaction and rolls back. It does not modify schema or fixture data.
 
+## Audit harness correction
+
+The first disposable PostgreSQL execution correctly stopped at the policy-expression assertion. Catalog output showed PostgreSQL deparses the repository's `auth.uid()` policy expression as `uid()` in `pg_policies.qual` because the function is schema-resolved in the policy expression. The initial assertion incorrectly required the literal text `auth.uid`; this was a test-harness false negative, not evidence of a tenant-isolation defect. The assertion now checks the deparsed `uid()` call while retaining exact policy, command, role, USING and WITH CHECK checks. The temporary diagnostic query was removed after identifying the mismatch.
+
 ## Existing defense-in-depth
 
 Phase 82 separately exercises two-tenant PostgREST behavior, including owner isolation, cross-tenant update denial, forged owner insert rejection and API-key hash confidentiality. Phase 94 verifies the authenticated enqueue-to-worker lifecycle and owner-authorized history read. Phase 97 complements those runtime checks with direct catalog assertions.
