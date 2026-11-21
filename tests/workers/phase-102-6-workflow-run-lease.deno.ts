@@ -110,10 +110,21 @@ Deno.test({
 
       // Simulate worker loss by expiring only this synthetic fixture row.
       // This direct mutation is permitted solely in the opt-in disposable DB.
-      const { error: expireError } = await admin.from("workflow_runs")
+      const { data: expiredRows, error: expireError } = await admin.from("workflow_runs")
         .update({ lease_until: new Date(Date.now() - 5_000).toISOString() })
-        .eq("id", runId).eq("lease_token", first.lease_token).eq("status", "running");
+        .eq("id", runId).eq("lease_token", first.lease_token).eq("status", "running")
+        .select("id,owner_id,status,attempt,lease_until");
       assert(!expireError, "synthetic lease expiry setup failed: " + (expireError?.message ?? ""));
+      console.error("PHASE1026_EXPIRY_UPDATE_DIAGNOSTIC", {
+        matchedRowCount: Array.isArray(expiredRows) ? expiredRows.length : null,
+        targetRunMatched: expiredRows?.[0]?.id === runId,
+        status: expiredRows?.[0]?.status ?? null,
+        attempt: expiredRows?.[0]?.attempt ?? null,
+        leaseUntil: expiredRows?.[0]?.lease_until ?? null,
+      });
+      assert(Array.isArray(expiredRows) && expiredRows.length === 1 &&
+        expiredRows[0]?.id === runId,
+        "synthetic lease expiry must update exactly the intended fixture row");
 
       const expiredHeartbeat = await admin.rpc("simula_heartbeat_workflow_run", {
         p_run_id: runId, p_owner_id: ownerId, p_attempt: first.attempt,
@@ -144,7 +155,33 @@ Deno.test({
           clientNow: new Date().toISOString(),
         }));
 
+      console.error("PHASE1026_RECLAIM_PRE_RPC", {
+        targetRunId: runId,
+        ownerMatches: beforeReclaim.owner_id === ownerId,
+        status: beforeReclaim.status,
+        attempt: beforeReclaim.attempt,
+        tokenMatches: beforeReclaim.lease_token === first.lease_token,
+        leaseUntil: beforeReclaim.lease_until,
+        leaseExpiredByClientClock: Date.parse(beforeReclaim.lease_until) <= Date.now(),
+        clientNow: new Date().toISOString(),
+        requestedLimit: claimArgs.p_limit,
+        requestedOwnerMatches: claimArgs.p_owner_id === ownerId,
+      });
+      const reclaimStartedAt = performance.now();
       const reclaim = await admin.rpc("simula_claim_workflow_runs_lease_internal", claimArgs);
+      console.error("PHASE1026_RECLAIM_RPC_DIAGNOSTIC", {
+        durationMs: Math.round(performance.now() - reclaimStartedAt),
+        code: reclaim.error?.code ?? null,
+        message: reclaim.error?.message ?? null,
+        details: reclaim.error?.details ?? null,
+        hint: reclaim.error?.hint ?? null,
+        returnedRowCount: Array.isArray(reclaim.data) ? reclaim.data.length : null,
+        returnedIds: Array.isArray(reclaim.data)
+          ? reclaim.data.map((row: { id: string }) => row.id)
+          : null,
+        targetRunReturned: Array.isArray(reclaim.data) &&
+          reclaim.data.some((row: { id: string }) => row.id === runId),
+      });
       if (reclaim.error || !Array.isArray(reclaim.data)) {
         throw new Error("RECLAIM_RPC_FAILED: " + JSON.stringify({
           message: reclaim.error?.message ?? null,
