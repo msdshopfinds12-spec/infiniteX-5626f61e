@@ -9,12 +9,12 @@ export type OverviewSnapshot = Readonly<{
 }>;
 
 type ReadOutcome = Readonly<{ count: number | null; error: string | null }>;
+type GenericReadResult =
+  | Readonly<{ status: "success"; data: readonly unknown[] }>
+  | Readonly<{ status: "error"; code: string }>;
 
 function resolveOutcome(
-  result: PromiseSettledResult<
-    | Awaited<ReturnType<WorkflowReadService["listOwnWorkflows"]>>
-    | Awaited<ReturnType<ProjectReadService["listOwnProjects"]>>
-  >,
+  result: PromiseSettledResult<GenericReadResult>,
 ): ReadOutcome {
   if (result.status === "rejected") {
     return { count: null, error: "request_failed" };
