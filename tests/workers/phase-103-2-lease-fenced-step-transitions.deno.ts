@@ -53,7 +53,15 @@ Deno.test({
     const foreignStep = crypto.randomUUID();
     const idempotencyKey = "phase1032:" + runId + ":step1:attempt1";
     const createdWorkflows: string[] = [];
-    let syntheticOwnerId: string | null = null;
+    const syntheticOwnerId = required("PHASE1032_OWNER_ID");
+    assert(UUID.test(syntheticOwnerId), "pre-seeded Phase 103.2 owner ID must be a UUID");
+    const ownerFixture = await admin.from("workflows")
+      .select("id,owner_id")
+      .eq("id", "81000000-1000-4000-8000-000000000003")
+      .eq("owner_id", syntheticOwnerId)
+      .maybeSingle();
+    assert(!ownerFixture.error && ownerFixture.data !== null,
+      "pre-seeded Phase 103.2 owner fixture is missing or mismatched");
 
     try {
       // Reuse the isolated Auth identity pre-seeded in the disposable SQL fixture.
