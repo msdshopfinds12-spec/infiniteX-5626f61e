@@ -14,11 +14,42 @@ function requiredString(value, label) {
   return value;
 }
 
+/**
+ * Closed event registry for workflow steps. Event payloads contain only opaque
+ * references and a template key; arbitrary URLs, headers, credentials and code
+ * are never accepted.
+ */
+export function resolveWorkflowOutboxEvent(actionType, config) {
+  if (actionType !== "emit_notification_intent") return null;
+  const safeConfig = record(config);
+  const recipientRef = safeConfig.recipient_ref;
+  const templateKey = safeConfig.template_key;
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const templatePattern = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
+  if (typeof recipientRef !== "string" || !uuid.test(recipientRef)) {
+    throw new Error("config.recipient_ref_must_be_uuid");
+  }
+  if (typeof templateKey !== "string" || !templatePattern.test(templateKey)) {
+    throw new Error("config.template_key_invalid");
+  }
+  return {
+    eventType: "notification.requested",
+    payload: { recipient_ref: recipientRef, template_key: templateKey },
+  };
+}
+
 export function executeSafeAction(actionType, input, config) {
   const data = record(input);
   const safeConfig = record(config);
 
   switch (actionType) {
+    case "emit_notification_intent": {
+      // Validate the closed event descriptor during action execution. The
+      // worker later persists this intent atomically with step completion.
+      resolveWorkflowOutboxEvent(actionType, safeConfig);
+      return data;
+    }
+
     case "pass_through":
       return data;
 
