@@ -1,0 +1,89 @@
+name: InfiniteX Advanced Security Gates
+
+on:
+  push:
+    branches:
+      - diagnostic/phase-1026-claim-eligibility
+    paths:
+      - ".github/workflows/infinitex-advanced-security.yml"
+      - "docs/security/**"
+      - "src/features/auth/**"
+      - "src/features/security/**"
+      - "supabase/functions/**"
+      - "supabase/migrations/**"
+      - "tests/security/**"
+      - "tests/workers/**"
+      - "tests/browser-secret-boundary.test.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinitex-advanced-security-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    name: Dependency audit, auth boundaries, worker types, tests, build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Configure Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Configure Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.2.12
+
+      - name: Record exact candidate and toolchain
+        run: |
+          git rev-parse HEAD
+          node --version
+          npm --version
+          deno --version
+
+      - name: Install exact lockfile dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Block high and critical dependency advisories
+        run: npm audit --audit-level=high
+
+      - name: TypeScript lint and project checks
+        run: npm run lint
+
+      - name: Full regression suite
+        run: npm test
+
+      - name: Edge CORS and worker security regression
+        run: npm run test:edge-function-security
+
+      - name: Authenticated worker boundary regression
+        run: npm run test:worker-http-boundary
+
+      - name: Type-check lease concurrency integration test
+        run: deno check tests/workers/phase-103-4-lease-concurrency.deno.ts
+
+      - name: Generate CycloneDX dependency SBOM
+        run: npm sbom --sbom-format cyclonedx > infinitex.cdx.json
+
+      - name: Upload dependency SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: infinitex-cyclonedx-sbom
+          path: infinitex.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Production build
+        run: npm run build
