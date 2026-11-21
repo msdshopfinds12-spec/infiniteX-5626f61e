@@ -81,13 +81,20 @@ export async function completeWorkflowStepWithOutbox(
       : null
     : response.data;
 
-  if (!isRecord(row) || typeof row.step_run_id !== "string" || !row.step_run_id.trim()) {
+  // These fields are PostgreSQL UUID/boolean return types. Validate the
+  // complete RPC contract instead of silently coercing malformed values.
+  if (
+    !isRecord(row) ||
+    !isCanonicalUuid(row.step_run_id) ||
+    !(row.outbox_id === null || isCanonicalUuid(row.outbox_id)) ||
+    typeof row.replayed !== "boolean"
+  ) {
     throw new Error("workflow_step_attempt_superseded");
   }
 
   return {
     stepRunId: row.step_run_id,
-    outboxId: typeof row.outbox_id === "string" && row.outbox_id.trim() ? row.outbox_id : null,
-    replayed: row.replayed === true,
+    outboxId: row.outbox_id,
+    replayed: row.replayed,
   };
 }
