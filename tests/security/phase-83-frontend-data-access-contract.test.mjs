@@ -87,11 +87,22 @@ test("API-key browser adapter delegates to authenticated Edge Function and valid
   assert.doesNotMatch(edge, /\.select\([^\n]*key_hash/);
 });
 
-test("workspace labels demo telemetry and read-only integration honestly", async () => {
+test("workspace distinguishes live account metadata from unverified capabilities", async () => {
   const app = await read("src/App.tsx");
+  const overview = await read("src/features/overview/overview-summary.tsx");
+  const snapshot = await read("src/features/overview/overview-snapshot.ts");
   assert.match(app, /READ-ONLY INTEGRATION/);
   assert.match(app, /DEMO MODE/);
-  assert.match(app, /values are not live backend telemetry/i);
-  assert.match(app, /overview metrics, agents, sample logs, and security posture remain demo or unverified/i);
-  assert.match(app, /pipeline execution is not connected/i);
+  assert.match(app, /AI agent runtime/);
+  assert.match(app, /Execution telemetry/);
+  assert.match(app, /Security posture/);
+  assert.match(app, /Not assessed in this UI/);
+  assert.match(overview, /authenticated, read-only account queries/);
+  assert.match(overview, /identityEpoch/);
+  assert.match(overview, /Late results from a prior identity are discarded/);
+  assert.match(snapshot, /listOwnWorkflows\(\{ limit: 100 \}\)/);
+  assert.match(snapshot, /listOwnProjects\(\{ limit: 100 \}\)/);
+  assert.match(snapshot, /Promise\.allSettled/);
+  assert.doesNotMatch(app, /Sample Agent Activity/);
+  assert.doesNotMatch(app, /Sample Pipeline Board/);
 });
