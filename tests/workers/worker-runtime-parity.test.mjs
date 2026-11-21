@@ -25,6 +25,7 @@ test("cron worker authenticates the shared secret and bounds streamed JSON", asy
 test("authenticated worker delegates every lifecycle transition to fenced lease RPCs", async () => {
   const source = await read("../../supabase/functions/simula-workflow-worker/index.ts");
   const rpc = await read("../../supabase/functions/_shared/workflow-lease-rpc.ts");
+  const contract = await read("../../supabase/functions/_shared/workflow-lease-contract.ts");
   const supervisor = await read("../../supabase/functions/_shared/workflow-lease-supervisor.ts");
   for (const token of [
     "claimWorkflowLeases(", "heartbeatWorkflowLease(", "startWorkflowStepWithLease(",
@@ -37,11 +38,12 @@ test("authenticated worker delegates every lifecycle transition to fenced lease 
   assert.match(source, /supervisor\.signal\.aborted/);
   assert.match(source, /abortableSleep/);
   assert.match(source, /createWorkflowStepCompletedEvent/);
-  assert.match(rpc, /simula_claim_workflow_runs_lease_internal/);
-  assert.match(rpc, /simula_start_workflow_step_with_lease/);
-  assert.match(rpc, /simula_fail_workflow_step_with_lease/);
-  assert.match(rpc, /simula_complete_step_with_outbox_lease/);
-  assert.match(rpc, /simula_finish_workflow_run_lease/);
+  assert.match(contract, /claim: "simula_claim_workflow_runs_lease_internal"/);
+  assert.match(contract, /startStep: "simula_start_workflow_step_with_lease"/);
+  assert.match(contract, /failStep: "simula_fail_workflow_step_with_lease"/);
+  assert.match(contract, /completeStep: "simula_complete_step_with_outbox_lease"/);
+  assert.match(contract, /finishRun: "simula_finish_workflow_run_lease"/);
+  assert.match(rpc, /LEASE_RPC\.claim/);
   assert.match(supervisor, /heartbeatTimeoutMs/);
   assert.match(supervisor, /Promise\.race/);
 });
