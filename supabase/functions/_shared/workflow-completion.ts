@@ -18,6 +18,13 @@ type CompletionRpc = (
   args: Record<string, unknown>,
 ) => Promise<RpcResponse>;
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_POSTGRES_INTEGER = 2_147_483_647;
+
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -34,10 +41,10 @@ export async function completeWorkflowStepWithOutbox(
   // Validate the complete envelope before property access or string operations.
   if (
     !isRecord(input) ||
-    typeof input.ownerId !== "string" || !input.ownerId.trim() ||
-    typeof input.runId !== "string" || !input.runId.trim() ||
-    typeof input.stepId !== "string" || !input.stepId.trim() ||
-    !Number.isSafeInteger(input.attempt) || input.attempt < 1 ||
+    !isUuid(input.ownerId) ||
+    !isUuid(input.runId) ||
+    !isUuid(input.stepId) ||
+    !Number.isSafeInteger(input.attempt) || input.attempt < 1 || input.attempt > MAX_POSTGRES_INTEGER ||
     !isRecord(input.output) ||
     typeof rpc !== "function"
   ) {
@@ -72,13 +79,15 @@ export async function completeWorkflowStepWithOutbox(
       : null
     : response.data;
 
-  if (!isRecord(row) || typeof row.step_run_id !== "string" || !row.step_run_id.trim()) {
-    throw new Error("workflow_step_attempt_superseded");
+  if (!isRecord(row) || !isUuid(row.step_run_id) ||
+      !(row.outbox_id === null || isUuid(row.outbox_id)) ||
+      typeof row.replayed !== "boolean") {
+    throw new Error("step_run_finish_invalid_response");
   }
 
   return {
     stepRunId: row.step_run_id,
-    outboxId: typeof row.outbox_id === "string" && row.outbox_id.trim() ? row.outbox_id : null,
-    replayed: row.replayed === true,
+    outboxId: row.outbox_id,
+    replayed: row.replayed,
   };
 }
