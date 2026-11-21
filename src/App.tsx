@@ -89,17 +89,17 @@ export default function App({
   }
 
   const title =
-    view === "overview" ? "Overview" :
-    view === "agents" ? "AI Agents" :
+    view === "overview" ? "Command Center" :
+    view === "agents" ? "AI Runtime" :
     view === "pipelines" ? "Pipelines" :
     view === "projects" ? "Projects" :
-    view === "logs" ? "Log Stream" :
+    view === "logs" ? "Workflow Activity" :
     view === "security" ? "Security Posture" : "Settings";
 
   return (
     <>
       <div className="app-shell">
-        <Sidebar view={view} onChange={(nextView) => { setView(nextView); setSearchTerm(""); }} />
+        <Sidebar view={view} workspaceLabel={authState.status === "authenticated" ? "Authenticated session" : "Preview mode"} onChange={(nextView) => { setView(nextView); setSearchTerm(""); }} />
         <div className="main">
           <TopBar title={title} theme={theme} onToggleTheme={toggleTheme} searchTerm={searchTerm} onSearchChange={setSearchTerm} />
           <main className="content">
@@ -116,9 +116,9 @@ export default function App({
               <strong>{authState.status === "authenticated" && workflowRunService ? "WORKFLOW QUEUE ENABLED" : authState.status === "authenticated" && (workflowReadService || projectReadService || profileReadService) ? "READ-ONLY INTEGRATION" : "DEMO MODE"}</strong>
               <span>
                 {authState.status === "authenticated" && workflowRunService
-                  ? "Workflow, project, and profile reads use authenticated Supabase queries protected by database RLS. Workflow requests use a server-side enqueue boundary; a queued response does not prove worker execution. Worker dispatch, AI agents, overview metrics, sample logs, and security posture remain unverified."
+                  ? "Workflow, project, and profile reads use authenticated Supabase queries protected by database RLS. Workflow requests use a server-side enqueue boundary; a queued response does not prove worker execution. Worker dispatch, live AI provider execution, global logs, and production security posture remain unverified. The AI runtime request boundary is CI-verified but provider-disabled."
                   : authState.status === "authenticated" && (workflowReadService || projectReadService || profileReadService)
-                    ? "Available workflow, project, and profile services use authenticated read-only Supabase queries protected by database RLS. Workflow queueing is disabled until the Phase 84 migration and Edge Function are explicitly deployed and verified. Project content is not loaded; overview metrics, agents, sample logs, and security posture remain demo or unverified."
+                    ? "Available workflow, project, and profile services use authenticated read-only Supabase queries protected by database RLS. Workflow queueing is disabled until the Phase 84 migration and Edge Function are explicitly deployed and verified. Project content is not loaded; live AI agents, global logs, and production security posture remain unavailable or unverified. The AI runtime request boundary is CI-verified but provider-disabled."
                     : "Illustrative sample data only. No live backend, agent runtime, pipeline, log stream or security scan is connected or verified."}
               </span>
             </div>
@@ -139,7 +139,7 @@ export default function App({
                 <section className="overview-capabilities" aria-label="Platform capability status">
                   <article className="capability-card">
                     <Bot size={18} aria-hidden="true" />
-                    <div><strong>AI agent runtime</strong><span>Not connected</span></div>
+                    <div><strong>AI model provider</strong><span>Disabled · not configured</span></div>
                   </article>
                   <article className="capability-card">
                     <Terminal size={18} aria-hidden="true" />
@@ -155,8 +155,8 @@ export default function App({
             {view === "agents" && (
               <div className="panel">
                 <div className="panel-head">
-                  <h2><Bot size={18} /> Registered AI Agents (sample)</h2>
-                  <span className="badge badge-neutral">LOCAL DATA</span>
+                  <h2><Bot size={18} /> AI Runtime &amp; Agent Registry</h2>
+                  <span className="badge badge-neutral">PROVIDER DISABLED</span>
                 </div>
                 <AgentList searchTerm={query} />
               </div>
@@ -201,8 +201,8 @@ export default function App({
             {view === "logs" && (
               <div className="panel">
                 <div className="panel-head">
-                  <h2><Terminal size={18} /> Sample Log Entries</h2>
-                  <span className="badge badge-neutral">static sample</span>
+                  <h2><Terminal size={18} /> Workflow Activity</h2>
+                  <span className="badge badge-neutral">PER-RUN EVENTS</span>
                 </div>
                 <LogStream searchTerm={query} />
               </div>
