@@ -26,7 +26,7 @@ function createClient(result: unknown, shouldThrow = false) {
 }
 
 const sample = {
-  id: "workflow-1",
+  id: "81000000-1000-4000-8000-000000000001",
   name: "Synthetic workflow",
   description: "A test workflow",
   status: "active",
@@ -85,8 +85,8 @@ test("workflow read service rejects invalid page limits before querying", async 
 
 test("workflow run history uses safe columns, workflow filter, newest-first ordering, and bounded limit", async () => {
   const run = {
-    id: "run-1",
-    workflow_id: "workflow-1",
+    id: "81000000-3000-4000-8000-000000000005",
+    workflow_id: "81000000-1000-4000-8000-000000000001",
     status: "succeeded",
     created_at: "2026-11-21T00:00:00.000Z",
     started_at: "2026-11-21T00:00:01.000Z",
@@ -94,13 +94,13 @@ test("workflow run history uses safe columns, workflow filter, newest-first orde
     attempt: 1,
   };
   const { client, calls } = createClient({ data: [run], error: null });
-  const result = await createWorkflowReadService(client).listWorkflowRuns(" workflow-1 ", { limit: 8 });
+  const result = await createWorkflowReadService(client).listWorkflowRuns(" 81000000-1000-4000-8000-000000000001 ", { limit: 8 });
   assert.equal(result.status, "success");
   if (result.status === "success") assert.deepEqual(result.data, [run]);
   assert.deepEqual(calls, [
     { method: "from", args: ["workflow_runs"] },
     { method: "select", args: ["id,workflow_id,status,created_at,started_at,finished_at,attempt"] },
-    { method: "eq", args: ["workflow_id", "workflow-1"] },
+    { method: "eq", args: ["workflow_id", "81000000-1000-4000-8000-000000000001"] },
     { method: "order", args: ["created_at", { ascending: false }] },
     { method: "limit", args: [8] },
   ]);
@@ -121,11 +121,11 @@ test("workflow run history rejects blank workflow IDs without querying", async (
 test("workflow run history normalizes database errors and validates its limit", async () => {
   const { client, calls } = createClient({ data: null, error: { message: "private run details" } });
   const service = createWorkflowReadService(client);
-  assert.deepEqual(await service.listWorkflowRuns("workflow-1"), {
+  assert.deepEqual(await service.listWorkflowRuns("81000000-1000-4000-8000-000000000001"), {
     status: "error",
     code: "query_failed",
   });
-  assert.deepEqual(await service.listWorkflowRuns("workflow-1", { limit: 101 }), {
+  assert.deepEqual(await service.listWorkflowRuns("81000000-1000-4000-8000-000000000001", { limit: 101 }), {
     status: "error",
     code: "invalid_limit",
   });
@@ -135,20 +135,20 @@ test("workflow run history normalizes database errors and validates its limit", 
 test("workflow event logs use safe metadata only and chronological order", async () => {
   const log = {
     id: 1,
-    workflow_id: "workflow-1",
-    run_id: "run-1",
+    workflow_id: "81000000-1000-4000-8000-000000000001",
+    run_id: "81000000-3000-4000-8000-000000000005",
     level: "info",
     event: "workflow_step_succeeded",
     created_at: "2026-11-21T00:00:01.000Z",
   };
   const { client, calls } = createClient({ data: [log], error: null });
-  const result = await createWorkflowReadService(client).listRunLogs(" run-1 ", { limit: 30 });
+  const result = await createWorkflowReadService(client).listRunLogs(" 81000000-3000-4000-8000-000000000005 ", { limit: 30 });
   assert.equal(result.status, "success");
   if (result.status === "success") assert.deepEqual(result.data, [log]);
   assert.deepEqual(calls, [
     { method: "from", args: ["workflow_logs"] },
     { method: "select", args: ["id,workflow_id,run_id,level,event,created_at"] },
-    { method: "eq", args: ["run_id", "run-1"] },
+    { method: "eq", args: ["run_id", "81000000-3000-4000-8000-000000000005"] },
     { method: "order", args: ["created_at", { ascending: true }] },
     { method: "limit", args: [30] },
   ]);
@@ -163,7 +163,7 @@ test("workflow event logs reject blank run IDs and invalid limits without queryi
     status: "error",
     code: "invalid_run_id",
   });
-  assert.deepEqual(await service.listRunLogs("run-1", { limit: 101 }), {
+  assert.deepEqual(await service.listRunLogs("81000000-3000-4000-8000-000000000005", { limit: 101 }), {
     status: "error",
     code: "invalid_limit",
   });
@@ -177,4 +177,18 @@ test("workflow read service does not accept a caller-supplied owner identity", (
     Object.keys(service).sort(),
     ["listOwnWorkflows", "listWorkflowRuns", "listRunLogs"].sort(),
   );
+});
+
+
+test("workflow run and log reads reject malformed UUIDs before querying", async () => {
+  const { client, calls } = createClient({ data: [], error: null });
+  const service = createWorkflowReadService(client);
+
+  assert.deepEqual(await service.listWorkflowRuns("not-a-uuid"), {
+    status: "error", code: "invalid_workflow_id",
+  });
+  assert.deepEqual(await service.listRunLogs("not-a-uuid"), {
+    status: "error", code: "invalid_run_id",
+  });
+  assert.deepEqual(calls, [], "malformed identifiers must not reach PostgREST");
 });
