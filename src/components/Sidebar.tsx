@@ -2,11 +2,11 @@ import { Activity, Bot, BriefcaseBusiness, GitBranch, Settings, ShieldCheck, Ter
 import type { ViewKey } from "../types";
 
 const nav: { key: ViewKey; label: string; icon: LucideIcon }[] = [
-  { key: "overview", label: "Overview", icon: Activity },
-  { key: "agents", label: "AI Agents", icon: Bot },
+  { key: "overview", label: "Command Center", icon: Activity },
+  { key: "agents", label: "AI Runtime", icon: Bot },
   { key: "pipelines", label: "Pipelines", icon: GitBranch },
   { key: "projects", label: "Projects", icon: BriefcaseBusiness },
-  { key: "logs", label: "Log Stream", icon: Terminal },
+  { key: "logs", label: "Activity", icon: Terminal },
   { key: "security", label: "Security", icon: ShieldCheck },
   { key: "settings", label: "Settings", icon: Settings },
 ];
