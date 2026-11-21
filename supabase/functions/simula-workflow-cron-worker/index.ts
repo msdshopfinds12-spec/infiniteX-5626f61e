@@ -158,13 +158,9 @@ export function createCronWorkerHandler(deps: CronWorkerDependencies) {
     };
 
     for (const lease of leases) {
+      // The claim adapter validates owner_id as a canonical UUID. Retain that
+      // database-returned owner on every subsequent RPC and row predicate.
       const ownerId = lease.ownerId;
-      if (lease.ownerId !== ownerId) {
-        summary.failed++;
-        summary.runs.push({ id: lease.runId, status: "rejected", error: "claimed_run_owner_mismatch" });
-        continue;
-      }
-
       const supervisor = new WorkflowLeaseSupervisor({
         lease,
         leaseDurationSeconds: 90,
