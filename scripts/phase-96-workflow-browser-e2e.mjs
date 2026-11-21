@@ -174,11 +174,16 @@ try {
 
   const response = await page.goto(baseURL, { waitUntil: "networkidle" });
   assert.equal(response?.status(), 200);
-  await page.getByRole("heading", { name: "Welcome back." }).waitFor();
-  await page.getByLabel("Email address").fill("workflow@example.test");
-  await page.getByLabel("Password", { exact: true }).fill("synthetic-password-123");
-  await page.getByRole("button", { name: "Sign in securely" }).click();
-  await page.locator(".account-strip .account-indicator").waitFor();
+  const authForm = page.getByTestId("auth-form");
+  await authForm.waitFor({ state: "visible" });
+  await page.getByRole("heading", { name: "Welcome back.", exact: true }).waitFor({ state: "visible" });
+  await authForm.getByRole("textbox", { name: "Email address", exact: true }).fill("workflow@example.test");
+  await authForm.getByLabel("Password", { exact: true }).fill("synthetic-password-123");
+  await authForm.getByRole("button", { name: "Sign in securely", exact: true }).click();
+  const authenticatedIndicator = page.getByTestId("authenticated-session-indicator");
+  await authenticatedIndicator.waitFor({ state: "visible" });
+  assert.equal(await authenticatedIndicator.count(), 1, "authenticated state must expose exactly one session indicator");
+  assert.match((await authenticatedIndicator.innerText()).trim(), /Authenticated session/);
   await page.getByText("WORKFLOW QUEUE ENABLED").waitFor();
 
   await page.getByRole("button", { name: "Pipelines" }).click();
