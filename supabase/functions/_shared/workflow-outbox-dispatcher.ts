@@ -116,16 +116,12 @@ function hasRpcStatus(
 ): boolean {
   if (!Array.isArray(data) || data.length !== 1) return false;
   const row = data[0];
-  return Boolean(
-    row &&
-    typeof row === "object" &&
-    statuses.includes((row as { status?: unknown }).status as string) &&
-    (row as { replayed?: unknown }).replayed === false ||
-    row &&
-    typeof row === "object" &&
-    statuses.includes((row as { status?: unknown }).status as string) &&
-    (row as { replayed?: unknown }).replayed === true
-  );
+  if (!row || typeof row !== "object") return false;
+  const status = (row as { status?: unknown }).status;
+  const replayed = (row as { replayed?: unknown }).replayed;
+  return typeof status === "string" &&
+    statuses.includes(status) &&
+    typeof replayed === "boolean";
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
