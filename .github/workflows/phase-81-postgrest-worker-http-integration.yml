@@ -205,11 +205,13 @@ jobs:
         run: |
           docker run -d --name infinitex-phase81-postgrest \
             --network container:infinitex-phase81-postgres \
-            -e PGRST_DB_URI=postgres://authenticator:phase81-local-only@127.0.0.1:5432/infinitex_rehearsal \
+            -e PGRST_DB_URI=postgres://authenticator:phase81-local-only@127.0.0.1:5432/infinitex_rehearsal?application_name=phase1034-postgrest \
             -e PGRST_DB_SCHEMAS=public \
             -e PGRST_DB_ANON_ROLE=anon \
             -e PGRST_JWT_SECRET="$PGRST_JWT_SECRET" \
             -e PGRST_DB_EXTRA_SEARCH_PATH=public,extensions,private \
+            -e PGRST_DB_POOL=10 \
+            -e PGRST_DB_POOL_ACQUISITION_TIMEOUT=10 \
             -e PGRST_SERVER_PORT=3000 \
             postgrest/postgrest:v12.2.12
           for attempt in $(seq 1 45); do
@@ -274,11 +276,13 @@ jobs:
           docker rm -f infinitex-phase81-postgrest >/dev/null
           docker run -d --name infinitex-phase81-postgrest \
             --network container:infinitex-phase81-postgres \
-            -e PGRST_DB_URI=postgres://authenticator:phase81-local-only@127.0.0.1:5432/infinitex_rehearsal \
+            -e PGRST_DB_URI=postgres://authenticator:phase81-local-only@127.0.0.1:5432/infinitex_rehearsal?application_name=phase1034-postgrest \
             -e PGRST_DB_SCHEMAS=public \
             -e PGRST_DB_ANON_ROLE=anon \
             -e PGRST_JWT_SECRET=phase81-disposable-local-signing-secret-not-production \
             -e PGRST_DB_EXTRA_SEARCH_PATH=public,extensions,private \
+            -e PGRST_DB_POOL=10 \
+            -e PGRST_DB_POOL_ACQUISITION_TIMEOUT=10 \
             -e PGRST_SERVER_PORT=3000 \
             postgrest/postgrest:v12.2.12
           for attempt in $(seq 1 45); do
@@ -297,6 +301,7 @@ jobs:
             GROUP BY state, wait_event_type, wait_event
             ORDER BY connections DESC;
           "
+          echo "PHASE1034_POSTGREST_POOL_CONFIG pool=10 acquisition_timeout_seconds=10 application_name=phase1034-postgrest"
           # Sample PostgreSQL while the replay RPC is in flight. The existing
           # post-failure snapshot is too late to identify transient waits.
           diagnostic_log="${RUNNER_TEMP:-/tmp}/phase1034-live-postgres.log"

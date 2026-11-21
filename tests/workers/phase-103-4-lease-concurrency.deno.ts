@@ -33,15 +33,58 @@ Deno.test({
     const ownerId = required("PHASE1032_OWNER_ID");
     assert(UUID.test(ownerId), "pre-seeded disposable owner ID must be a UUID");
 
-    const localFetch: typeof fetch = (input, init) => {
+    const localFetch: typeof fetch = async (input, init) => {
       const source = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
       const target = new URL(source);
       if (target.pathname === "/rest/v1") target.pathname = "/";
       else if (target.pathname.startsWith("/rest/v1/")) target.pathname = target.pathname.slice("/rest/v1".length);
+
+      // Preserve both Request.signal and init.signal while retaining the hard
+      // 20-second diagnostic deadline. Never log request bodies or auth headers.
       const timeout = AbortSignal.timeout(20_000);
-      const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
-      if (input instanceof Request) return fetch(new Request(target, input), { signal });
-      return fetch(target, { ...init, signal });
+      const inheritedSignal = input instanceof Request ? input.signal : undefined;
+      const signals = [inheritedSignal, init?.signal, timeout]
+        .filter((value): value is AbortSignal => value != null);
+      const signal = AbortSignal.any(signals);
+      const isReplayRpc = target.pathname.endsWith(
+        "/rpc/simula_complete_step_with_outbox_lease",
+      );
+      const requestId = crypto.randomUUID();
+      const startedAt = performance.now();
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+
+      try {
+        const response = input instanceof Request
+          ? await fetch(new Request(target, input), { ...init, signal })
+          : await fetch(target, { ...init, signal });
+
+        if (isReplayRpc) {
+          console.error("PHASE1034_HTTP_RESPONSE", {
+            requestId,
+            method,
+            pathname: target.pathname,
+            durationMs: Math.round(performance.now() - startedAt),
+            status: response.status,
+            contentType: response.headers.get("content-type"),
+            server: response.headers.get("server"),
+          });
+        }
+        return response;
+      } catch (error) {
+        if (isReplayRpc) {
+          console.error("PHASE1034_HTTP_TRANSPORT_ERROR", {
+            requestId,
+            method,
+            pathname: target.pathname,
+            durationMs: Math.round(performance.now() - startedAt),
+            errorName: error instanceof Error ? error.name : "UnknownError",
+            timeoutAborted: timeout.aborted,
+            requestSignalAborted: inheritedSignal?.aborted ?? false,
+            initSignalAborted: init?.signal?.aborted ?? false,
+          });
+        }
+        throw error;
+      }
     };
     const admin = createClient(url, serviceJwt, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -266,15 +309,60 @@ Deno.test({
         elapsedSinceLeaseHeartbeatMs: Math.round(performance.now() - conflictLeaseHeartbeatAt),
         startedAt: new Date().toISOString(),
       });
-      const conflictRpcStartedAt = performance.now();
-      const conflictingOutput = await admin.rpc("simula_complete_step_with_outbox_lease", {
+      const conflictingOutputArgs = {
         ...secondIdentity,
         p_step_id: stepId,
         p_output: { result: "different-output-must-not-replay" },
         p_event_type: event.eventType,
         p_idempotency_key: event.idempotencyKey,
         p_payload: event.payload,
+      };
+
+      // First issue the exact RPC through raw HTTP. This separates the
+      // PostgREST/HTTP result from any Supabase-js response handling.
+      const rawHttpStartedAt = performance.now();
+      const rawHttpResponse = await localFetch(
+        new URL("/rest/v1/rpc/simula_complete_step_with_outbox_lease", url),
+        {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + serviceJwt,
+            apikey: serviceJwt,
+            "Content-Type": "application/json",
+            "Accept-Profile": "public",
+            "Content-Profile": "public",
+          },
+          body: JSON.stringify(conflictingOutputArgs),
+        },
+      );
+      const rawHttpBody = await rawHttpResponse.json().catch(() => null) as
+        | { code?: unknown; message?: unknown }
+        | null;
+      const rawHttpErrorCode = typeof rawHttpBody?.code === "string"
+        ? rawHttpBody.code
+        : null;
+      const rawHttpErrorMessage = typeof rawHttpBody?.message === "string"
+        ? rawHttpBody.message
+        : "";
+      console.error("PHASE1034_RAW_HTTP_REPLAY_RESULT", {
+        durationMs: Math.round(performance.now() - rawHttpStartedAt),
+        status: rawHttpResponse.status,
+        errorCode: rawHttpErrorCode,
+        expectedMessageObserved: rawHttpErrorMessage.includes(
+          "outbox_replay_step_state_mismatch",
+        ),
       });
+      assert(
+        !rawHttpResponse.ok &&
+          rawHttpErrorMessage.includes("outbox_replay_step_state_mismatch"),
+        "raw PostgREST HTTP replay must return the expected altered-output mismatch",
+      );
+
+      const conflictRpcStartedAt = performance.now();
+      const conflictingOutput = await admin.rpc(
+        "simula_complete_step_with_outbox_lease",
+        conflictingOutputArgs,
+      );
       console.error("PHASE1034_OUTPUT_REPLAY_DIAGNOSTIC", {
         elapsedSinceLeaseHeartbeatMs: Math.round(
           performance.now() - conflictLeaseHeartbeatAt,

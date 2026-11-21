@@ -20,6 +20,26 @@ fi
 
 sample_count=$duration_seconds
 for ((sample = 1; sample <= sample_count; sample++)); do
+  # Include idle sessions in pool accounting: the detailed activity sample
+  # below intentionally focuses on active/transactional/waiting backends.
+  psql -X -v ON_ERROR_STOP=1 -At -F '|' -c "
+    SELECT
+      'PHASE1034_POOL_SAMPLE',
+      to_char(clock_timestamp(), 'HH24:MI:SS.MS'),
+      count(*) FILTER (WHERE a.backend_type = 'client backend'),
+      count(*) FILTER (WHERE a.backend_type = 'client backend' AND a.state = 'active'),
+      count(*) FILTER (WHERE a.backend_type = 'client backend' AND a.state = 'idle'),
+      count(*) FILTER (WHERE a.backend_type = 'client backend' AND a.state = 'idle in transaction'),
+      count(*) FILTER (WHERE a.backend_type = 'client backend' AND cardinality(pg_blocking_pids(a.pid)) > 0),
+      current_setting('max_connections')
+    FROM pg_catalog.pg_stat_activity AS a
+    WHERE a.datname = current_database()
+      AND a.pid <> pg_backend_pid();
+  " || {
+    echo "PHASE1034_POOL_SAMPLE_ERROR: read-only connection-count query failed" >&2
+    exit 1
+  }
+
   psql -X -v ON_ERROR_STOP=1 -At -F '|' -c "
     SELECT
       'PHASE1034_LIVE_DB_SAMPLE',
