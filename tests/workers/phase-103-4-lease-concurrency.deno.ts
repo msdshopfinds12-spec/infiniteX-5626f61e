@@ -63,6 +63,33 @@ Deno.test({
       assert(!ownerFixture.error && ownerFixture.data !== null,
         "pre-seeded disposable owner fixture is missing or mismatched");
 
+      // The owner-scoped claim can also terminalize expired final-attempt runs.
+      // Prove this dedicated test owner has no eligible pre-existing work so
+      // neither concurrent claimant can consume another test's fixture.
+      const ownerQueueBefore = await admin.from("workflow_runs")
+        .select("id,owner_id,status,attempt,lease_token,lease_until", { count: "exact" })
+        .eq("owner_id", ownerId);
+      assert(!ownerQueueBefore.error && Array.isArray(ownerQueueBefore.data) &&
+        ownerQueueBefore.count === ownerQueueBefore.data.length,
+        "cannot establish complete owner-scoped queue isolation");
+      const now = Date.now();
+      const eligibleOwnerRuns = ownerQueueBefore.data.filter((row) => {
+        const attempt = Number(row.attempt);
+        const expired = typeof row.lease_until === "string" &&
+          Number.isFinite(Date.parse(row.lease_until)) && Date.parse(row.lease_until) <= now;
+        return (row.status === "queued" && attempt < 5) ||
+          (row.status === "running" && attempt < 5 && row.lease_token !== null && expired) ||
+          (row.status === "running" && attempt >= 5 && expired);
+      });
+      assert(eligibleOwnerRuns.length === 0,
+        "PHASE1034_BLOCKED: dedicated owner has pre-existing claimable or terminalizable runs");
+      const unrelatedOwnerRunsBefore = ownerQueueBefore.data
+        .map((row) => ({
+          id: row.id, owner_id: row.owner_id, status: row.status,
+          attempt: row.attempt, lease_token: row.lease_token, lease_until: row.lease_until,
+        }))
+        .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+
       const workflow = await admin.from("workflows").insert({
         id: workflowId, owner_id: ownerId, name: "phase-1034-concurrency",
         status: "draft", trigger_type: "manual",
@@ -193,6 +220,21 @@ Deno.test({
         finalRun.data.attempt === 2 && finalRun.data.lease_token === null &&
         finalRun.data.lease_until === null,
         "terminal state must preserve attempt 2 and clear active lease fields");
+
+      const unrelatedOwnerRunsAfter = await admin.from("workflow_runs")
+        .select("id,owner_id,status,attempt,lease_token,lease_until", { count: "exact" })
+        .eq("owner_id", ownerId).neq("id", runId);
+      assert(!unrelatedOwnerRunsAfter.error && Array.isArray(unrelatedOwnerRunsAfter.data) &&
+        unrelatedOwnerRunsAfter.count === unrelatedOwnerRunsAfter.data.length,
+        "cannot verify complete owner-scoped queue after concurrency test");
+      const unrelatedOwnerRunsSnapshotAfter = unrelatedOwnerRunsAfter.data
+        .map((row) => ({
+          id: row.id, owner_id: row.owner_id, status: row.status,
+          attempt: row.attempt, lease_token: row.lease_token, lease_until: row.lease_until,
+        }))
+        .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+      assert(JSON.stringify(unrelatedOwnerRunsSnapshotAfter) === JSON.stringify(unrelatedOwnerRunsBefore),
+        "concurrent owner-scoped claims changed an unrelated owner run");
 
       console.log("PHASE 103.4 CONCURRENCY AND STALE-GENERATION FENCING: PASS");
     } finally {
