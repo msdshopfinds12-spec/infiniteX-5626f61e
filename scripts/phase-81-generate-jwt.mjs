@@ -19,7 +19,7 @@ const userId = "81000000-0000-4000-8000-000000000001";
 const userBId = "81000000-0000-4000-8000-000000000002";
 const userToken = sign({ aud: "authenticated", role: "authenticated", sub: userId, iat: now, exp });
 const userBToken = sign({ aud: "authenticated", role: "authenticated", sub: userBId, iat: now, exp });
-const serviceToken = sign({ aud: "authenticated", role: "service_role", sub: userId, iat: now, exp });
+const serviceToken = sign({ aud: "authenticated", role: "service_role", iat: now, exp });
 await appendFile(output, [
   "PHASE81_USER_JWT=" + userToken,
   "PHASE81_USER_B_JWT=" + userBToken,

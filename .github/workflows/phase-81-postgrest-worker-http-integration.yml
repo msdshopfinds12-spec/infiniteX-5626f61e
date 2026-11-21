@@ -33,7 +33,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: infinitex-phase-81-postgrest-worker-http-${{ github.ref }}
+  # Each commit gets an isolated runner/database; do not let an older
+  # cancelled run's diagnostic cleanup block verification of the new head.
+  group: infinitex-phase-81-postgrest-worker-http-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -144,8 +146,8 @@ jobs:
       - name: Collect disposable service logs
         if: always()
         run: |
-          docker logs infinitex-phase81-postgrest 2>&1 | tail -n 160 || true
-          docker logs infinitex-phase81-postgres 2>&1 | tail -n 160 || true
+          timeout 20s docker logs infinitex-phase81-postgrest 2>&1 | tail -n 160 || true
+          timeout 20s docker logs infinitex-phase81-postgres 2>&1 | tail -n 160 || true
 
       - name: Remove disposable services
         if: always()

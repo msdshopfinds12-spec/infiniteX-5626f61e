@@ -65,11 +65,37 @@ test("completion helper accepts a valid RPC envelope and returns normalized iden
 });
 
 test("completion helper sanitizes malformed RPC envelopes", async () => {
-  for (const response of [undefined, null, {}, { data: null }, { data: [], error: null }]) {
+  for (const response of [undefined, null, {}, { data: null }]) {
     await assert.rejects(
       completeWorkflowStepWithOutbox(async () => response, validInput),
       (error) => error instanceof Error &&
-        ["step_run_finish_failed", "workflow_step_attempt_superseded"].includes(error.message),
+        error.message === "step_run_finish_failed",
     );
   }
+});
+
+test("completion helper rejects an empty RPC result array", async () => {
+  await assert.rejects(
+    completeWorkflowStepWithOutbox(
+      async () => ({ data: [], error: null }),
+      validInput,
+    ),
+    { message: "workflow_step_attempt_superseded" },
+  );
+});
+
+test("completion helper rejects multiple returned completion rows", async () => {
+  await assert.rejects(
+    completeWorkflowStepWithOutbox(
+      async () => ({
+        data: [
+          { step_run_id: "step-run-1" },
+          { step_run_id: "step-run-2" },
+        ],
+        error: null,
+      }),
+      validInput,
+    ),
+    { message: "workflow_step_attempt_superseded" },
+  );
 });

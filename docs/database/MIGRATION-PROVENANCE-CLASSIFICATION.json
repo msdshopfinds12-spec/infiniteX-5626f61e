@@ -32,6 +32,16 @@
       "sha256": "51f907f2be04339deb61cfb4bfe90b66ac66dc244b6b0a5361dd5c3a36d801b8",
       "reason": "Phase 87.1 candidate only. Rehearsal and integration are limited to disposable PostgreSQL CI; no live migration evidence or production approval.",
       "productionApproval": "NOT_GRANTED"
+    },
+    {
+      "version": "20261121000300",
+      "name": "fix_ambiguous_outbox_lease_expiry",
+      "path": "supabase/migrations/20261121000300_fix_ambiguous_outbox_lease_expiry.sql",
+      "classification": "PROPOSED_NOT_APPLIED",
+      "sourceStatus": "NOT_VERIFIED_LIVE",
+      "sha256": "8bab1def33302b3a0627e2b356d197e86adae5804d7af7640c61be2ca1791c56",
+      "reason": "Phase 87.4 forward-only correction for the PL/pgSQL OUT-parameter ambiguity in simula_claim_workflow_outbox(). Intended for disposable PostgreSQL CI rehearsal only; no live migration evidence or production approval.",
+      "productionApproval": "NOT_GRANTED"
     }
   ]
 }

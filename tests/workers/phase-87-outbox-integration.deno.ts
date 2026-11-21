@@ -15,8 +15,10 @@ const postgrestFetch: typeof fetch = (input, init) => {
   const target = new URL(source);
   if (target.pathname === "/rest/v1") target.pathname = "/";
   else if (target.pathname.startsWith("/rest/v1/")) target.pathname = target.pathname.slice("/rest/v1".length);
-  if (input instanceof Request) return fetch(new Request(target, input));
-  return fetch(target, init);
+  const timeoutSignal = AbortSignal.timeout(20_000);
+  const signal = init?.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+  if (input instanceof Request) return fetch(new Request(target, input), { signal });
+  return fetch(target, { ...init, signal });
 };
 
 Deno.test({
@@ -38,6 +40,7 @@ Deno.test({
     const runId = "81000000-3000-4000-8000-000000000005";
     const stepId = "81000000-2000-4000-8000-000000000001";
     const workflowId = "81000000-1000-4000-8000-000000000001";
+    console.log("Phase 87: inserting synthetic outbox workflow run");
     const { error: runInsertError } = await admin.from("workflow_runs").insert({
       id: runId,
       workflow_id: workflowId,
@@ -69,6 +72,7 @@ Deno.test({
       p_payload: { recipient_ref: "synthetic-user-a", template: "test-only" },
     };
 
+    console.log("Phase 87: creating transactional completion and outbox event");
     const { data: first, error: firstError } = await admin.rpc(
       "simula_complete_step_with_outbox",
       completionArgs,
@@ -78,6 +82,7 @@ Deno.test({
     const outboxId = first[0].outbox_id;
     assert(typeof outboxId === "string", "first completion must return a durable outbox ID");
 
+    console.log("Phase 87: verifying idempotent replay");
     const { data: replay, error: replayError } = await admin.rpc(
       "simula_complete_step_with_outbox",
       completionArgs,
@@ -92,6 +97,7 @@ Deno.test({
     assert(Boolean(conflictError), "same idempotency key with a different payload must be rejected");
 
     const claimArgs = { p_limit: 5 };
+    console.log("Phase 87: claiming outbox event concurrently");
     const [claimA, claimB] = await Promise.all([
       admin.rpc("simula_claim_workflow_outbox", claimArgs),
       admin.rpc("simula_claim_workflow_outbox", claimArgs),
@@ -115,6 +121,7 @@ Deno.test({
     assert(!failedFinishError && failedFinish?.[0]?.status === "pending",
       "transient delivery failure must return the event to pending with backoff");
 
+    console.log("Phase 87: retry backoff observed; waiting for next eligible claim");
     await new Promise((resolve) => setTimeout(resolve, 5500));
     const { data: secondClaims, error: secondClaimError } = await admin.rpc(
       "simula_claim_workflow_outbox",
@@ -135,6 +142,7 @@ Deno.test({
     });
     assert(Boolean(staleLeaseError), "stale outbox lease token must not complete a newer delivery attempt");
 
+    console.log("Phase 87: confirming stale lease rejection and current lease success");
     const { data: successfulFinish, error: successfulFinishError } = await admin.rpc(
       "simula_finish_workflow_outbox",
       {
@@ -154,5 +162,6 @@ Deno.test({
     assert(!finalReplayError && finalReplay?.[0]?.replayed === true
       && finalReplay[0].outbox_id === outboxId,
       "completion replay after delivery must return the same outbox event");
+    console.log("Phase 87: transactional outbox integration verified");
   },
 });
