@@ -39,7 +39,7 @@ Use the existing Phase 81 CI service topology and a separate Deno integration te
 3. Reusing the same idempotency key with a different payload is rejected by the SQL idempotency comparison.
 4. Two independent runs racing for one owner-scoped idempotency key produce exactly one winner under the unique constraint.
 5. The losing cross-run transaction leaves its step run in the original `running` state, demonstrating transaction rollback.
-6. Cleanup failures fail the test rather than being silently ignored.
+6. Cleanup uses `Promise.allSettled` so a rejected network request cannot prevent the other scoped cleanup operation from being attempted; returned errors and rejected promises both fail the test.
 
 The event-type, payload and cross-run conflict cases deliberately call the SQL RPC directly as adversarial database-contract tests. They are not valid application-generated event descriptors; the application TypeScript contract rejects noncanonical event types, keys and payload identities before the RPC boundary.
 
